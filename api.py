@@ -15,6 +15,18 @@ DB_URL = os.getenv("DATABASE_URL", "sqlite:///sensors.db")  # Cloud URL in produ
 engine = create_engine(DB_URL, echo=False)
 Session = sessionmaker(bind=engine)
 
+@app.route("/")
+def home():
+    return """
+    <h1>Sensor API is running</h1>
+    <p>Endpoints:</p>
+    <ul>
+        <li><a href="/api/readings">/api/readings</a> - All readings</li>
+        <li><a href="/api/latest">/api/latest</a> - Latest per sensor</li>
+        <li><a href="/api/db_status">/api/db_status</a> - DB status</li>
+    </ul>
+    """
+
 @app.route("/api/db_status")
 def db_status():
     try:
