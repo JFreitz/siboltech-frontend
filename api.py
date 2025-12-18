@@ -4,12 +4,16 @@ Simple Flask API to serve sensor data from cloud DB.
 Deploy on Railway, Vercel calls this for dashboard.
 """
 
+
 import os
 from flask import Flask, jsonify
+from flask_cors import CORS
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
+
 app = Flask(__name__)
+CORS(app)
 
 DB_URL = os.getenv("DATABASE_URL", "sqlite:///sensors.db")  # Cloud URL in production
 engine = create_engine(DB_URL, echo=False)
