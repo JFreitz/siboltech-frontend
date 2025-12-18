@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sensor Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2em; }
+    h1 { color: #2c3e50; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background: #f4f4f4; }
+    .timestamp { font-size: 0.9em; color: #888; }
+  </style>
+</head>
+<body>
+  <h1>Live Sensor Dashboard</h1>
+  <button onclick="fetchData()">Refresh</button>
+  <table id="sensor-table">
+    <thead>
+      <tr>
+        <th>Sensor</th>
+        <th>Value</th>
+        <th>Unit</th>
+        <th>Timestamp</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <script>
+    const API_URL = 'https://sensorcollector-production.up.railway.app/api/latest'; // Replace with your Railway API URL
+    async function fetchData() {
+      const res = await fetch(API_URL, { cache: 'no-store' });
+      const data = await res.json();
+      const tbody = document.querySelector('#sensor-table tbody');
+      tbody.innerHTML = '';
+      Object.entries(data).forEach(([sensor, info]) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${sensor}</td>
+          <td>${info.value}</td>
+          <td>${info.unit}</td>
+          <td class="timestamp">${info.timestamp}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+    fetchData();
+    setInterval(fetchData, 5000); // Auto-refresh every 5 seconds
+  </script>
+</body>
+</html>
