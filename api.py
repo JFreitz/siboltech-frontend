@@ -9,13 +9,15 @@ from flask import Flask, jsonify
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-@app.route("/")
-def home():
-    return {"message": "Sensor API is running", "endpoints": ["/api/readings", "/api/latest"]}
+app = Flask(__name__)
 
 DB_URL = os.getenv("DATABASE_URL", "sqlite:///sensors.db")  # Cloud URL in production
 engine = create_engine(DB_URL, echo=False)
 Session = sessionmaker(bind=engine)
+
+@app.route("/")
+def home():
+    return {"message": "Sensor API is running", "endpoints": ["/api/readings", "/api/latest"]}
 
 @app.route("/api/readings")
 def get_readings():
