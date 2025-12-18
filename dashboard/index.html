@@ -28,7 +28,7 @@
     <tbody></tbody>
   </table>
   <script>
-    const API_URL = 'https://YOUR-RAILWAY-APP.up.railway.app/api/latest'; // Replace with your Railway API URL
+    const API_URL = 'https://sensorcollector-production.up.railway.app/api/latest'; // Live Railway API URL
     async function fetchData() {
       const res = await fetch(API_URL, { cache: 'no-store' });
       const data = await res.json();
