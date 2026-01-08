@@ -8,3 +8,4 @@ python-dotenv
 flask
 sqlite-web
 gunicorn
+pyserial
