@@ -3,7 +3,7 @@
 
 ESP32 should print ONE JSON object per line, example:
 
-{"device":"esp32-1","ts":"2026-01-08T12:34:56Z","readings":{"temperature_c":24.12,"humidity":55.1,"pressure_hpa":1008.4}}
+{"device":"esp32-1","ts":"2026-01-08T12:34:56Z","readings":{"temperature_c":24.12,"humidity":55.1}}
 
 This script will:
 - parse each line as JSON
@@ -24,6 +24,8 @@ import glob
 import json
 import os
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from typing import Any
 
@@ -48,10 +50,35 @@ def _parse_ts(value: Any) -> datetime:
         if s.endswith("Z"):
             s = s[:-1] + "+00:00"
         try:
-            return datetime.fromisoformat(s)
+            dt = datetime.fromisoformat(s)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
         except Exception:
             return _utcnow()
     return _utcnow()
+
+
+def _http_post_json(url: str, token: str | None, payload: dict[str, Any], timeout_s: float = 10.0) -> dict:
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=body, method="POST")
+    req.add_header("Content-Type", "application/json")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+        return json.loads(raw or "{}")
+    except urllib.error.HTTPError as e:
+        detail = ""
+        try:
+            detail = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            pass
+        raise RuntimeError(f"HTTP {e.code}: {detail}".strip())
+    except Exception as e:
+        raise RuntimeError(str(e))
 
 
 def autodetect_port() -> str | None:
@@ -72,17 +99,21 @@ def readings_to_rows(payload: dict[str, Any]) -> list[SensorReading]:
         "device": device,
     }
 
+    # Default to only storing temperature/humidity.
+    # Override by setting ALLOWED_SENSORS="sensor1,sensor2" if you later add more.
+    allowed = os.getenv("ALLOWED_SENSORS", "temperature_c,humidity")
+    allowed_sensors = {s.strip() for s in allowed.split(",") if s.strip()}
+
     units = {
         "temperature_c": "C",
         "humidity": "%",
-        "pressure_hpa": "hPa",
-        "ph": "pH",
-        "tds_ppm": "ppm",
-        "do_mg_per_l": "mg/L",
     }
 
     rows: list[SensorReading] = []
     for sensor, value in readings.items():
+        sensor_name = str(sensor)
+        if allowed_sensors and sensor_name not in allowed_sensors:
+            continue
         try:
             v = float(value)
         except Exception:
@@ -91,9 +122,9 @@ def readings_to_rows(payload: dict[str, Any]) -> list[SensorReading]:
         rows.append(
             SensorReading(
                 timestamp=ts,
-                sensor=str(sensor),
+                sensor=sensor_name,
                 value=v,
-                unit=units.get(str(sensor)),
+                unit=units.get(sensor_name),
                 meta=meta_base,
             )
         )
@@ -120,10 +151,36 @@ def main() -> int:
     parser.add_argument("--port", default=os.getenv("ESP32_SERIAL_PORT"), help="e.g. /dev/ttyACM0")
     parser.add_argument("--baud", type=int, default=int(os.getenv("ESP32_BAUD", "115200")))
     parser.add_argument(
+        "--no-db",
+        action="store_true",
+        help="Don't write to the DB; just read/print serial lines (useful for smoke testing USB serial).",
+    )
+    parser.add_argument(
+        "--raw",
+        action="store_true",
+        help="Print every line received (including non-JSON).",
+    )
+    parser.add_argument(
         "--sync-every",
         type=int,
-        default=int(os.getenv("SYNC_EVERY_N_MESSAGES", "1")),
-        help="Sync to cloud after N messages (0 disables)",
+        default=int(os.getenv("SYNC_EVERY_N_MESSAGES", "0")),
+        help="(Legacy) Run sync.py after N messages (0 disables). Use CLOUD_INGEST_URL for real-time HTTP ingest.",
+    )
+    parser.add_argument(
+        "--cloud-url",
+        default=os.getenv("CLOUD_INGEST_URL", ""),
+        help="Railway ingest URL, e.g. https://<app>.up.railway.app/api/ingest (or set CLOUD_INGEST_URL)",
+    )
+    parser.add_argument(
+        "--ingest-token",
+        default=os.getenv("INGEST_TOKEN", ""),
+        help="Bearer token for /api/ingest (or set INGEST_TOKEN). Leave empty if your ingest is open.",
+    )
+    parser.add_argument(
+        "--cloud-timeout",
+        type=float,
+        default=float(os.getenv("CLOUD_INGEST_TIMEOUT_SECONDS", "10")),
+        help="HTTP timeout seconds for cloud ingest.",
     )
     args = parser.parse_args()
 
@@ -132,8 +189,14 @@ def main() -> int:
         print("No serial port found. Plug in ESP32 and try again.")
         return 2
 
-    init_db()
+    if not args.no_db:
+        init_db()
     print(f"Listening on {port} @ {args.baud} baud")
+
+    cloud_url = (args.cloud_url or "").strip()
+    ingest_token = (args.ingest_token or "").strip() or None
+    if cloud_url:
+        print(f"Cloud ingest enabled -> {cloud_url}")
 
     msg_count = 0
     while True:
@@ -145,6 +208,12 @@ def main() -> int:
                     if not line:
                         continue
 
+                    if args.raw:
+                        print(line)
+
+                    if args.no_db:
+                        continue
+
                     try:
                         payload = json.loads(line)
                     except json.JSONDecodeError:
@@ -154,6 +223,20 @@ def main() -> int:
                     rows = readings_to_rows(payload)
                     if not rows:
                         continue
+
+                    if cloud_url:
+                        # Send the raw ESP32 payload to the cloud API (real-time).
+                        # Ensure a timestamp exists for better ordering.
+                        if "ts" not in payload and "timestamp" not in payload:
+                            payload = dict(payload)
+                            payload["ts"] = _utcnow().isoformat().replace("+00:00", "Z")
+                        try:
+                            result = _http_post_json(cloud_url, ingest_token, payload, timeout_s=args.cloud_timeout)
+                            inserted = result.get("inserted")
+                            if inserted is not None:
+                                print(f"Cloud ingest ok (inserted={inserted})")
+                        except Exception as e:
+                            print(f"Cloud ingest failed (kept local backup): {e}")
 
                     session = get_session()
                     try:

@@ -67,6 +67,17 @@ python sync.py
 
 Run periodically (e.g., cron) to push local data to cloud.
 
+### If your Railway DB host is internal-only
+
+If your Postgres URL host ends with `.railway.internal`, it is only reachable from inside Railway.
+
+In that case, deploy the API to Railway and sync via HTTP ingest instead:
+
+- On Railway (API service): set `DATABASE_URL` (internal is fine) and `INGEST_TOKEN`.
+- On the Pi: set `CLOUD_INGEST_URL` to `https://<your-app>.up.railway.app/api/ingest` and the same `INGEST_TOKEN`.
+
+`sync.py` will automatically use HTTP ingest when `CLOUD_INGEST_URL` is set (or when `CLOUD_DATABASE_URL` is Railway-internal).
+
 ## Export for ML
 
 ```bash

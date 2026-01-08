@@ -25,3 +25,8 @@ sensors.db
 .env
 calibration.json
 sensor_data.csv
+
+# Local runtime artifacts
+.last_http_sync_ts
+logs/
+*.pid
