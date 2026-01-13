@@ -107,6 +107,15 @@ def readings_to_rows(payload: dict[str, Any]) -> list[SensorReading]:
             # Keep going; we can still store other sensors.
             pass
 
+    if "do_mg_l" not in computed_readings and "do_voltage_v" in computed_readings:
+        try:
+            from calibration import calibrate_do
+
+            v_do = float(computed_readings.get("do_voltage_v"))
+            computed_readings["do_mg_l"] = float(calibrate_do(v_do))
+        except Exception:
+            pass
+
     meta_base: dict[str, Any] = {
         "source": "esp32_usb",
         "device": device,
@@ -114,7 +123,7 @@ def readings_to_rows(payload: dict[str, Any]) -> list[SensorReading]:
 
     # Default sensors stored.
     # Override by setting ALLOWED_SENSORS="sensor1,sensor2".
-    allowed = os.getenv("ALLOWED_SENSORS", "temperature_c,humidity,tds_ppm,ph")
+    allowed = os.getenv("ALLOWED_SENSORS", "temperature_c,humidity,tds_ppm,ph,do_mg_l")
     allowed_sensors = {s.strip() for s in allowed.split(",") if s.strip()}
 
     units = {
@@ -122,6 +131,7 @@ def readings_to_rows(payload: dict[str, Any]) -> list[SensorReading]:
         "humidity": "%",
         "tds_ppm": "ppm",
         "ph": "pH",
+        "do_mg_l": "mg/L",
     }
 
     tds_voltage_v = None
@@ -137,6 +147,13 @@ def readings_to_rows(payload: dict[str, Any]) -> list[SensorReading]:
             ph_voltage_v = float(computed_readings.get("ph_voltage_v"))
     except Exception:
         ph_voltage_v = None
+
+    do_voltage_v = None
+    try:
+        if isinstance(computed_readings, dict) and "do_voltage_v" in computed_readings:
+            do_voltage_v = float(computed_readings.get("do_voltage_v"))
+    except Exception:
+        do_voltage_v = None
 
     rows: list[SensorReading] = []
     for sensor, value in computed_readings.items():
@@ -156,6 +173,10 @@ def readings_to_rows(payload: dict[str, Any]) -> list[SensorReading]:
         if sensor_name == "ph" and ph_voltage_v is not None:
             meta = dict(meta)
             meta["ph_voltage_v"] = ph_voltage_v
+
+        if sensor_name == "do_mg_l" and do_voltage_v is not None:
+            meta = dict(meta)
+            meta["do_voltage_v"] = do_voltage_v
 
         rows.append(
             SensorReading(
