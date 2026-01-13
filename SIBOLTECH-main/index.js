@@ -1308,7 +1308,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		toggleDeleteButtonsVisibility('#aeroponicsPlantsList');
 	}, 100);
 	
-	setInterval(()=>{ drawMini('mini1'); drawMini('mini2'); drawMini('mini3'); updateSensorsAndActuators(); }, 5000);
+	// Real-time updates every 1 second
+	setInterval(()=>{ drawMini('mini1'); drawMini('mini2'); drawMini('mini3'); updateSensorsAndActuators(); }, 1000);
 	
 	// Handle window resize for responsive canvas
 	let resizeTimeout;
