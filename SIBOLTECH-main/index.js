@@ -2803,8 +2803,14 @@ initThemeToggle();
 // ==================== RELAY CONTROL ====================
 const RELAY_API_URL = 'https://sensorcollector-production.up.railway.app/api';
 
+// Track if we're currently toggling to prevent polling conflicts
+let isToggling = false;
+
 // Fetch and sync relay states from server
 async function fetchRelayStates() {
+    // Don't fetch while toggling to prevent state conflicts
+    if (isToggling) return;
+    
     try {
         const response = await fetch(`${RELAY_API_URL}/relay/status`);
         if (!response.ok) throw new Error('Failed to fetch relay status');
@@ -2812,7 +2818,7 @@ async function fetchRelayStates() {
         
         data.relays.forEach(relay => {
             const checkbox = document.getElementById(`relay-${relay.id}`);
-            if (checkbox) {
+            if (checkbox && !checkbox.disabled) {
                 checkbox.checked = relay.state;
             }
         });
@@ -2825,6 +2831,7 @@ async function fetchRelayStates() {
 async function toggleRelay(relayId, turnOn) {
     const checkbox = document.getElementById(`relay-${relayId}`);
     if (checkbox) checkbox.disabled = true;
+    isToggling = true;
     
     try {
         const action = turnOn ? 'on' : 'off';
@@ -2836,28 +2843,34 @@ async function toggleRelay(relayId, turnOn) {
         const data = await response.json();
         console.log(`Relay ${relayId} -> ${action}`, data);
         
+        // Update checkbox to match server response
+        if (checkbox) checkbox.checked = data.state;
+        
     } catch (error) {
         console.error(`Failed to toggle relay ${relayId}:`, error);
         // Revert checkbox on error
         if (checkbox) checkbox.checked = !turnOn;
     } finally {
         if (checkbox) checkbox.disabled = false;
+        // Small delay before allowing polling again
+        setTimeout(() => { isToggling = false; }, 500);
     }
 }
 
 // Initialize relay controls
 function initRelayControls() {
-    // Add event listeners to all relay checkboxes
+    // Set all checkboxes to OFF initially (visual default)
     for (let i = 1; i <= 8; i++) {
         const checkbox = document.getElementById(`relay-${i}`);
         if (checkbox) {
+            checkbox.checked = false; // Default to OFF
             checkbox.addEventListener('change', (e) => {
                 toggleRelay(i, e.target.checked);
             });
         }
     }
     
-    // Fetch initial relay states
+    // Fetch actual relay states from server
     fetchRelayStates();
     
     // Poll relay states every 2 seconds to stay in sync
