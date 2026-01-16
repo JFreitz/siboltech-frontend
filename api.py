@@ -8,6 +8,8 @@ This module avoids Postgres-specific SQL so it can run on both.
 """
 
 import os
+import json
+import ssl
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -15,6 +17,8 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+
+import paho.mqtt.publish as mqtt_publish
 
 from db import Base, SensorReading
 
@@ -33,6 +37,32 @@ Base.metadata.create_all(bind=engine)
 
 
 DISPLAY_TZ = ZoneInfo(os.getenv("DISPLAY_TIMEZONE", "Asia/Manila"))
+
+# ==================== MQTT Configuration ====================
+# HiveMQ Cloud (free tier) - Set these as environment variables in Railway
+MQTT_BROKER = os.getenv("MQTT_BROKER", "YOUR_CLUSTER.s1.eu.hivemq.cloud")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "8883"))
+MQTT_USER = os.getenv("MQTT_USER", "YOUR_MQTT_USERNAME")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "YOUR_MQTT_PASSWORD")
+MQTT_TOPIC_CMD = "siboltech/relay/cmd"
+
+
+def _publish_mqtt(payload: dict):
+    """Publish a message to MQTT broker."""
+    try:
+        mqtt_publish.single(
+            topic=MQTT_TOPIC_CMD,
+            payload=json.dumps(payload),
+            hostname=MQTT_BROKER,
+            port=MQTT_PORT,
+            auth={"username": MQTT_USER, "password": MQTT_PASSWORD},
+            tls={"tls_version": ssl.PROTOCOL_TLS},
+            qos=1
+        )
+        return True
+    except Exception as e:
+        print(f"MQTT publish error: {e}")
+        return False
 
 
 def _utcnow() -> datetime:
@@ -360,11 +390,16 @@ def relay_on(relay_id):
     
     RELAY_STATES[relay_id] = True
     _save_relay_state(relay_id, True)
+    
+    # Publish to MQTT for instant ESP32 response
+    mqtt_sent = _publish_mqtt({"relay": relay_id, "state": "ON"})
+    
     return jsonify({
         "success": True,
         "relay": relay_id,
         "label": RELAY_LABELS.get(relay_id),
-        "state": True
+        "state": True,
+        "mqtt_sent": mqtt_sent
     })
 
 
@@ -376,11 +411,16 @@ def relay_off(relay_id):
     
     RELAY_STATES[relay_id] = False
     _save_relay_state(relay_id, False)
+    
+    # Publish to MQTT for instant ESP32 response
+    mqtt_sent = _publish_mqtt({"relay": relay_id, "state": "OFF"})
+    
     return jsonify({
         "success": True,
         "relay": relay_id,
         "label": RELAY_LABELS.get(relay_id),
-        "state": False
+        "state": False,
+        "mqtt_sent": mqtt_sent
     })
 
 
@@ -390,7 +430,11 @@ def relay_all_on():
     for i in range(1, 9):
         RELAY_STATES[i] = True
         _save_relay_state(i, True)
-    return jsonify({"success": True, "message": "All relays ON"})
+    
+    # Publish to MQTT
+    mqtt_sent = _publish_mqtt({"relay": "all", "state": "ON"})
+    
+    return jsonify({"success": True, "message": "All relays ON", "mqtt_sent": mqtt_sent})
 
 
 @app.route("/api/relay/all/off", methods=["POST"])
@@ -399,7 +443,11 @@ def relay_all_off():
     for i in range(1, 9):
         RELAY_STATES[i] = False
         _save_relay_state(i, False)
-    return jsonify({"success": True, "message": "All relays OFF"})
+    
+    # Publish to MQTT
+    mqtt_sent = _publish_mqtt({"relay": "all", "state": "OFF"})
+    
+    return jsonify({"success": True, "message": "All relays OFF", "mqtt_sent": mqtt_sent})
 
 
 def _save_relay_state(relay_id, state):

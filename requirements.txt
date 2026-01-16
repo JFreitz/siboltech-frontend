@@ -9,3 +9,4 @@ flask
 sqlite-web
 gunicorn
 pyserial
+paho-mqtt
