@@ -2801,8 +2801,8 @@ function updateThemeIcon(theme) {
 initThemeToggle();
 
 // ==================== ACTUATOR CONTROL ====================
-// Relay API URL - Change this to your Raspberry Pi's IP if accessing from another device
-const RELAY_API_URL = 'http://localhost:5001';
+// Cloud API URL - Railway hosted backend
+const RELAY_API_URL = 'https://sensorcollector-production.up.railway.app/api';
 
 // Relay mapping: actuator ID -> relay number
 const ACTUATOR_RELAY_MAP = {
