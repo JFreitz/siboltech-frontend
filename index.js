@@ -2800,3 +2800,186 @@ function updateThemeIcon(theme) {
 // Initialize theme toggle on page load
 initThemeToggle();
 
+// ==================== ACTUATOR CONTROL ====================
+// Relay API URL - Change this to your Raspberry Pi's IP if accessing from another device
+const RELAY_API_URL = 'http://localhost:5001';
+
+// Relay mapping: actuator ID -> relay number
+const ACTUATOR_RELAY_MAP = {
+	'act-water': 1,      // Misting Pump -> Relay 1
+	'act-air': 2,        // Air Pump -> Relay 2
+	'act-fan-in': 3,     // Exhaust Fan (In) -> Relay 3
+	'act-fan-out': 4,    // Exhaust Fan (Out) -> Relay 4
+	'act-lights-aerponics': 5,  // Grow Lights (Aeroponics) -> Relay 5
+	'act-lights-dwc': 6  // Grow Lights (DWC) -> Relay 6
+};
+
+// Nutrient button mapping
+const NUTRIENT_RELAY_MAP = {
+	'btn-ph-up': 7,      // pH Up -> Relay 7
+	'btn-ph-down': 8,    // pH Down -> Relay 8
+	'btn-leafy-green': 1 // Leafy Green uses same as misting (or change as needed)
+};
+
+// Track relay connection status
+let relayApiConnected = false;
+
+// Initialize actuator controls
+function initActuatorControls() {
+	// Add click handlers to actuator cards
+	document.querySelectorAll('.actuators .act').forEach(act => {
+		act.style.cursor = 'pointer';
+		act.addEventListener('click', () => {
+			const stateEl = act.querySelector('.state');
+			if (!stateEl) return;
+			
+			const actuatorId = stateEl.id;
+			const relayNum = ACTUATOR_RELAY_MAP[actuatorId];
+			if (!relayNum) return;
+			
+			const currentState = stateEl.classList.contains('on');
+			toggleRelay(relayNum, !currentState, stateEl);
+		});
+	});
+	
+	// Add click handlers to nutrient buttons
+	document.querySelectorAll('.nutrient-btn').forEach(btn => {
+		btn.addEventListener('click', () => {
+			const btnId = btn.id;
+			const relayNum = NUTRIENT_RELAY_MAP[btnId];
+			if (!relayNum) return;
+			
+			// Pulse the nutrient for 2 seconds
+			pulseRelay(relayNum, btn);
+		});
+	});
+	
+	// Fetch initial relay status
+	fetchRelayStatus();
+	
+	// Auto-refresh relay status every 10 seconds
+	setInterval(fetchRelayStatus, 10000);
+}
+
+// Toggle a relay on/off
+async function toggleRelay(relayNum, newState, stateEl) {
+	const action = newState ? 'on' : 'off';
+	
+	try {
+		const response = await fetch(`${RELAY_API_URL}/relay/${relayNum}/${action}`, {
+			method: 'POST'
+		});
+		const data = await response.json();
+		
+		if (data.success) {
+			updateActuatorUI(stateEl, newState);
+			relayApiConnected = true;
+		} else {
+			console.error('Relay toggle failed:', data.error);
+			showActuatorNotification('Failed to control actuator', 'error');
+		}
+	} catch (error) {
+		console.error('Relay API error:', error);
+		relayApiConnected = false;
+		showActuatorNotification('Relay API not connected. Run relay_api.py', 'error');
+	}
+}
+
+// Pulse a relay (on for duration, then off) - for nutrient dosing
+async function pulseRelay(relayNum, btnEl) {
+	if (btnEl.classList.contains('is-dosing')) return; // Already dosing
+	
+	btnEl.classList.add('is-dosing');
+	
+	try {
+		// Turn ON
+		await fetch(`${RELAY_API_URL}/relay/${relayNum}/on`, { method: 'POST' });
+		
+		// Wait 2 seconds
+		await new Promise(resolve => setTimeout(resolve, 2000));
+		
+		// Turn OFF
+		await fetch(`${RELAY_API_URL}/relay/${relayNum}/off`, { method: 'POST' });
+		
+		relayApiConnected = true;
+	} catch (error) {
+		console.error('Nutrient pulse error:', error);
+		relayApiConnected = false;
+		showActuatorNotification('Relay API not connected', 'error');
+	}
+	
+	btnEl.classList.remove('is-dosing');
+}
+
+// Fetch and update all relay statuses
+async function fetchRelayStatus() {
+	try {
+		const response = await fetch(`${RELAY_API_URL}/relay/status`);
+		const data = await response.json();
+		
+		if (data.relays) {
+			relayApiConnected = true;
+			
+			// Update each actuator's UI based on relay state
+			data.relays.forEach(relay => {
+				// Find actuator with this relay number
+				for (const [actId, relayNum] of Object.entries(ACTUATOR_RELAY_MAP)) {
+					if (relayNum === relay.id) {
+						const stateEl = document.getElementById(actId);
+						if (stateEl) {
+							updateActuatorUI(stateEl, relay.state);
+						}
+					}
+				}
+			});
+		}
+	} catch (error) {
+		relayApiConnected = false;
+		// Silently fail - don't spam console
+	}
+}
+
+// Update actuator UI element
+function updateActuatorUI(stateEl, isOn) {
+	if (isOn) {
+		stateEl.textContent = 'ON';
+		stateEl.classList.add('on');
+		stateEl.classList.remove('off');
+	} else {
+		stateEl.textContent = 'OFF';
+		stateEl.classList.remove('on');
+		stateEl.classList.add('off');
+	}
+}
+
+// Show notification for actuator actions
+function showActuatorNotification(message, type) {
+	const container = document.getElementById('notificationContainer');
+	if (!container) return;
+	
+	const notification = document.createElement('div');
+	notification.className = `notification ${type === 'error' ? 'dangerous' : 'neutral'}`;
+	notification.innerHTML = `
+		<div class="notification-icon">${type === 'error' ? '⚠️' : '✅'}</div>
+		<div class="notification-content">
+			<div class="notification-title">${type === 'error' ? 'Actuator Error' : 'Actuator'}</div>
+			<div class="notification-message">${message}</div>
+		</div>
+	`;
+	
+	container.appendChild(notification);
+	
+	// Trigger animation
+	setTimeout(() => notification.classList.add('show'), 10);
+	
+	// Remove after 3 seconds
+	setTimeout(() => {
+		notification.classList.remove('show');
+		setTimeout(() => notification.remove(), 300);
+	}, 3000);
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', initActuatorControls);
+
+
