@@ -2800,3 +2800,73 @@ function updateThemeIcon(theme) {
 // Initialize theme toggle on page load
 initThemeToggle();
 
+// ==================== RELAY CONTROL ====================
+const RELAY_API_URL = 'https://sensorcollector-production.up.railway.app/api';
+
+// Fetch and sync relay states from server
+async function fetchRelayStates() {
+    try {
+        const response = await fetch(`${RELAY_API_URL}/relay/status`);
+        if (!response.ok) throw new Error('Failed to fetch relay status');
+        const data = await response.json();
+        
+        data.relays.forEach(relay => {
+            const checkbox = document.getElementById(`relay-${relay.id}`);
+            if (checkbox) {
+                checkbox.checked = relay.state;
+            }
+        });
+    } catch (error) {
+        console.error('Failed to fetch relay states:', error);
+    }
+}
+
+// Toggle a relay on/off
+async function toggleRelay(relayId, turnOn) {
+    const checkbox = document.getElementById(`relay-${relayId}`);
+    if (checkbox) checkbox.disabled = true;
+    
+    try {
+        const action = turnOn ? 'on' : 'off';
+        const response = await fetch(`${RELAY_API_URL}/relay/${relayId}/${action}`, {
+            method: 'POST'
+        });
+        
+        if (!response.ok) throw new Error('Failed to toggle relay');
+        const data = await response.json();
+        console.log(`Relay ${relayId} -> ${action}`, data);
+        
+    } catch (error) {
+        console.error(`Failed to toggle relay ${relayId}:`, error);
+        // Revert checkbox on error
+        if (checkbox) checkbox.checked = !turnOn;
+    } finally {
+        if (checkbox) checkbox.disabled = false;
+    }
+}
+
+// Initialize relay controls
+function initRelayControls() {
+    // Add event listeners to all relay checkboxes
+    for (let i = 1; i <= 8; i++) {
+        const checkbox = document.getElementById(`relay-${i}`);
+        if (checkbox) {
+            checkbox.addEventListener('change', (e) => {
+                toggleRelay(i, e.target.checked);
+            });
+        }
+    }
+    
+    // Fetch initial relay states
+    fetchRelayStates();
+    
+    // Poll relay states every 2 seconds to stay in sync
+    setInterval(fetchRelayStates, 2000);
+}
+
+// Initialize relay controls when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initRelayControls);
+} else {
+    initRelayControls();
+}
