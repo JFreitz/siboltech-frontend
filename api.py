@@ -296,6 +296,128 @@ def get_latest():
         data[sensor] = {"value": r[1], "unit": r[2], "timestamp": _format_ts_for_display(r[3])}
     return jsonify(data)
 
+
+# ==================== RELAY CONTROL ====================
+# In-memory relay states (persisted in DB for reliability)
+RELAY_STATES = {i: False for i in range(1, 9)}
+RELAY_LABELS = {
+    1: "Misting Pump",
+    2: "Air Pump",
+    3: "Exhaust Fan (In)",
+    4: "Exhaust Fan (Out)",
+    5: "Grow Lights (Aeroponics)",
+    6: "Grow Lights (DWC)",
+    7: "pH Up",
+    8: "pH Down"
+}
+
+
+def _init_relay_states():
+    """Load relay states from DB on startup."""
+    global RELAY_STATES
+    try:
+        with Session() as session:
+            for i in range(1, 9):
+                row = session.execute(
+                    text("SELECT value FROM sensor_readings WHERE sensor = :s ORDER BY timestamp DESC LIMIT 1"),
+                    {"s": f"relay_{i}"}
+                ).first()
+                if row:
+                    RELAY_STATES[i] = row[0] == 1.0
+    except Exception:
+        pass
+
+
+# Initialize on startup
+_init_relay_states()
+
+
+@app.route("/api/relay/status")
+def relay_status():
+    """Get status of all relays."""
+    return jsonify({
+        "success": True,
+        "relays": [
+            {"id": i, "label": RELAY_LABELS.get(i, f"Relay {i}"), "state": RELAY_STATES[i]}
+            for i in range(1, 9)
+        ]
+    })
+
+
+@app.route("/api/relay/pending")
+def relay_pending():
+    """ESP32 polls this to get relay states to apply."""
+    # Return compact format for ESP32
+    states = "".join(["1" if RELAY_STATES[i] else "0" for i in range(1, 9)])
+    return jsonify({"states": states})
+
+
+@app.route("/api/relay/<int:relay_id>/on", methods=["POST"])
+def relay_on(relay_id):
+    """Turn relay ON."""
+    if relay_id < 1 or relay_id > 8:
+        return jsonify({"success": False, "error": "Invalid relay ID"}), 400
+    
+    RELAY_STATES[relay_id] = True
+    _save_relay_state(relay_id, True)
+    return jsonify({
+        "success": True,
+        "relay": relay_id,
+        "label": RELAY_LABELS.get(relay_id),
+        "state": True
+    })
+
+
+@app.route("/api/relay/<int:relay_id>/off", methods=["POST"])
+def relay_off(relay_id):
+    """Turn relay OFF."""
+    if relay_id < 1 or relay_id > 8:
+        return jsonify({"success": False, "error": "Invalid relay ID"}), 400
+    
+    RELAY_STATES[relay_id] = False
+    _save_relay_state(relay_id, False)
+    return jsonify({
+        "success": True,
+        "relay": relay_id,
+        "label": RELAY_LABELS.get(relay_id),
+        "state": False
+    })
+
+
+@app.route("/api/relay/all/on", methods=["POST"])
+def relay_all_on():
+    """Turn all relays ON."""
+    for i in range(1, 9):
+        RELAY_STATES[i] = True
+        _save_relay_state(i, True)
+    return jsonify({"success": True, "message": "All relays ON"})
+
+
+@app.route("/api/relay/all/off", methods=["POST"])
+def relay_all_off():
+    """Turn all relays OFF."""
+    for i in range(1, 9):
+        RELAY_STATES[i] = False
+        _save_relay_state(i, False)
+    return jsonify({"success": True, "message": "All relays OFF"})
+
+
+def _save_relay_state(relay_id, state):
+    """Save relay state to DB for persistence."""
+    try:
+        with Session() as session:
+            session.add(SensorReading(
+                timestamp=_utcnow(),
+                sensor=f"relay_{relay_id}",
+                value=1.0 if state else 0.0,
+                unit="state",
+                meta={"label": RELAY_LABELS.get(relay_id)}
+            ))
+            session.commit()
+    except Exception:
+        pass
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
