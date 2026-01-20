@@ -18,15 +18,21 @@ SERIAL_PORT = "/dev/ttyUSB0"
 BAUD_RATE = 115200
 
 def send_command(ser, cmd):
-    """Send a command and print the response."""
+    """Send a command and print the response with minimal latency."""
     ser.write((cmd + "\n").encode())
-    time.sleep(0.1)
+    ser.flush()  # Flush immediately to ensure transmission
+    time.sleep(0.01)  # Reduced from 0.1s to 0.01s
     
-    # Read response
-    while ser.in_waiting:
-        line = ser.readline().decode('utf-8', errors='ignore').strip()
-        if line:
-            print(line)
+    # Read response with timeout
+    start = time.time()
+    while (time.time() - start) < 0.5:  # Total read timeout: 500ms
+        if ser.in_waiting:
+            line = ser.readline().decode('utf-8', errors='ignore').strip()
+            if line:
+                print(line)
+                start = time.time()  # Reset timeout on each successful read
+        else:
+            time.sleep(0.001)  # Small sleep to avoid busy-waiting
 
 def main():
     try:
