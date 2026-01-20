@@ -1,9 +1,0 @@
-{
-  "outputDirectory": "dashboard",
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ]
-}
