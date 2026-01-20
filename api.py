@@ -24,7 +24,8 @@ from db import Base, SensorReading
 
 
 app = Flask(__name__)
-CORS(app)
+# Enable CORS for all origins (allows Vercel frontend to access)
+CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}})
 
 _DEFAULT_SQLITE_PATH = os.path.join(os.path.dirname(__file__), "sensors.db")
 DB_URL = os.getenv("DATABASE_URL", f"sqlite:///{_DEFAULT_SQLITE_PATH}")
@@ -39,11 +40,11 @@ Base.metadata.create_all(bind=engine)
 DISPLAY_TZ = ZoneInfo(os.getenv("DISPLAY_TIMEZONE", "Asia/Manila"))
 
 # ==================== MQTT Configuration ====================
-# HiveMQ Cloud (free tier) - Set these as environment variables in Railway
-MQTT_BROKER = os.getenv("MQTT_BROKER", "YOUR_CLUSTER.s1.eu.hivemq.cloud")
-MQTT_PORT = int(os.getenv("MQTT_PORT", "8883"))
-MQTT_USER = os.getenv("MQTT_USER", "YOUR_MQTT_USERNAME")
-MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "YOUR_MQTT_PASSWORD")
+# HiveMQ Cloud (free tier) credentials
+MQTT_BROKER = "f6647fc9076e4ccc9e403c3ae7633c0b.s1.eu.hivemq.cloud"
+MQTT_PORT = 8883
+MQTT_USER = "username"
+MQTT_PASSWORD = "Password123"
 MQTT_TOPIC_CMD = "siboltech/relay/cmd"
 
 
@@ -360,6 +361,11 @@ def _init_relay_states():
 
 # Initialize on startup
 _init_relay_states()
+
+# Alias endpoint for relay status (for frontend compatibility)
+@app.route("/api/relays")
+def relays_alias():
+    return relay_status()
 
 
 @app.route("/api/relay/status")
