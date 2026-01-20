@@ -3439,9 +3439,9 @@ async function loadRelayStatus() {
 			const data = await response.json();
 			if (data.relays) {
 				data.relays.forEach(relay => {
-					const btn = document.querySelector(`[data-relay-id="${relay.id}"]`);
-					const stateEl = btn?.querySelector('.relay-state');
-					if (btn && stateEl) {
+					const card = document.querySelector(`[data-relay-id="${relay.id}"]`);
+					const stateEl = card?.querySelector('.relay-state');
+					if (card && stateEl) {
 						stateEl.classList.remove('state-off', 'state-on');
 						stateEl.classList.add(relay.state ? 'state-on' : 'state-off');
 						stateEl.textContent = relay.state ? 'ON' : 'OFF';
@@ -3456,14 +3456,17 @@ async function loadRelayStatus() {
 
 // Setup relay button listeners when page loads
 function setupRelayButtons() {
-	const relayButtons = document.querySelectorAll('[data-relay-id]');
-	relayButtons.forEach(btn => {
-		btn.addEventListener('click', () => {
-			const relayNum = parseInt(btn.dataset.relayId);
-			const stateEl = btn.querySelector('.relay-state');
-			const currentState = stateEl?.textContent === 'ON';
-			toggleRelay(relayNum, !currentState, stateEl);
-		});
+	const relayCards = document.querySelectorAll('[data-relay-id]');
+	relayCards.forEach(card => {
+		const btn = card.querySelector('.relay-toggle-btn');
+		if (btn) {
+			btn.addEventListener('click', () => {
+				const relayNum = parseInt(card.dataset.relayId);
+				const stateEl = card.querySelector('.relay-state');
+				const currentState = stateEl?.textContent === 'ON';
+				toggleRelay(relayNum, !currentState, stateEl);
+			});
+		}
 	});
 }
 

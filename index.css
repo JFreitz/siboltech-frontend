@@ -4910,3 +4910,116 @@ body.sidebar-collapsed .brand{
 	font-weight: 700;
 	color: #35530a;
 }
+
+/* ==================== RELAY CONTROL STYLES ==================== */
+#manual.tab-content {
+	padding: 20px;
+}
+
+.manual-header {
+	margin-bottom: 32px;
+	padding: 20px;
+	background: linear-gradient(135deg, #5fa63a, #3b7a2a);
+	border-radius: 12px;
+	color: white;
+}
+
+.manual-header h2 {
+	margin: 0 0 8px 0;
+	font-size: 28px;
+	font-weight: 700;
+}
+
+.manual-header p {
+	margin: 0;
+	font-size: 14px;
+	opacity: 0.9;
+}
+
+.relay-control-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	gap: 16px;
+	margin-top: 20px;
+}
+
+.relay-card {
+	background: white;
+	border: 2px solid #e8ecf4;
+	border-radius: 12px;
+	overflow: hidden;
+	transition: all 0.3s ease;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.relay-card:hover {
+	border-color: #5fa63a;
+	box-shadow: 0 4px 16px rgba(95, 166, 58, 0.15);
+	transform: translateY(-2px);
+}
+
+.relay-header {
+	background: linear-gradient(135deg, #f0f4f8, #e8ecf4);
+	padding: 12px 16px;
+	border-bottom: 2px solid #e8ecf4;
+}
+
+.relay-header h3 {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 600;
+	color: #35530a;
+}
+
+.relay-body {
+	padding: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	align-items: center;
+}
+
+.relay-state {
+	font-size: 18px;
+	font-weight: 700;
+	padding: 12px 16px;
+	border-radius: 8px;
+	text-align: center;
+	width: 100%;
+	transition: all 0.3s ease;
+	font-family: 'Poppins', sans-serif;
+}
+
+.relay-state.state-off {
+	background: #fee;
+	color: #c33;
+}
+
+.relay-state.state-on {
+	background: #efe;
+	color: #3a7;
+}
+
+.relay-toggle-btn {
+	background: linear-gradient(180deg, #5fa63a, #3b7a2a);
+	color: white;
+	border: none;
+	padding: 10px 20px;
+	border-radius: 8px;
+	font-weight: 600;
+	font-size: 14px;
+	cursor: pointer;
+	transition: all 0.3s ease;
+	box-shadow: 0 2px 8px rgba(59, 122, 42, 0.2);
+	width: 100%;
+}
+
+.relay-toggle-btn:hover {
+	background: linear-gradient(180deg, #6fb54a, #2b6a1a);
+	box-shadow: 0 4px 12px rgba(59, 122, 42, 0.3);
+	transform: translateY(-1px);
+}
+
+.relay-toggle-btn:active {
+	transform: translateY(0);
+}
