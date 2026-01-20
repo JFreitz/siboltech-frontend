@@ -3407,7 +3407,69 @@ function populateRandomVoltages() {
 	});
 }
 
+// ==================== RELAY CONTROL ====================
+const RELAY_API_URL = 'https://sys-disabled-jobs-plug.trycloudflare.com/api';
+
+async function toggleRelay(relayNum, newState, stateEl) {
+	try {
+		const action = newState ? 'on' : 'off';
+		const response = await fetch(`${RELAY_API_URL}/relay/${relayNum}/${action}`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' }
+		});
+		
+		if (response.ok) {
+			if (stateEl) {
+				stateEl.classList.remove('state-off', 'state-on');
+				stateEl.classList.add(newState ? 'state-on' : 'state-off');
+				stateEl.textContent = newState ? 'ON' : 'OFF';
+			}
+		} else {
+			console.error(`Failed to toggle relay ${relayNum}`);
+		}
+	} catch (error) {
+		console.error(`Error toggling relay ${relayNum}:`, error);
+	}
+}
+
+async function loadRelayStatus() {
+	try {
+		const response = await fetch(`${RELAY_API_URL}/relay/status`);
+		if (response.ok) {
+			const data = await response.json();
+			if (data.relays) {
+				data.relays.forEach(relay => {
+					const btn = document.querySelector(`[data-relay-id="${relay.id}"]`);
+					const stateEl = btn?.querySelector('.relay-state');
+					if (btn && stateEl) {
+						stateEl.classList.remove('state-off', 'state-on');
+						stateEl.classList.add(relay.state ? 'state-on' : 'state-off');
+						stateEl.textContent = relay.state ? 'ON' : 'OFF';
+					}
+				});
+			}
+		}
+	} catch (error) {
+		console.error('Error loading relay status:', error);
+	}
+}
+
+// Setup relay button listeners when page loads
+function setupRelayButtons() {
+	const relayButtons = document.querySelectorAll('[data-relay-id]');
+	relayButtons.forEach(btn => {
+		btn.addEventListener('click', () => {
+			const relayNum = parseInt(btn.dataset.relayId);
+			const stateEl = btn.querySelector('.relay-state');
+			const currentState = stateEl?.textContent === 'ON';
+			toggleRelay(relayNum, !currentState, stateEl);
+		});
+	});
+}
+
 document.addEventListener('DOMContentLoaded', () => {
 	populateRandomVoltages();
+	loadRelayStatus();
+	setupRelayButtons();
 });
 
