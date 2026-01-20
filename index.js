@@ -3408,7 +3408,7 @@ function populateRandomVoltages() {
 }
 
 // ==================== RELAY CONTROL ====================
-const RELAY_API_URL = 'https://sys-disabled-jobs-plug.trycloudflare.com/api';
+const RELAY_API_URL = 'https://rubber-mhz-boring-same.trycloudflare.com/api';
 
 async function toggleRelay(relayNum, newState, stateEl) {
 	try {

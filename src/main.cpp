@@ -20,7 +20,7 @@ static const char* WIFI_PASSWORD = "qwertyuiop";
 
 // --- Cloud API Configuration (for sensor data upload) ---
 // Using Cloudflare Tunnel to self-hosted RPi API (free forever!)
-static const char* API_BASE_URL = "https://ohio-roll-scholar-table.trycloudflare.com";
+static const char* API_BASE_URL = "https://rubber-mhz-boring-same.trycloudflare.com";
 static const char* API_KEY = "espkey123";
 static uint32_t last_sensor_upload_ms = 0;
 static const uint32_t SENSOR_UPLOAD_INTERVAL = 15000;
