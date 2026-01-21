@@ -3690,7 +3690,7 @@ function populateRandomVoltages() {
 }
 
 // ==================== RELAY CONTROL ====================
-const RELAY_API_URL = 'https://glance-burke-oven-jackie.trycloudflare.com/api';
+const RELAY_API_URL = 'https://cheese-ericsson-respected-colleges.trycloudflare.com/api';
 
 // Mapping between dashboard actuator IDs and relay numbers
 const ACTUATOR_TO_RELAY = {
