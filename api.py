@@ -336,6 +336,10 @@ def get_history():
     - interval: 'daily' or '15min' (default: 'daily')
     - days: number of days to look back (default: 7)
     - limit: max records to return (default: 100)
+    
+    Both intervals return AVERAGED data:
+    - daily: average per day
+    - 15min: average per 15-minute bucket
     """
     interval = request.args.get('interval', 'daily').lower()
     days = int(request.args.get('days', 7))
@@ -345,7 +349,7 @@ def get_history():
     
     with Session() as session:
         if interval == '15min':
-            # Get all readings in the time range, ordered by timestamp
+            # Get all readings in the time range for 15-min bucketing
             rows = session.execute(
                 text(
                     """
@@ -354,10 +358,9 @@ def get_history():
                     WHERE sensor IN ('temperature_c', 'humidity', 'tds_ppm', 'ph', 'do_mg_l')
                       AND timestamp >= :cutoff
                     ORDER BY timestamp DESC
-                    LIMIT :limit
                     """
                 ),
-                {"cutoff": cutoff, "limit": limit * 5},  # 5 sensors per reading
+                {"cutoff": cutoff},
             ).fetchall()
         else:
             # Daily aggregation - get average per day per sensor
@@ -379,34 +382,60 @@ def get_history():
     
     # Group readings by timestamp
     if interval == '15min':
-        # Group individual readings by timestamp
-        readings_by_ts = {}
+        # Group readings into 15-minute buckets and calculate averages
+        buckets = {}  # key: bucket_start_time, value: {sensor: [values]}
+        
         for r in rows:
-            ts = r[0]
-            ts_key = ts.isoformat() if hasattr(ts, 'isoformat') else str(ts)
-            if ts_key not in readings_by_ts:
-                readings_by_ts[ts_key] = {
-                    'timestamp': _format_ts_for_display(ts),
-                    'ph': None,
-                    'do': None,
-                    'tds': None,
-                    'temp': None,
-                    'humidity': None
-                }
+            ts_raw = r[0]
             sensor = r[1]
             value = r[2]
-            if sensor == 'ph':
-                readings_by_ts[ts_key]['ph'] = round(value, 2) if value else None
-            elif sensor == 'do_mg_l':
-                readings_by_ts[ts_key]['do'] = round(value, 2) if value else None
-            elif sensor == 'tds_ppm':
-                readings_by_ts[ts_key]['tds'] = round(value, 1) if value else None
-            elif sensor == 'temperature_c':
-                readings_by_ts[ts_key]['temp'] = round(value, 1) if value else None
-            elif sensor == 'humidity':
-                readings_by_ts[ts_key]['humidity'] = round(value, 1) if value else None
+            
+            if value is None:
+                continue
+            
+            # Parse timestamp - SQLite returns strings, Postgres returns datetime
+            if isinstance(ts_raw, str):
+                try:
+                    ts = datetime.fromisoformat(ts_raw.replace('Z', '+00:00'))
+                except:
+                    continue
+            elif isinstance(ts_raw, datetime):
+                ts = ts_raw
+            else:
+                continue
+                
+            # Calculate 15-minute bucket start time
+            bucket_minute = (ts.minute // 15) * 15
+            bucket_ts = ts.replace(minute=bucket_minute, second=0, microsecond=0)
+            
+            bucket_key = bucket_ts.strftime('%Y-%m-%d %H:%M')
+            
+            if bucket_key not in buckets:
+                buckets[bucket_key] = {
+                    'timestamp': bucket_ts,
+                    'ph': [],
+                    'do_mg_l': [],
+                    'tds_ppm': [],
+                    'temperature_c': [],
+                    'humidity': []
+                }
+            
+            if sensor in buckets[bucket_key]:
+                buckets[bucket_key][sensor].append(value)
         
-        data = list(readings_by_ts.values())[:limit]
+        # Calculate averages for each bucket
+        data = []
+        for bucket_key in sorted(buckets.keys(), reverse=True)[:limit]:
+            bucket = buckets[bucket_key]
+            reading = {
+                'timestamp': _format_ts_for_display(bucket['timestamp']),
+                'ph': round(sum(bucket['ph']) / len(bucket['ph']), 2) if bucket['ph'] else None,
+                'do': round(sum(bucket['do_mg_l']) / len(bucket['do_mg_l']), 2) if bucket['do_mg_l'] else None,
+                'tds': round(sum(bucket['tds_ppm']) / len(bucket['tds_ppm']), 1) if bucket['tds_ppm'] else None,
+                'temp': round(sum(bucket['temperature_c']) / len(bucket['temperature_c']), 1) if bucket['temperature_c'] else None,
+                'humidity': round(sum(bucket['humidity']) / len(bucket['humidity']), 1) if bucket['humidity'] else None
+            }
+            data.append(reading)
     else:
         # Daily averages
         readings_by_day = {}
