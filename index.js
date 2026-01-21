@@ -772,14 +772,64 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	const historyBoard = document.querySelector('.history-board');
 	if (historyBoard) {
 		const historyState = { method: 'aero', plant: '1', interval: 'Daily' };
-		const historyEmptyCell = historyBoard.querySelector('.history-empty');
+		const historyTableBody = historyBoard.querySelector('.history-table-wrap[data-history-view="sensor"] tbody');
+
+		// Fetch and display sensor history data
+		async function fetchSensorHistory() {
+			const interval = historyState.interval === 'Daily' ? 'daily' : '15min';
+			const days = interval === 'daily' ? 30 : 1; // 30 days for daily, 1 day for 15min
+			
+			try {
+				const response = await fetch(`${RELAY_API_URL}/history?interval=${interval}&days=${days}&limit=50`);
+				if (!response.ok) throw new Error('Failed to fetch history');
+				
+				const data = await response.json();
+				
+				if (data.success && data.readings && data.readings.length > 0) {
+					renderHistoryTable(data.readings);
+				} else {
+					showHistoryEmpty();
+				}
+			} catch (err) {
+				console.error('History fetch error:', err);
+				showHistoryEmpty();
+			}
+		}
+		
+		// Render history data to the table
+		function renderHistoryTable(readings) {
+			if (!historyTableBody) return;
+			
+			const rows = readings.map(r => `
+				<tr>
+					<td>${r.timestamp || '-'}</td>
+					<td>${r.ph !== null ? r.ph : '-'}</td>
+					<td>${r.do !== null ? r.do + ' mg/L' : '-'}</td>
+					<td>${r.tds !== null ? r.tds + ' ppm' : '-'}</td>
+					<td>${r.temp !== null ? r.temp + ' °C' : '-'}</td>
+					<td>${r.humidity !== null ? r.humidity + ' %' : '-'}</td>
+					<td colspan="5" class="plant-data-na">-</td>
+				</tr>
+			`).join('');
+			
+			historyTableBody.innerHTML = rows;
+		}
+		
+		// Show empty state message
+		function showHistoryEmpty() {
+			if (!historyTableBody) return;
+			const methodLabel = historyBoard.querySelector('[data-history-tab].active')?.textContent?.trim() || 'Aeroponics';
+			const intervalLabel = historyState.interval;
+			historyTableBody.innerHTML = `
+				<tr>
+					<td colspan="11" class="history-empty">No sensor data available for ${intervalLabel} interval (${methodLabel}).</td>
+				</tr>
+			`;
+		}
 
 		const updateHistoryEmpty = () => {
-			if (!historyEmptyCell) return;
-			const methodLabel = historyBoard.querySelector('[data-history-tab].active')?.textContent?.trim() || 'Aeroponics';
-			const intervalLabel = historyBoard.querySelector('.history-chip.active')?.textContent?.trim() || 'Daily';
-			const plantLabel = historyBoard.querySelector('.history-pill.active')?.textContent?.trim() || '1';
-			historyEmptyCell.textContent = `No data yet for Plant ${plantLabel} (${intervalLabel}, ${methodLabel}).`;
+			// Now fetches real data instead of just showing empty
+			fetchSensorHistory();
 		};
 
 		historyBoard.querySelectorAll('[data-history-tab]').forEach(btn => {
@@ -788,13 +838,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				historyBoard.querySelectorAll('[data-history-tab]').forEach(b => b.classList.remove('active'));
 				btn.classList.add('active');
 				historyState.method = btn.getAttribute('data-history-tab') || historyState.method;
-				updateHistoryEmpty();
+				
 				// Toggle history table views based on selected method
 				const view = historyState.method === 'trad' ? 'plant' : 'sensor';
 				historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
 					if (w.getAttribute('data-history-view') === view) w.style.display = '';
 					else w.style.display = 'none';
 				});
+				
+				// Fetch data for sensor view
+				if (view === 'sensor') {
+					fetchSensorHistory();
+				}
 			});
 		});
 
@@ -810,7 +865,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				historyBoard.querySelectorAll('.history-pill').forEach(p => p.classList.remove('active'));
 				pill.classList.add('active');
 				historyState.plant = pill.textContent.trim();
-				updateHistoryEmpty();
+				// Plant selection doesn't affect sensor data, but refresh anyway
+				fetchSensorHistory();
 			});
 		});
 
@@ -819,11 +875,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				historyBoard.querySelectorAll('.history-chip').forEach(c => c.classList.remove('active'));
 				chip.classList.add('active');
 				historyState.interval = chip.textContent.trim();
-				updateHistoryEmpty();
+				// Fetch new data when interval changes
+				fetchSensorHistory();
 			});
 		});
 
-		updateHistoryEmpty();
+		// Initial load
+		fetchSensorHistory();
 	}
 
 	// Prediction dropdown option click handlers
