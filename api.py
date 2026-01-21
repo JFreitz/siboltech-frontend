@@ -330,7 +330,7 @@ def get_latest():
 
 # ==================== RELAY CONTROL ====================
 # In-memory relay states (persisted in DB for reliability)
-RELAY_STATES = {i: False for i in range(1, 9)}
+RELAY_STATES = {i: False for i in range(1, 10)}  # 9 relays
 RELAY_LABELS = {
     1: "Misting Pump",
     2: "Air Pump",
@@ -339,7 +339,8 @@ RELAY_LABELS = {
     5: "Grow Lights (Aeroponics)",
     6: "Grow Lights (DWC)",
     7: "pH Up",
-    8: "pH Down"
+    8: "pH Down",
+    9: "Leafy Green"
 }
 
 
@@ -348,7 +349,7 @@ def _init_relay_states():
     global RELAY_STATES
     try:
         with Session() as session:
-            for i in range(1, 9):
+            for i in range(1, 10):  # 9 relays
                 row = session.execute(
                     text("SELECT value FROM sensor_readings WHERE sensor = :s ORDER BY timestamp DESC LIMIT 1"),
                     {"s": f"relay_{i}"}
@@ -375,7 +376,7 @@ def relay_status():
         "success": True,
         "relays": [
             {"id": i, "label": RELAY_LABELS.get(i, f"Relay {i}"), "state": RELAY_STATES[i]}
-            for i in range(1, 9)
+            for i in range(1, 10)  # 9 relays
         ]
     })
 
@@ -383,15 +384,15 @@ def relay_status():
 @app.route("/api/relay/pending")
 def relay_pending():
     """ESP32 polls this to get relay states to apply."""
-    # Return compact format for ESP32
-    states = "".join(["1" if RELAY_STATES[i] else "0" for i in range(1, 9)])
+    # Return compact format for ESP32 (9 relays)
+    states = "".join(["1" if RELAY_STATES[i] else "0" for i in range(1, 10)])
     return jsonify({"states": states})
 
 
 @app.route("/api/relay/<int:relay_id>/on", methods=["POST"])
 def relay_on(relay_id):
     """Turn relay ON."""
-    if relay_id < 1 or relay_id > 8:
+    if relay_id < 1 or relay_id > 9:
         return jsonify({"success": False, "error": "Invalid relay ID"}), 400
     
     RELAY_STATES[relay_id] = True
@@ -413,7 +414,7 @@ def relay_on(relay_id):
 @app.route("/api/relay/<int:relay_id>/off", methods=["POST"])
 def relay_off(relay_id):
     """Turn relay OFF."""
-    if relay_id < 1 or relay_id > 8:
+    if relay_id < 1 or relay_id > 9:
         return jsonify({"success": False, "error": "Invalid relay ID"}), 400
     
     RELAY_STATES[relay_id] = False
