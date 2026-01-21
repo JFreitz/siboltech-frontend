@@ -1427,51 +1427,137 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	}
 
 	// Nutrient solution quick actions with 2-second pulse mode
-	// Threshold-based logic:
-	// - pH Up: activates when pH < 5.5 (too acidic)
-	// - pH Down: activates when pH > 6.5 (too alkaline for hydroponics)
-	// - Leafy Green: activates when TDS < 600 (nutrient deficiency)
+	// Threshold-based logic with HYSTERESIS and MOVING AVERAGE to prevent noise-triggered activations
+	// - pH Up: activates when pH < 5.5, deactivates when pH > 5.8
+	// - pH Down: activates when pH > 6.5, deactivates when pH < 6.2
+	// - Leafy Green: activates when TDS < 600, deactivates when TDS > 650
 	const NUTRIENT_THRESHOLDS = {
-		'btn-ph-up': { sensor: 'ph', condition: 'below', threshold: 5.5 },
-		'btn-ph-down': { sensor: 'ph', condition: 'above', threshold: 6.5 },
-		'btn-leafy-green': { sensor: 'tds', condition: 'below', threshold: 600 }
+		'btn-ph-up': { 
+			sensor: 'ph', 
+			condition: 'below', 
+			triggerOn: 5.5,      // Activate when below this
+			triggerOff: 5.8,     // Deactivate when above this (hysteresis)
+			consecutiveRequired: 3  // Require 3 consecutive readings
+		},
+		'btn-ph-down': { 
+			sensor: 'ph', 
+			condition: 'above', 
+			triggerOn: 6.5,      // Activate when above this
+			triggerOff: 6.2,     // Deactivate when below this (hysteresis)
+			consecutiveRequired: 3
+		},
+		'btn-leafy-green': { 
+			sensor: 'tds', 
+			condition: 'below', 
+			triggerOn: 600,      // Activate when below this
+			triggerOff: 650,     // Deactivate when above this (hysteresis)
+			consecutiveRequired: 3
+		}
 	};
 
 	const NUTRIENT_PULSE_DURATION = 2000; // 2 seconds
 	const NUTRIENT_AUTO_COOLDOWN = 30000; // 30 seconds cooldown between auto-activations
+	const MOVING_AVG_WINDOW = 5; // Number of readings to average
+
+	// State tracking for anti-fluctuation
 	const nutrientLastActivation = {
 		'btn-ph-up': 0,
 		'btn-ph-down': 0,
 		'btn-leafy-green': 0
 	};
+	
+	// Moving average buffers
+	const sensorHistory = {
+		ph: [],
+		tds: []
+	};
+	
+	// Consecutive threshold breach counter
+	const consecutiveBreaches = {
+		'btn-ph-up': 0,
+		'btn-ph-down': 0,
+		'btn-leafy-green': 0
+	};
+	
+	// Track if nutrient is currently "active" (for hysteresis)
+	const nutrientActiveState = {
+		'btn-ph-up': false,
+		'btn-ph-down': false,
+		'btn-leafy-green': false
+	};
 
-	// Check sensor readings and auto-activate nutrient relays if thresholds exceeded
+	// Calculate moving average
+	function updateMovingAverage(sensor, newValue) {
+		const history = sensorHistory[sensor];
+		history.push(newValue);
+		if (history.length > MOVING_AVG_WINDOW) {
+			history.shift(); // Remove oldest
+		}
+		return history.reduce((a, b) => a + b, 0) / history.length;
+	}
+
+	// Check sensor readings with anti-fluctuation logic
 	function checkNutrientAutoActivation(phValue, tdsValue) {
 		const now = Date.now();
-		const sensorValues = { ph: phValue, tds: tdsValue };
+		
+		// Update moving averages
+		const avgPH = updateMovingAverage('ph', phValue);
+		const avgTDS = updateMovingAverage('tds', tdsValue);
+		const avgValues = { ph: avgPH, tds: avgTDS };
 		
 		Object.entries(NUTRIENT_THRESHOLDS).forEach(([btnId, config]) => {
-			const { sensor, condition, threshold } = config;
-			const value = sensorValues[sensor];
-			if (value === undefined || isNaN(value)) return;
+			const { sensor, condition, triggerOn, triggerOff, consecutiveRequired } = config;
+			const avgValue = avgValues[sensor];
+			if (avgValue === undefined || isNaN(avgValue)) return;
 			
-			// Check if threshold is exceeded
-			let shouldActivate = false;
-			if (condition === 'below' && value < threshold) {
-				shouldActivate = true;
-			} else if (condition === 'above' && value > threshold) {
-				shouldActivate = true;
+			// Check if threshold is exceeded (using averaged value)
+			let thresholdBreached = false;
+			if (condition === 'below' && avgValue < triggerOn) {
+				thresholdBreached = true;
+			} else if (condition === 'above' && avgValue > triggerOn) {
+				thresholdBreached = true;
 			}
 			
-			// Check cooldown
-			if (shouldActivate && (now - nutrientLastActivation[btnId]) > NUTRIENT_AUTO_COOLDOWN) {
-				// Check if button is not already dosing
+			// Check if we should deactivate (hysteresis - crossed back over triggerOff)
+			let shouldDeactivate = false;
+			if (nutrientActiveState[btnId]) {
+				if (condition === 'below' && avgValue > triggerOff) {
+					shouldDeactivate = true;
+				} else if (condition === 'above' && avgValue < triggerOff) {
+					shouldDeactivate = true;
+				}
+			}
+			
+			// Update consecutive breach counter
+			if (thresholdBreached && !nutrientActiveState[btnId]) {
+				consecutiveBreaches[btnId]++;
+			} else if (!thresholdBreached || shouldDeactivate) {
+				consecutiveBreaches[btnId] = 0;
+				if (shouldDeactivate) {
+					nutrientActiveState[btnId] = false;
+					console.log(`[Hysteresis] ${btnId} deactivated: ${sensor} avg=${avgValue.toFixed(2)} crossed ${triggerOff}`);
+				}
+			}
+			
+			// Only activate if:
+			// 1. Threshold breached for consecutive readings
+			// 2. Cooldown period passed
+			// 3. Not already in active state
+			const shouldActivate = 
+				consecutiveBreaches[btnId] >= consecutiveRequired &&
+				!nutrientActiveState[btnId] &&
+				(now - nutrientLastActivation[btnId]) > NUTRIENT_AUTO_COOLDOWN;
+			
+			if (shouldActivate) {
 				const btn = document.getElementById(btnId);
 				if (btn && !btn.disabled) {
 					nutrientLastActivation[btnId] = now;
+					nutrientActiveState[btnId] = true;
+					consecutiveBreaches[btnId] = 0;
+					
 					const label = btnId === 'btn-ph-up' ? 'pH Up' : 
 					              btnId === 'btn-ph-down' ? 'pH Down' : 'Leafy Green';
-					console.log(`Auto-activating ${label}: ${sensor}=${value} ${condition} ${threshold}`);
+					console.log(`[Auto-activate] ${label}: ${sensor} avg=${avgValue.toFixed(2)} ${condition} ${triggerOn} (${consecutiveRequired} consecutive readings)`);
 					
 					// Disable button during pulse
 					btn.disabled = true;
