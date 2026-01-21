@@ -28,9 +28,10 @@ static uint32_t last_relay_poll_ms = 0;
 static const uint32_t RELAY_POLL_INTERVAL = 50;  // Poll every 50ms for faster response
 static bool wifi_connected = false;
 
-// --- 8-Channel Relay Module ---
-static const int RELAY_PINS[] = {12, 13, 14, 15, 16, 17, 18, 19};
-static const int NUM_RELAYS = 8;
+// --- 9-Channel Relay Module ---
+// Relay 1-8: GPIO 12-19, Relay 9: GPIO 23 (Leafy Green)
+static const int RELAY_PINS[] = {12, 13, 14, 15, 16, 17, 18, 19, 23};
+static const int NUM_RELAYS = 9;
 static bool relay_states[NUM_RELAYS] = {false};
 static String serial_buffer = "";
 
@@ -95,8 +96,8 @@ void processCommand(String cmd) {
     return;
   }
   if (cmd.startsWith("R") && cmd.length() >= 4) {
-    int relayNum = cmd.substring(1, 2).toInt();
-    if (relayNum >= 1 && relayNum <= 8) {
+    int relayNum = cmd.substring(1).toInt(); // Support R1-R9
+    if (relayNum >= 1 && relayNum <= 9) {
       setRelay(relayNum, cmd.indexOf("ON") >= 0);
       printRelayStatus();
     }
@@ -164,7 +165,7 @@ void pollRelayStates() {
     JsonDocument doc;
     if (!deserializeJson(doc, payload)) {
       const char* states = doc["states"];
-      if (states && strlen(states) == 8) {
+      if (states && strlen(states) == NUM_RELAYS) {  // Now expects 9 chars
         for (int i = 0; i < NUM_RELAYS; i++) {
           bool newState = (states[i] == '1');
           if (relay_states[i] != newState) {
@@ -189,7 +190,7 @@ void setup() {
     pinMode(RELAY_PINS[i], OUTPUT);
     digitalWrite(RELAY_PINS[i], HIGH);
   }
-  Serial.println("Relays initialized (GPIO 12-19)");
+  Serial.println("Relays initialized (GPIO 12-19, 23)");
 
   analogReadResolution(12);
   analogSetPinAttenuation(TDS_PIN, ADC_0db);

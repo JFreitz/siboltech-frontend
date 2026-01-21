@@ -1421,8 +1421,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		updateOverrideState();
 	}
 
-	// Nutrient solution quick actions
-	function showNutrientNotification(label){
+	// Nutrient solution quick actions with 2-second pulse mode
+	// Threshold-based logic:
+	// - pH Up: activates when pH < 5.5 (too acidic)
+	// - pH Down: activates when pH > 6.5 (too alkaline for hydroponics)
+	// - Leafy Green: activates when TDS < 600 (nutrient deficiency)
+	const NUTRIENT_THRESHOLDS = {
+		'btn-ph-up': { sensor: 'ph', condition: 'below', threshold: 5.5 },
+		'btn-ph-down': { sensor: 'ph', condition: 'above', threshold: 6.5 },
+		'btn-leafy-green': { sensor: 'tds', condition: 'below', threshold: 600 }
+	};
+
+	const NUTRIENT_PULSE_DURATION = 2000; // 2 seconds
+
+	function showNutrientNotification(label, isAuto = false){
 		const container = document.getElementById('notificationContainer');
 		if(!container) return;
 		const notif = document.createElement('div');
@@ -1431,7 +1443,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			<div class="notification-icon">💧</div>
 			<div class="notification-content">
 				<div class="notification-title">Nutrient Solution</div>
-				<div class="notification-message">${label} triggered</div>
+				<div class="notification-message">${label} ${isAuto ? '(auto)' : ''} - 2s pulse</div>
 			</div>
 		`;
 		container.appendChild(notif);
@@ -1440,6 +1452,33 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			notif.classList.remove('show');
 			setTimeout(() => notif.remove(), 300);
 		}, 2500);
+	}
+
+	// Pulse a nutrient relay: ON for 2 seconds, then OFF
+	async function pulseNutrientRelay(btnId, label, isAuto = false) {
+		const relayNum = ACTUATOR_TO_RELAY[btnId];
+		if (!relayNum) return;
+
+		try {
+			// Turn ON
+			await fetch(`${RELAY_API_URL}/relay/${relayNum}/on`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' }
+			});
+			showNutrientNotification(label, isAuto);
+			console.log(`Nutrient ${label} relay ${relayNum} ON`);
+
+			// After 2 seconds, turn OFF
+			setTimeout(async () => {
+				await fetch(`${RELAY_API_URL}/relay/${relayNum}/off`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' }
+				});
+				console.log(`Nutrient ${label} relay ${relayNum} OFF`);
+			}, NUTRIENT_PULSE_DURATION);
+		} catch (err) {
+			console.error(`Failed to pulse nutrient relay: ${err}`);
+		}
 	}
 
 	function setupNutrientButtons(){
@@ -1452,17 +1491,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		actions.forEach(action => {
 			const btn = document.getElementById(action.id);
 			if(!btn) return;
-			btn.addEventListener('click', () => {
+			btn.addEventListener('click', async () => {
 				if(btn.disabled) return;
 				btn.disabled = true;
 				btn.classList.add('is-dosing');
 				btn.setAttribute('aria-pressed', 'true');
-				showNutrientNotification(action.label);
+				
+				// Pulse relay for 2 seconds (ON then OFF)
+				await pulseNutrientRelay(action.id, action.label);
+				
+				// Re-enable button after pulse duration + cooldown
 				setTimeout(() => {
 					btn.disabled = false;
 					btn.classList.remove('is-dosing');
 					btn.setAttribute('aria-pressed', 'false');
-				}, 5000);
+				}, NUTRIENT_PULSE_DURATION + 500);
 			});
 		});
 	}
@@ -3457,8 +3500,9 @@ const ACTUATOR_TO_RELAY = {
 	'act-fan-out': 4,      // Exhaust Fan (Out)
 	'act-lights-aerponics': 5, // Grow Lights (Aeroponics)
 	'act-lights-dwc': 6,   // Grow Lights (DWC)
-	'btn-ph-up': 7,        // pH Up (nutrient)
-	'btn-ph-down': 8       // pH Down (nutrient)
+	'btn-ph-up': 7,        // pH Up (nutrient) - GPIO 18
+	'btn-ph-down': 8,      // pH Down (nutrient) - GPIO 19
+	'btn-leafy-green': 9   // Leafy Green (nutrient) - GPIO 23
 };
 
 const RELAY_TO_ACTUATOR = Object.fromEntries(
