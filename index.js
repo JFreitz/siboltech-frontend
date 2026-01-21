@@ -1304,12 +1304,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	function updateSensorsAndActuators(){
 		// sample values - replace with real sensor API later
-		// widen ranges so warnings/critical states appear more often during demo
-		const phValue = (6 + Math.random()*2).toFixed(2);      // 6.00 - 7.99
-		const doValue = (6 + Math.random()*4).toFixed(1);       // 6.0 - 9.9
-		const tempValue = (22 + Math.random()*8).toFixed(1);    // 22.0 - 29.9
-		const humValue = Math.floor(45 + Math.random()*45);     // 45 - 89
-		const tdsValue = (0.3 + Math.random()*2.2).toFixed(2);  // 0.30 - 2.50
+		// Ranges designed to occasionally trigger auto-nutrient thresholds for testing
+		// pH threshold: <5.5 triggers pH Up, >6.5 triggers pH Down
+		// TDS threshold: <600 triggers Leafy Green
+		const phValue = (5.0 + Math.random()*2.5).toFixed(2);   // 5.00 - 7.50 (can trigger both pH Up and Down)
+		const doValue = (6 + Math.random()*4).toFixed(1);        // 6.0 - 9.9
+		const tempValue = (22 + Math.random()*8).toFixed(1);     // 22.0 - 29.9
+		const humValue = Math.floor(45 + Math.random()*45);      // 45 - 89
+		const tdsValue = Math.floor(400 + Math.random()*800);    // 400 - 1200 ppm (can trigger Leafy Green)
 		
 		// push live readings to all mirrored UI blocks (dashboard, training, sensors tab)
 		const setValueAll = (key, val) => {
@@ -1344,6 +1346,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			setActuatorState('act-fan-out', Math.random()>0.4 ? 'ON':'OFF');
 			setActuatorState('act-lights-aerponics', Math.random()>0.3 ? 'ON':'OFF');
 			setActuatorState('act-lights-dwc', Math.random()>0.3 ? 'ON':'OFF');
+			
+			// Auto-activate nutrient relays based on sensor thresholds
+			checkNutrientAutoActivation(parseFloat(phValue), parseFloat(tdsValue));
 		}
 	}
 
@@ -1433,6 +1438,57 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	};
 
 	const NUTRIENT_PULSE_DURATION = 2000; // 2 seconds
+	const NUTRIENT_AUTO_COOLDOWN = 30000; // 30 seconds cooldown between auto-activations
+	const nutrientLastActivation = {
+		'btn-ph-up': 0,
+		'btn-ph-down': 0,
+		'btn-leafy-green': 0
+	};
+
+	// Check sensor readings and auto-activate nutrient relays if thresholds exceeded
+	function checkNutrientAutoActivation(phValue, tdsValue) {
+		const now = Date.now();
+		const sensorValues = { ph: phValue, tds: tdsValue };
+		
+		Object.entries(NUTRIENT_THRESHOLDS).forEach(([btnId, config]) => {
+			const { sensor, condition, threshold } = config;
+			const value = sensorValues[sensor];
+			if (value === undefined || isNaN(value)) return;
+			
+			// Check if threshold is exceeded
+			let shouldActivate = false;
+			if (condition === 'below' && value < threshold) {
+				shouldActivate = true;
+			} else if (condition === 'above' && value > threshold) {
+				shouldActivate = true;
+			}
+			
+			// Check cooldown
+			if (shouldActivate && (now - nutrientLastActivation[btnId]) > NUTRIENT_AUTO_COOLDOWN) {
+				// Check if button is not already dosing
+				const btn = document.getElementById(btnId);
+				if (btn && !btn.disabled) {
+					nutrientLastActivation[btnId] = now;
+					const label = btnId === 'btn-ph-up' ? 'pH Up' : 
+					              btnId === 'btn-ph-down' ? 'pH Down' : 'Leafy Green';
+					console.log(`Auto-activating ${label}: ${sensor}=${value} ${condition} ${threshold}`);
+					
+					// Disable button during pulse
+					btn.disabled = true;
+					btn.classList.add('is-dosing');
+					
+					// Pulse the relay (2 seconds ON then OFF)
+					pulseNutrientRelay(btnId, label, true);
+					
+					// Re-enable after pulse
+					setTimeout(() => {
+						btn.disabled = false;
+						btn.classList.remove('is-dosing');
+					}, NUTRIENT_PULSE_DURATION + 500);
+				}
+			}
+		});
+	}
 
 	function showNutrientNotification(label, isAuto = false){
 		const container = document.getElementById('notificationContainer');
