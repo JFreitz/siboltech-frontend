@@ -11,7 +11,7 @@ static const char* DEVICE_ID = "esp32-wroom32";
 
 // --- WiFi Configuration ---
 static const char* WIFI_SSID = "JP";
-static const char* WIFI_PASSWORD = "qwertyuiop";
+static const char* WIFI_PASSWORD = "qwertyuiopa";
 
 // --- MQTT Configuration (HiveMQ Cloud Free Tier) ---
 // Sign up at: https://www.hivemq.com/mqtt-cloud-broker/
@@ -20,12 +20,12 @@ static const char* WIFI_PASSWORD = "qwertyuiop";
 
 // --- Cloud API Configuration (for sensor data upload) ---
 // Using Cloudflare Tunnel to self-hosted RPi API (free forever!)
-static const char* API_BASE_URL = "https://rubber-mhz-boring-same.trycloudflare.com";
+static const char* API_BASE_URL = "https://glance-burke-oven-jackie.trycloudflare.com";
 static const char* API_KEY = "espkey123";
 static uint32_t last_sensor_upload_ms = 0;
 static const uint32_t SENSOR_UPLOAD_INTERVAL = 15000;
 static uint32_t last_relay_poll_ms = 0;
-static const uint32_t RELAY_POLL_INTERVAL = 500;  // Poll every 500ms for faster response
+static const uint32_t RELAY_POLL_INTERVAL = 50;  // Poll every 50ms for faster response
 static bool wifi_connected = false;
 
 // --- 8-Channel Relay Module ---
@@ -208,16 +208,7 @@ void setup() {
 void loop() {
   const uint32_t now = millis();
 
-  // WiFi reconnect
-  if (WiFi.status() != WL_CONNECTED) {
-    static uint32_t last_wifi = 0;
-    if (now - last_wifi > 10000) { last_wifi = now; connectWiFi(); }
-  }
-  wifi_connected = (WiFi.status() == WL_CONNECTED);
-
-
-
-  // Serial commands
+  // === PRIORITY 1: Serial commands (fastest response) ===
   while (Serial.available()) {
     char c = Serial.read();
     if (c == '\n' || c == '\r') {
@@ -225,8 +216,21 @@ void loop() {
     } else { serial_buffer += c; }
   }
 
-  // Sensor reading
-  if (now - last_print_ms < 1000) { delay(10); return; }
+  // === PRIORITY 2: Relay polling (100ms) ===
+  if (now - last_relay_poll_ms >= RELAY_POLL_INTERVAL) {
+    last_relay_poll_ms = now;
+    pollRelayStates();
+  }
+
+  // === PRIORITY 3: WiFi reconnect ===
+  if (WiFi.status() != WL_CONNECTED) {
+    static uint32_t last_wifi = 0;
+    if (now - last_wifi > 10000) { last_wifi = now; connectWiFi(); }
+  }
+  wifi_connected = (WiFi.status() == WL_CONNECTED);
+
+  // === PRIORITY 4: Sensor reading (1s interval) ===
+  if (now - last_print_ms < 1000) { return; }
   last_print_ms = now;
 
   float temp_c = bme_ok ? bme.readTemperature() : 25.0f;
@@ -254,11 +258,5 @@ void loop() {
   if (now - last_sensor_upload_ms >= SENSOR_UPLOAD_INTERVAL) {
     last_sensor_upload_ms = now;
     uploadSensorData(temp_c, humidity, tds_ppm, ph_voltage, do_voltage);
-  }
-
-  // Poll Railway API for relay commands (REST fallback)
-  if (now - last_relay_poll_ms >= RELAY_POLL_INTERVAL) {
-    last_relay_poll_ms = now;
-    pollRelayStates();
   }
 }

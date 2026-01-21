@@ -3408,7 +3408,7 @@ function populateRandomVoltages() {
 }
 
 // ==================== RELAY CONTROL ====================
-const RELAY_API_URL = 'https://rubber-mhz-boring-same.trycloudflare.com/api';
+const RELAY_API_URL = 'https://glance-burke-oven-jackie.trycloudflare.com/api';
 
 async function toggleRelay(relayNum, newState, stateEl) {
 	try {
