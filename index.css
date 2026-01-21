@@ -5023,3 +5023,63 @@ body.sidebar-collapsed .brand{
 .relay-toggle-btn:active {
 	transform: translateY(0);
 }
+
+/* ==================== OVERRIDE MODE STYLES ==================== */
+/* Manual mode - user controls relays directly */
+.actuator-card.manual-mode {
+	border: 2px solid #ff9800;
+	box-shadow: 0 0 20px rgba(255, 152, 0, 0.2);
+}
+
+.actuator-card.manual-mode .card-header {
+	color: #ff9800;
+}
+
+.actuator-card.manual-mode .actuator-header::after {
+	content: ' (MANUAL MODE)';
+	color: #ff9800;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+/* Auto mode - sensor readings control actuators */
+.actuator-card.auto-mode {
+	border: 2px solid #4caf50;
+}
+
+.actuator-card.auto-mode .actuator-header::after {
+	content: ' (AUTO MODE)';
+	color: #4caf50;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+/* Actuator toggle enabled in manual mode */
+.actuator-toggle.manual-enabled {
+	cursor: pointer;
+}
+
+.actuator-toggle.manual-enabled .toggle-slider {
+	box-shadow: 0 0 8px rgba(255, 152, 0, 0.5);
+}
+
+/* Override toggle styling */
+.override-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.override-label {
+	font-weight: 600;
+	font-size: 12px;
+	color: #666;
+}
+
+.actuator-override .toggle-slider {
+	background: #ccc;
+}
+
+.actuator-override input:checked + .toggle-slider {
+	background: #ff9800;
+}

@@ -1347,18 +1347,27 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		}
 	}
 
-	// helper: set actuator state text + checkbox
+	// helper: set actuator state text + checkbox AND send to relay API
 	function setActuatorState(id, state){
 		const checkbox = document.getElementById(id);
 		if(!checkbox) return;
 		const label = checkbox.closest('.toggle-switch');
 		const toggleText = label ? label.querySelector('.toggle-text') : null;
+		const isOn = (state === 'ON');
 		
-		checkbox.checked = (state === 'ON');
+		checkbox.checked = isOn;
 		if(toggleText) toggleText.textContent = state;
+		
+		// Also update the physical relay via API (only in auto mode)
+		const relayNum = typeof ACTUATOR_TO_RELAY !== 'undefined' ? ACTUATOR_TO_RELAY[id] : null;
+		if(relayNum && !actuatorOverride) {
+			// Send to relay API for auto-control
+			toggleRelay(relayNum, isOn, null);
+		}
 	}
 
-	// Add event listeners to actuator toggles to update text
+	// Add event listeners to actuator toggles to update text (moved to setupActuatorRelayControl)
+	// Keeping basic text update for manual override mode
 	document.querySelectorAll('.actuator-toggle input[type="checkbox"]').forEach(checkbox => {
 		checkbox.addEventListener('change', () => {
 			const label = checkbox.closest('.toggle-switch');
@@ -1366,10 +1375,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			if(toggleText) {
 				toggleText.textContent = checkbox.checked ? 'ON' : 'OFF';
 			}
+			// If override is ON, send to relay API
+			if(actuatorOverride) {
+				const relayNum = typeof ACTUATOR_TO_RELAY !== 'undefined' ? ACTUATOR_TO_RELAY[checkbox.id] : null;
+				if(relayNum) {
+					toggleRelay(relayNum, checkbox.checked, null);
+				}
+			}
 		});
 	});
 
-	// Override toggle: when ON, freeze auto-updates to actuators; manual toggles still work
+	// Override toggle: when ON, freeze auto-updates to actuators; manual toggles control relays directly
 	const overrideToggle = document.getElementById('actuatorOverrideToggle');
 	if(overrideToggle){
 		const updateOverrideState = () => {
@@ -1377,6 +1393,29 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			const textEl = label ? label.querySelector('.toggle-text') : null;
 			actuatorOverride = overrideToggle.checked;
 			if(textEl) textEl.textContent = actuatorOverride ? 'ON' : 'OFF';
+			
+			// Visual feedback: change actuator card styling based on mode
+			const actuatorCard = document.querySelector('.actuator-card');
+			if(actuatorCard) {
+				if(actuatorOverride) {
+					actuatorCard.classList.add('manual-mode');
+					actuatorCard.classList.remove('auto-mode');
+				} else {
+					actuatorCard.classList.add('auto-mode');
+					actuatorCard.classList.remove('manual-mode');
+				}
+			}
+			
+			// Enable/disable actuator toggles visual cue
+			document.querySelectorAll('.actuator-toggle').forEach(toggle => {
+				if(actuatorOverride) {
+					toggle.classList.add('manual-enabled');
+				} else {
+					toggle.classList.remove('manual-enabled');
+				}
+			});
+			
+			console.log(`Override mode: ${actuatorOverride ? 'MANUAL' : 'AUTO'}`);
 		};
 		overrideToggle.addEventListener('change', updateOverrideState);
 		updateOverrideState();
@@ -3410,6 +3449,22 @@ function populateRandomVoltages() {
 // ==================== RELAY CONTROL ====================
 const RELAY_API_URL = 'https://glance-burke-oven-jackie.trycloudflare.com/api';
 
+// Mapping between dashboard actuator IDs and relay numbers
+const ACTUATOR_TO_RELAY = {
+	'act-water': 1,        // Misting Pump
+	'act-air': 2,          // Air Pump
+	'act-fan-in': 3,       // Exhaust Fan (In)
+	'act-fan-out': 4,      // Exhaust Fan (Out)
+	'act-lights-aerponics': 5, // Grow Lights (Aeroponics)
+	'act-lights-dwc': 6,   // Grow Lights (DWC)
+	'btn-ph-up': 7,        // pH Up (nutrient)
+	'btn-ph-down': 8       // pH Down (nutrient)
+};
+
+const RELAY_TO_ACTUATOR = Object.fromEntries(
+	Object.entries(ACTUATOR_TO_RELAY).map(([k, v]) => [v, k])
+);
+
 async function toggleRelay(relayNum, newState, stateEl) {
 	try {
 		const action = newState ? 'on' : 'off';
@@ -3419,16 +3474,43 @@ async function toggleRelay(relayNum, newState, stateEl) {
 		});
 		
 		if (response.ok) {
+			// Update Manual tab relay card
 			if (stateEl) {
 				stateEl.classList.remove('state-off', 'state-on');
 				stateEl.classList.add(newState ? 'state-on' : 'state-off');
 				stateEl.textContent = newState ? 'ON' : 'OFF';
+			}
+			// Also update dashboard actuator toggle if exists
+			const actuatorId = RELAY_TO_ACTUATOR[relayNum];
+			if (actuatorId) {
+				syncActuatorUI(actuatorId, newState);
 			}
 		} else {
 			console.error(`Failed to toggle relay ${relayNum}`);
 		}
 	} catch (error) {
 		console.error(`Error toggling relay ${relayNum}:`, error);
+	}
+}
+
+// Sync actuator UI (dashboard toggle) with relay state
+function syncActuatorUI(actuatorId, state) {
+	const checkbox = document.getElementById(actuatorId);
+	if (!checkbox) return;
+	checkbox.checked = state;
+	const label = checkbox.closest('.toggle-switch');
+	const toggleText = label ? label.querySelector('.toggle-text') : null;
+	if (toggleText) toggleText.textContent = state ? 'ON' : 'OFF';
+}
+
+// Sync Manual tab relay card UI with state
+function syncRelayCardUI(relayNum, state) {
+	const card = document.querySelector(`[data-relay-id="${relayNum}"]`);
+	const stateEl = card?.querySelector('.relay-state');
+	if (stateEl) {
+		stateEl.classList.remove('state-off', 'state-on');
+		stateEl.classList.add(state ? 'state-on' : 'state-off');
+		stateEl.textContent = state ? 'ON' : 'OFF';
 	}
 }
 
@@ -3439,12 +3521,12 @@ async function loadRelayStatus() {
 			const data = await response.json();
 			if (data.relays) {
 				data.relays.forEach(relay => {
-					const card = document.querySelector(`[data-relay-id="${relay.id}"]`);
-					const stateEl = card?.querySelector('.relay-state');
-					if (card && stateEl) {
-						stateEl.classList.remove('state-off', 'state-on');
-						stateEl.classList.add(relay.state ? 'state-on' : 'state-off');
-						stateEl.textContent = relay.state ? 'ON' : 'OFF';
+					// Update Manual tab relay cards
+					syncRelayCardUI(relay.id, relay.state);
+					// Update Dashboard actuator toggles
+					const actuatorId = RELAY_TO_ACTUATOR[relay.id];
+					if (actuatorId) {
+						syncActuatorUI(actuatorId, relay.state);
 					}
 				});
 			}
@@ -3454,7 +3536,7 @@ async function loadRelayStatus() {
 	}
 }
 
-// Setup relay button listeners when page loads
+// Setup relay button listeners when page loads (Manual tab)
 function setupRelayButtons() {
 	const relayCards = document.querySelectorAll('[data-relay-id]');
 	relayCards.forEach(card => {
@@ -3470,9 +3552,37 @@ function setupRelayButtons() {
 	});
 }
 
+// Setup dashboard actuator toggle listeners to control real relays
+function setupActuatorRelayControl() {
+	document.querySelectorAll('.actuator-toggle input[type="checkbox"]').forEach(checkbox => {
+		checkbox.addEventListener('change', () => {
+			const relayNum = ACTUATOR_TO_RELAY[checkbox.id];
+			if (relayNum) {
+				const newState = checkbox.checked;
+				// Only send to API if override is ON (manual mode)
+				const overrideToggle = document.getElementById('actuatorOverrideToggle');
+				if (overrideToggle && overrideToggle.checked) {
+					toggleRelay(relayNum, newState, null);
+				}
+			}
+			// Update toggle text
+			const label = checkbox.closest('.toggle-switch');
+			const toggleText = label ? label.querySelector('.toggle-text') : null;
+			if (toggleText) toggleText.textContent = checkbox.checked ? 'ON' : 'OFF';
+		});
+	});
+}
+
+// Poll relay status periodically to keep UI in sync
+function startRelayStatusPolling() {
+	loadRelayStatus(); // Initial load
+	setInterval(loadRelayStatus, 2000); // Poll every 2 seconds
+}
+
 document.addEventListener('DOMContentLoaded', () => {
 	populateRandomVoltages();
-	loadRelayStatus();
 	setupRelayButtons();
+	setupActuatorRelayControl();
+	startRelayStatusPolling();
 });
 
