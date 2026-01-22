@@ -1826,7 +1826,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		toggleDeleteButtonsVisibility('#aeroponicsPlantsList');
 	}, 100);
 	
-	setInterval(()=>{ drawMini('mini1'); drawMini('mini2'); drawMini('mini3'); updateSensorsAndActuators(); }, 2000);  // Poll every 2 seconds for real-time updates
+	setInterval(()=>{ drawMini('mini1'); drawMini('mini2'); drawMini('mini3'); updateSensorsAndActuators(); }, 5000);  // Poll every 5 seconds for near real-time
 	
 	// Handle window resize for responsive canvas
 	let resizeTimeout;
@@ -3817,7 +3817,7 @@ function setupActuatorRelayControl() {
 // Poll relay status periodically to keep UI in sync
 function startRelayStatusPolling() {
 	loadRelayStatus(); // Initial load
-	setInterval(loadRelayStatus, 2000); // Poll every 2 seconds
+	setInterval(loadRelayStatus, 5000); // Poll every 5 seconds
 }
 
 document.addEventListener('DOMContentLoaded', () => {
