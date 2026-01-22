@@ -1360,50 +1360,53 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	let actuatorOverride = false;
 
-	async function updateSensorsAndActuators(){
-		// Fetch real sensor data from API
-		try {
-			const response = await fetch(`${RELAY_API_URL}/latest`);
-			if (!response.ok) throw new Error('Failed to fetch sensor data');
-			const data = await response.json();
-			
-			// Extract values from API response
-			const phValue = data.ph ? data.ph.value.toFixed(2) : '0.00';
-			const doValue = data.do_mg_l ? data.do_mg_l.value.toFixed(1) : '0.0';
-			const tempValue = data.temperature_c ? data.temperature_c.value.toFixed(1) : '0.0';
-			const humValue = data.humidity ? Math.floor(data.humidity.value) : 0;
-			const tdsValue = data.tds_ppm ? Math.floor(data.tds_ppm.value) : 0;
-			
-			// push live readings to all mirrored UI blocks (dashboard, training, sensors tab)
-			const setValueAll = (key, val) => {
-				document.querySelectorAll(`[id="val-${key}"]`).forEach(el => { el.textContent = val; });
-			};
-			setValueAll('ph', phValue);
-			setValueAll('do', doValue);
-			setValueAll('temp', tempValue);
-			setValueAll('hum', humValue);
-			setValueAll('tds', tdsValue);
+	function updateSensorsAndActuators(){
+		// sample values - replace with real sensor API later
+		// Ranges designed to occasionally trigger auto-nutrient thresholds for testing
+		// pH threshold: <5.5 triggers pH Up, >6.5 triggers pH Down
+		// TDS threshold: <600 triggers Leafy Green
+		const phValue = (5.0 + Math.random()*2.5).toFixed(2);   // 5.00 - 7.50 (can trigger both pH Up and Down)
+		const doValue = (6 + Math.random()*4).toFixed(1);        // 6.0 - 9.9
+		const tempValue = (22 + Math.random()*8).toFixed(1);     // 22.0 - 29.9
+		const humValue = Math.floor(45 + Math.random()*45);      // 45 - 89
+		const tdsValue = Math.floor(400 + Math.random()*800);    // 400 - 1200 ppm (can trigger Leafy Green)
+		
+		// push live readings to all mirrored UI blocks (dashboard, training, sensors tab)
+		const setValueAll = (key, val) => {
+			document.querySelectorAll(`[id="val-${key}"]`).forEach(el => { el.textContent = val; });
+		};
+		setValueAll('ph', phValue);
+		setValueAll('do', doValue);
+		setValueAll('temp', tempValue);
+		setValueAll('hum', humValue);
+		setValueAll('tds', tdsValue);
 
-			// Record values for sensor graphs time series
-			recordSensorValue('ph', parseFloat(phValue));
-			recordSensorValue('do', parseFloat(doValue));
-			recordSensorValue('temp', parseFloat(tempValue));
-			recordSensorValue('hum', parseFloat(humValue));
-			recordSensorValue('tds', parseFloat(tdsValue));
-			
-			// Update alerts based on values
-			updateSensorAlert('ph', phValue);
-			updateSensorAlert('do', doValue);
-			updateSensorAlert('temp', tempValue);
-			updateSensorAlert('hum', humValue);
-			updateSensorAlert('tds', tdsValue);
+		// Record values for sensor graphs time series
+		recordSensorValue('ph', parseFloat(phValue));
+		recordSensorValue('do', parseFloat(doValue));
+		recordSensorValue('temp', parseFloat(tempValue));
+		recordSensorValue('hum', parseFloat(humValue));
+		recordSensorValue('tds', parseFloat(tdsValue));
+		
+		// Update alerts based on values
+		updateSensorAlert('ph', phValue);
+		updateSensorAlert('do', doValue);
+		updateSensorAlert('temp', tempValue);
+		updateSensorAlert('hum', humValue);
+		updateSensorAlert('tds', tdsValue);
 
-			// Auto-activate nutrient relays based on sensor thresholds (only in auto mode)
-			if(!actuatorOverride){
-				checkNutrientAutoActivation(parseFloat(phValue), parseFloat(tdsValue));
-			}
-		} catch (err) {
-			console.error('Sensor fetch error:', err);
+		// actuators - only auto-adjust when override is OFF
+		if(!actuatorOverride){
+			setActuatorState('act-water', Math.random()>0.2 ? 'ON':'OFF');
+			setActuatorState('act-air', Math.random()>0.5 ? 'ON':'OFF');
+			// Track both exhaust fans separately (in/out)
+			setActuatorState('act-fan-in', Math.random()>0.4 ? 'ON':'OFF');
+			setActuatorState('act-fan-out', Math.random()>0.4 ? 'ON':'OFF');
+			setActuatorState('act-lights-aerponics', Math.random()>0.3 ? 'ON':'OFF');
+			setActuatorState('act-lights-dwc', Math.random()>0.3 ? 'ON':'OFF');
+			
+			// Auto-activate nutrient relays based on sensor thresholds
+			checkNutrientAutoActivation(parseFloat(phValue), parseFloat(tdsValue));
 		}
 	}
 
@@ -1826,7 +1829,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		toggleDeleteButtonsVisibility('#aeroponicsPlantsList');
 	}, 100);
 	
-	setInterval(()=>{ drawMini('mini1'); drawMini('mini2'); drawMini('mini3'); updateSensorsAndActuators(); }, 5000);  // Poll every 5 seconds for near real-time
+	setInterval(()=>{ drawMini('mini1'); drawMini('mini2'); drawMini('mini3'); updateSensorsAndActuators(); }, 5000);
 	
 	// Handle window resize for responsive canvas
 	let resizeTimeout;
@@ -3817,7 +3820,7 @@ function setupActuatorRelayControl() {
 // Poll relay status periodically to keep UI in sync
 function startRelayStatusPolling() {
 	loadRelayStatus(); // Initial load
-	setInterval(loadRelayStatus, 5000); // Poll every 5 seconds
+	setInterval(loadRelayStatus, 2000); // Poll every 2 seconds
 }
 
 document.addEventListener('DOMContentLoaded', () => {
