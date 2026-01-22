@@ -19,11 +19,11 @@ static const char* WIFI_PASSWORD = "qwertyuiopa";
 
 
 // --- Cloud API Configuration (for sensor data upload) ---
-// Using Cloudflare Tunnel to self-hosted RPi API (free forever!)
-static const char* API_BASE_URL = "https://likelihood-glucose-struck-representing.trycloudflare.com";
+// Use LOCAL RPi IP for fast sensor uploads, relay polling stays on local network
+static const char* API_BASE_URL = "http://172.20.10.2:5000";  // Local RPi - much faster!
 static const char* API_KEY = "espkey123";
 static uint32_t last_sensor_upload_ms = 0;
-static const uint32_t SENSOR_UPLOAD_INTERVAL = 5000;  // Upload every 5 seconds for faster dashboard updates
+static const uint32_t SENSOR_UPLOAD_INTERVAL = 2000;  // Upload every 2 seconds (fast local network)
 static uint32_t last_relay_poll_ms = 0;
 static const uint32_t RELAY_POLL_INTERVAL = 50;  // Poll every 50ms for faster response
 static bool wifi_connected = false;

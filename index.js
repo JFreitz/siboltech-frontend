@@ -680,11 +680,26 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	
 
+	// Create overlay for mobile sidebar
+	let overlay = document.querySelector('.sidebar-overlay');
+	if (!overlay) {
+		overlay = document.createElement('div');
+		overlay.className = 'sidebar-overlay';
+		document.body.appendChild(overlay);
+	}
+	
+	// Close sidebar when clicking overlay
+	overlay.addEventListener('click', () => {
+		sidebar.classList.remove('mobile-open');
+		overlay.classList.remove('active');
+	});
+
 	// Toggle sidebar (collapse/expand on desktop, open/close on mobile)
 	burger.addEventListener('click', ()=>{
-		// For mobile (small screens), use 'open' class for slide in/out
-		if(window.innerWidth <= 900){
-			sidebar.classList.toggle('open');
+		// For mobile (small screens), use 'mobile-open' class for slide in/out
+		if(window.innerWidth <= 768){
+			const isOpen = sidebar.classList.toggle('mobile-open');
+			overlay.classList.toggle('active', isOpen);
 		} else {
 			// For desktop, use 'collapsed' class for collapse/expand
 			sidebar.classList.toggle('collapsed');
@@ -760,7 +775,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			}
 			
 			// close mobile sidebar after selection
-			if(window.innerWidth <= 900) sidebar.classList.remove('open');
+			if(window.innerWidth <= 768) { sidebar.classList.remove('mobile-open'); document.querySelector('.sidebar-overlay')?.classList.remove('active'); }
 			// If calibrate selected, focus first input
 			if(t === 'calibrate'){
 				setTimeout(()=>document.getElementById('calSensor')?.focus(),200);
@@ -898,7 +913,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			generatePlantGraphs(metric, selectedMethod);
 			
 			// Close mobile sidebar if open
-			if(window.innerWidth <= 900) sidebar.classList.remove('open');
+			if(window.innerWidth <= 768) { sidebar.classList.remove('mobile-open'); document.querySelector('.sidebar-overlay')?.classList.remove('active'); }
 		});
 	});
 

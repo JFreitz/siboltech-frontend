@@ -5083,3 +5083,294 @@ body.sidebar-collapsed .brand{
 .actuator-override input:checked + .toggle-slider {
 	background: #ff9800;
 }
+
+/* ==================== MOBILE RESPONSIVE STYLES ==================== */
+/* Tablet and smaller */
+@media (max-width: 768px) {
+    /* Hide sidebar by default on mobile */
+    .sidebar {
+        transform: translateX(-100%);
+        position: fixed;
+        z-index: 1000;
+        width: 250px !important;
+        height: calc(100vh - 56px);
+        top: 56px;
+    }
+    
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
+    
+    /* Main content takes full width */
+    .main {
+        margin-left: 0 !important;
+        padding: 10px;
+    }
+    
+    .sidebar.collapsed ~ .main {
+        margin-left: 0 !important;
+    }
+    
+    /* Show burger menu */
+    .burger {
+        display: flex !important;
+    }
+    
+    /* Grid adjustments */
+    .grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* Card adjustments */
+    .card {
+        padding: 14px;
+    }
+    
+    /* Tab content header */
+    .tab-content h2 {
+        font-size: 18px;
+        padding-bottom: 12px;
+    }
+    
+    /* Sensor cards grid */
+    .sensors-grid, .sensor-readings-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px;
+    }
+    
+    /* Actuator grid */
+    .actuator-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* Dashboard mini graphs */
+    .mini-graphs-row {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .mini-graph-card {
+        width: 100% !important;
+        min-width: unset !important;
+    }
+    
+    /* Topbar adjustments */
+    .topbar {
+        padding: 0 10px;
+    }
+    
+    .brand-logo {
+        height: 32px;
+    }
+    
+    .topbar-clock {
+        font-size: 12px;
+    }
+    
+    /* Calibration tabs */
+    .calibrate-tabs, .training-tabs {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .calibrate-tab-btn, .training-tab-btn {
+        font-size: 14px;
+        padding: 6px 8px;
+    }
+}
+
+/* Mobile phones */
+@media (max-width: 480px) {
+    body {
+        padding-top: 50px;
+    }
+    
+    .topbar {
+        height: 50px;
+    }
+    
+    .sidebar {
+        top: 50px;
+        height: calc(100vh - 50px);
+    }
+    
+    /* Sensor cards - single column on small phones */
+    .sensors-grid, .sensor-readings-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* Sensor value display */
+    .sensor-value, .val-display {
+        font-size: 24px !important;
+    }
+    
+    /* Card padding */
+    .card {
+        padding: 12px;
+        border-radius: 12px;
+    }
+    
+    /* Tab header */
+    .tab-content h2 {
+        font-size: 16px;
+    }
+    
+    /* Mini graphs smaller */
+    .mini-graph-card canvas {
+        height: 120px !important;
+    }
+    
+    /* Form elements */
+    .form-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .form-row label {
+        min-width: unset;
+        margin-bottom: 4px;
+    }
+    
+    /* Buttons */
+    .btn, button {
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+    
+    /* Plant list */
+    #plantList {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* Params card */
+    .params-card {
+        padding: 12px;
+    }
+    
+    /* Metrics row */
+    .metrics-row {
+        gap: 8px;
+    }
+    
+    .metric-card {
+        padding: 10px;
+    }
+    
+    /* Prediction columns stack */
+    .prediction-graphs-two-column {
+        flex-direction: column;
+    }
+    
+    .farming-method-container {
+        flex: 1 1 100%;
+    }
+    
+    /* Calibration sections */
+    .calibration-section {
+        padding: 12px;
+    }
+    
+    /* Toggle switches */
+    .toggle-switch {
+        transform: scale(0.9);
+    }
+    
+    /* Actuator cards */
+    .actuator-row {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .actuator-toggle {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+/* Overlay for mobile sidebar */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+}
+
+.sidebar-overlay.active {
+    display: block;
+}
+
+@media (max-width: 480px) {
+    .sidebar-overlay {
+        top: 50px;
+    }
+}
+
+/* Ensure charts are responsive */
+canvas {
+    max-width: 100% !important;
+}
+
+/* History table responsive */
+@media (max-width: 768px) {
+    .history-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .history-table th,
+    .history-table td {
+        white-space: nowrap;
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+}
+
+/* Notification positioning for mobile */
+@media (max-width: 768px) {
+    .notification-container {
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        width: auto;
+    }
+    
+    .notification {
+        font-size: 13px;
+        padding: 10px 14px;
+    }
+}
+
+/* Modal responsive */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95% !important;
+        max-width: 95% !important;
+        margin: 10px;
+        padding: 16px;
+    }
+    
+    .modal-title {
+        font-size: 18px;
+    }
+}
+
+/* Smooth sidebar transition */
+@media (max-width: 768px) {
+    .sidebar {
+        transition: transform 0.3s ease-in-out;
+    }
+    
+    .sidebar-overlay {
+        transition: opacity 0.3s ease-in-out;
+        opacity: 0;
+    }
+    
+    .sidebar-overlay.active {
+        opacity: 1;
+    }
+}
