@@ -4026,10 +4026,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
         const offset = (sumY - slope * sumX) / n;
         
-        // Get temperature for reference
-        const tempInput = document.getElementById(`${sensor}BufferTemp`);
-        const tempC = parseFloat(tempInput?.value) || 25;
-        
         return { slope, offset, tempC };
     }
     
