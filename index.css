@@ -5460,3 +5460,397 @@ body.sidebar-collapsed .brand{
         padding: 10px 14px;
     }
 }
+
+/* ==================== SIMPLIFIED CALIBRATION STYLES ==================== */
+.simple-cal-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px 0;
+}
+
+.cal-status-card, .cal-live-card, .cal-points-card, .cal-result-card {
+    background: rgba(255,255,255,0.95);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.cal-status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.cal-status-title {
+    font-weight: 600;
+    font-size: 16px;
+    color: #1d2330;
+}
+
+.cal-status-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.cal-status-badge.calibrated {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.cal-status-values {
+    display: flex;
+    gap: 24px;
+}
+
+.cal-stat {
+    display: flex;
+    flex-direction: column;
+}
+
+.cal-stat-label {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.cal-stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1d2330;
+}
+
+/* Live voltage card */
+.cal-live-card {
+    background: linear-gradient(135deg, #1a4d2e, #2d6a4f);
+    color: white;
+    text-align: center;
+}
+
+.cal-live-header {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-bottom: 8px;
+}
+
+.cal-live-value {
+    font-size: 48px;
+    font-weight: 700;
+    font-family: 'SF Mono', 'Consolas', monospace;
+}
+
+.cal-live-hint {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-top: 4px;
+}
+
+/* Calibration points */
+.cal-points-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    font-weight: 600;
+    color: #1d2330;
+}
+
+.cal-point-select {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background: white;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.cal-temp-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #f3f4f6;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    font-size: 14px;
+}
+
+.cal-temp-input {
+    width: 80px;
+    padding: 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 16px;
+    text-align: center;
+}
+
+.cal-point {
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.cal-point.captured {
+    border-color: #22c55e;
+    background: #f0fdf4;
+}
+
+.cal-point-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.cal-point.captured .cal-point-header {
+    background: #dcfce7;
+}
+
+.cal-point-num {
+    width: 28px;
+    height: 28px;
+    background: #1a4d2e;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.cal-point-label {
+    flex: 1;
+    font-weight: 600;
+    color: #1d2330;
+}
+
+.cal-point-status {
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.cal-point.captured .cal-point-status {
+    color: #22c55e;
+}
+
+.cal-point-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.cal-point-voltage {
+    font-size: 14px;
+    color: #4b5563;
+}
+
+.cal-point-voltage span {
+    font-weight: 700;
+    color: #1d2330;
+}
+
+.cal-capture-btn {
+    padding: 12px 20px;
+    background: #1a4d2e;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.cal-capture-btn:hover {
+    background: #145239;
+}
+
+.cal-capture-btn:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+}
+
+.cal-standard-input {
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 15px;
+    width: 100%;
+}
+
+/* Result card */
+.cal-result-card {
+    background: #ecfdf5;
+    border: 2px solid #22c55e;
+}
+
+.cal-result-header {
+    font-size: 16px;
+    font-weight: 600;
+    color: #065f46;
+    margin-bottom: 12px;
+}
+
+.cal-result-values {
+    display: flex;
+    gap: 32px;
+}
+
+.cal-result-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.cal-result-item span:first-child {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.cal-result-item span:last-child {
+    font-size: 28px;
+    font-weight: 700;
+    color: #065f46;
+}
+
+/* Action buttons */
+.cal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.cal-btn {
+    padding: 14px 28px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.cal-btn-primary {
+    background: #1a4d2e;
+    color: white;
+}
+
+.cal-btn-primary:hover:not(:disabled) {
+    background: #145239;
+}
+
+.cal-btn-primary:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+}
+
+.cal-btn-secondary {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+}
+
+.cal-btn-secondary:hover {
+    background: #e5e7eb;
+}
+
+/* Success modal */
+.cal-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.cal-modal-content {
+    background: white;
+    padding: 32px;
+    border-radius: 20px;
+    text-align: center;
+    max-width: 320px;
+}
+
+.cal-modal-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.cal-modal-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1d2330;
+    margin-bottom: 8px;
+}
+
+.cal-modal-msg {
+    font-size: 14px;
+    color: #6b7280;
+    margin-bottom: 20px;
+}
+
+/* Calibration Success Modal */
+.cal-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.cal-modal-content {
+    background: #1e2936;
+    border-radius: 16px;
+    padding: 32px;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+}
+
+.cal-modal-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.cal-modal-content h3 {
+    color: #00d9ff;
+    margin-bottom: 12px;
+}
+
+.cal-modal-content p {
+    color: #b4c6e0;
+    margin-bottom: 24px;
+}
+
+.cal-modal-close {
+    background: #00d9ff;
+    color: #0a1929;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.cal-modal-close:hover {
+    background: #00bcd4;
+}

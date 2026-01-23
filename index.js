@@ -3890,3 +3890,359 @@ document.addEventListener('DOMContentLoaded', () => {
 	startRelayStatusPolling();
 });
 
+
+// ==================== SIMPLIFIED CALIBRATION SYSTEM ====================
+(function initSimpleCalibration() {
+    const API_URL = typeof RELAY_API_URL !== 'undefined' ? RELAY_API_URL : 'https://likelihood-glucose-struck-representing.trycloudflare.com/api';
+    
+    // State for each sensor
+    const calState = {
+        ph: { points: [], voltage: null },
+        do: { points: [], voltage: null },
+        tds: { points: [], voltage: null }
+    };
+    
+    // Buffer values for pH
+    const phBuffers = [4.00, 6.86, 9.18];
+    
+    // Load current calibration from API
+    async function loadCalibration() {
+        try {
+            const res = await fetch(`${API_URL}/calibration`);
+            const data = await res.json();
+            
+            // Update UI with current values
+            for (const sensor of ['ph', 'do', 'tds']) {
+                if (data[sensor]) {
+                    document.getElementById(`${sensor}CurrentSlope`).textContent = data[sensor].slope?.toFixed(4) || '--';
+                    document.getElementById(`${sensor}CurrentOffset`).textContent = data[sensor].offset?.toFixed(4) || '--';
+                    const badge = document.getElementById(`${sensor}CalStatus`);
+                    if (badge && data[sensor].slope !== 1.0) {
+                        badge.textContent = 'Calibrated';
+                        badge.classList.add('calibrated');
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Failed to load calibration:', e);
+        }
+    }
+    
+    // Fetch live voltage readings
+    async function fetchVoltage() {
+        try {
+            const res = await fetch(`${API_URL}/voltage`);
+            const data = await res.json();
+            
+            if (data.ph?.voltage !== undefined) {
+                document.getElementById('phLiveVoltage').textContent = data.ph.voltage.toFixed(4) + ' V';
+                calState.ph.voltage = data.ph.voltage;
+            }
+            if (data.do?.voltage !== undefined) {
+                document.getElementById('doLiveVoltage').textContent = data.do.voltage.toFixed(4) + ' V';
+                calState.do.voltage = data.do.voltage;
+            }
+            if (data.tds?.voltage !== undefined) {
+                document.getElementById('tdsLiveVoltage').textContent = data.tds.voltage.toFixed(4) + ' V';
+                calState.tds.voltage = data.tds.voltage;
+            }
+        } catch (e) {
+            console.error('Failed to fetch voltage:', e);
+        }
+    }
+    
+    // Calculate slope and offset from captured points
+    function calculateCalibration(sensor) {
+        const points = calState[sensor].points;
+        if (points.length < 1) return null;
+        
+        if (points.length === 1) {
+            // 1-point: assume slope, calculate offset
+            // For pH: slope ≈ -0.0592V/pH at 25°C (Nernst)
+            // For DO: assume linear from 0
+            // For TDS: assume linear from 0
+            const p = points[0];
+            let slope, offset;
+            
+            if (sensor === 'ph') {
+                slope = -0.059; // Nernst constant
+                offset = p.value - (slope * p.voltage);
+            } else if (sensor === 'do') {
+                // At 100% saturation, typical DO is ~8.2 mg/L at 25°C
+                slope = 8.2 / p.voltage;
+                offset = 0;
+            } else { // tds
+                slope = p.value / p.voltage;
+                offset = 0;
+            }
+            return { slope, offset };
+        }
+        
+        // 2+ points: linear regression
+        const n = points.length;
+        let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+        
+        for (const p of points) {
+            sumX += p.voltage;
+            sumY += p.value;
+            sumXY += p.voltage * p.value;
+            sumXX += p.voltage * p.voltage;
+        }
+        
+        const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+        const offset = (sumY - slope * sumX) / n;
+        
+        return { slope, offset };
+    }
+    
+    // Update UI after capturing a point
+    function updatePointUI(sensor, pointNum) {
+        const point = calState[sensor].points.find(p => p.pointNum === pointNum);
+        if (!point) return;
+        
+        const pointEl = document.getElementById(`${sensor}Point${pointNum}`);
+        const voltageEl = document.getElementById(`${sensor}Point${pointNum}Voltage`);
+        const statusEl = document.getElementById(`${sensor}Point${pointNum}Status`);
+        
+        if (pointEl) pointEl.classList.add('captured');
+        if (voltageEl) voltageEl.textContent = point.voltage.toFixed(4);
+        if (statusEl) statusEl.textContent = '✅ Captured';
+        
+        // Check if we can calculate calibration
+        checkCalibrationReady(sensor);
+    }
+    
+    // Check if enough points to enable Apply button
+    function checkCalibrationReady(sensor) {
+        const points = calState[sensor].points;
+        const modeSelect = document.getElementById(`${sensor}PointMode`);
+        const requiredPoints = parseInt(modeSelect?.value || '2');
+        
+        const applyBtn = document.getElementById(`${sensor}ApplyBtn`);
+        const resultCard = document.getElementById(`${sensor}ResultCard`);
+        
+        if (points.length >= requiredPoints || (sensor !== 'ph' && points.length >= 1)) {
+            // Calculate and show result
+            const cal = calculateCalibration(sensor);
+            if (cal) {
+                document.getElementById(`${sensor}NewSlope`).textContent = cal.slope.toFixed(4);
+                document.getElementById(`${sensor}NewOffset`).textContent = cal.offset.toFixed(4);
+                if (resultCard) resultCard.style.display = 'block';
+                if (applyBtn) applyBtn.disabled = false;
+            }
+        }
+    }
+    
+    // Save calibration to API
+    async function saveCalibration(sensor) {
+        const cal = calculateCalibration(sensor);
+        if (!cal) return;
+        
+        try {
+            const res = await fetch(`${API_URL}/calibration`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sensor, slope: cal.slope, offset: cal.offset })
+            });
+            
+            if (res.ok) {
+                // Update current values display
+                document.getElementById(`${sensor}CurrentSlope`).textContent = cal.slope.toFixed(4);
+                document.getElementById(`${sensor}CurrentOffset`).textContent = cal.offset.toFixed(4);
+                
+                const badge = document.getElementById(`${sensor}CalStatus`);
+                if (badge) {
+                    badge.textContent = 'Calibrated';
+                    badge.classList.add('calibrated');
+                }
+                
+                // Show success modal
+                const modal = document.getElementById('calSuccessModal');
+                const msg = document.getElementById('calSuccessMsg');
+                if (msg) msg.textContent = `${sensor.toUpperCase()} calibration saved! Slope: ${cal.slope.toFixed(4)}, Offset: ${cal.offset.toFixed(4)}`;
+                if (modal) modal.style.display = 'flex';
+                
+                // Clear state
+                clearCalibration(sensor);
+            }
+        } catch (e) {
+            console.error('Failed to save calibration:', e);
+            alert('Failed to save calibration. Check console.');
+        }
+    }
+    
+    // Clear calibration state
+    function clearCalibration(sensor) {
+        calState[sensor].points = [];
+        
+        // Reset UI
+        for (let i = 1; i <= 3; i++) {
+            const pointEl = document.getElementById(`${sensor}Point${i}`);
+            const voltageEl = document.getElementById(`${sensor}Point${i}Voltage`);
+            const statusEl = document.getElementById(`${sensor}Point${i}Status`);
+            
+            if (pointEl) pointEl.classList.remove('captured');
+            if (voltageEl) voltageEl.textContent = '--';
+            if (statusEl) statusEl.textContent = '⏳ Waiting';
+        }
+        
+        const resultCard = document.getElementById(`${sensor}ResultCard`);
+        const applyBtn = document.getElementById(`${sensor}ApplyBtn`);
+        
+        if (resultCard) resultCard.style.display = 'none';
+        if (applyBtn) applyBtn.disabled = true;
+    }
+    
+    // Setup event listeners
+    function setupEventListeners() {
+        // Tab switching
+        document.querySelectorAll('.calibrate-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const sensor = btn.dataset.sensor;
+                
+                // Update active tab
+                document.querySelectorAll('.calibrate-tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                // Show correct panel
+                document.querySelectorAll('.simple-cal-panel').forEach(p => p.style.display = 'none');
+                const panel = document.querySelector(`.simple-cal-panel[data-sensor-type="${sensor}"]`);
+                if (panel) panel.style.display = 'flex';
+            });
+        });
+        
+        // pH point mode change
+        const phModeSelect = document.getElementById('phPointMode');
+        if (phModeSelect) {
+            phModeSelect.addEventListener('change', () => {
+                const mode = parseInt(phModeSelect.value);
+                document.getElementById('phPoint3').style.display = mode >= 3 ? 'block' : 'none';
+                clearCalibration('ph');
+            });
+        }
+        
+        // DO point mode change
+        const doModeSelect = document.getElementById('doPointMode');
+        if (doModeSelect) {
+            doModeSelect.addEventListener('change', () => {
+                const mode = parseInt(doModeSelect.value);
+                document.getElementById('doPoint2').style.display = mode >= 2 ? 'block' : 'none';
+                clearCalibration('do');
+            });
+        }
+        
+        // TDS point mode change
+        const tdsModeSelect = document.getElementById('tdsPointMode');
+        if (tdsModeSelect) {
+            tdsModeSelect.addEventListener('change', () => {
+                const mode = parseInt(tdsModeSelect.value);
+                document.getElementById('tdsPoint2').style.display = mode >= 2 ? 'block' : 'none';
+                clearCalibration('tds');
+            });
+        }
+        
+        // pH capture buttons
+        for (let i = 1; i <= 3; i++) {
+            const btn = document.getElementById(`phCapture${i}`);
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    if (calState.ph.voltage === null) {
+                        alert('No voltage reading available. Is the sensor connected?');
+                        return;
+                    }
+                    
+                    // Remove existing point if recapturing
+                    calState.ph.points = calState.ph.points.filter(p => p.pointNum !== i);
+                    
+                    calState.ph.points.push({
+                        pointNum: i,
+                        value: phBuffers[i - 1],
+                        voltage: calState.ph.voltage
+                    });
+                    
+                    updatePointUI('ph', i);
+                });
+            }
+        }
+        
+        // DO capture buttons
+        for (let i = 1; i <= 2; i++) {
+            const btn = document.getElementById(`doCapture${i}`);
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    if (calState.do.voltage === null) {
+                        alert('No voltage reading available. Is the sensor connected?');
+                        return;
+                    }
+                    
+                    calState.do.points = calState.do.points.filter(p => p.pointNum !== i);
+                    
+                    // DO values: Point 1 = 100% saturation (8.2 mg/L at 25°C), Point 2 = 0%
+                    const doValue = i === 1 ? 8.2 : 0;
+                    
+                    calState.do.points.push({
+                        pointNum: i,
+                        value: doValue,
+                        voltage: calState.do.voltage
+                    });
+                    
+                    updatePointUI('do', i);
+                });
+            }
+        }
+        
+        // TDS capture buttons
+        for (let i = 1; i <= 2; i++) {
+            const btn = document.getElementById(`tdsCapture${i}`);
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    if (calState.tds.voltage === null) {
+                        alert('No voltage reading available. Is the sensor connected?');
+                        return;
+                    }
+                    
+                    const standardInput = document.getElementById(`tdsStandard${i}`);
+                    const standardValue = parseFloat(standardInput?.value);
+                    
+                    if (!standardValue || standardValue <= 0) {
+                        alert('Please enter a valid TDS standard value (ppm)');
+                        return;
+                    }
+                    
+                    calState.tds.points = calState.tds.points.filter(p => p.pointNum !== i);
+                    
+                    calState.tds.points.push({
+                        pointNum: i,
+                        value: standardValue,
+                        voltage: calState.tds.voltage
+                    });
+                    
+                    updatePointUI('tds', i);
+                });
+            }
+        }
+        
+        // Apply buttons
+        for (const sensor of ['ph', 'do', 'tds']) {
+            const applyBtn = document.getElementById(`${sensor}ApplyBtn`);
+            if (applyBtn) {
+                applyBtn.addEventListener('click', () => saveCalibration(sensor));
+            }
+            
+            const clearBtn = document.getElementById(`${sensor}ClearBtn`);
+            if (clearBtn) {
+                clearBtn.addEventListener('click', () => clearCalibration(sensor));
+            }
+        }
+    }
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        setupEventListeners();
+        loadCalibration();
+        fetchVoltage();
+        
+        // Update voltage every 2 seconds
+        setInterval(fetchVoltage, 2000);
+    });
+})();
