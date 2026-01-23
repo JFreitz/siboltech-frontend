@@ -398,71 +398,6 @@
 	text-align: center;
 }
 
-/* Growth Comparison Card */
-.growth-comparison-card {
-	background: linear-gradient(135deg, #dff7df 0%, #d6f2d7 40%, #eaf9ee 100%);
-	border-radius: 14px;
-	padding: 18px;
-	box-shadow: 0 8px 30px rgba(6, 80, 20, 0.06);
-	border: 1px solid rgba(255,255,255,0.55);
-	margin: 8px 0 24px 0;
-}
-.growth-card-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:12px; }
-.growth-card-header h2 { margin:0; color:#1e6f2a; font-size:22px; font-weight:700; }
-.growth-header-actions { display:flex; align-items:center; gap:12px; min-width:0; }
-.growth-header-actions > * { flex-shrink: 0; }
-.growth-metric-controls { flex-shrink: 0; }
-.growth-metric-controls { display:flex; gap:8px; align-items:center; margin-right:8px; }
-.growth-metric-controls .metric-btn { background: transparent; border: 1px solid rgba(255,255,255,0.6); padding:8px 12px; border-radius:12px; cursor:pointer; font-weight:700; color:#275a2a; box-shadow: 0 4px 10px rgba(0,0,0,0.04); }
-.growth-metric-controls .metric-btn.active { background: #ffffff; border-color: rgba(0,0,0,0.06); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
-.growth-legend { display:flex; gap:12px; align-items:center; margin-left:12px; margin-right:auto; }
-.growth-legend .legend-item { display:flex; gap:8px; align-items:center; font-weight:600; color:#356c34; }
-
-/* Top legend above the card */
-.top-legend { margin-bottom:12px; display:flex; gap:14px; align-items:center; }
-.top-legend .legend-item { font-size:14px; color:#2f6f2b; }
-.top-growth-legend-wrap { display:flex; justify-content:flex-start; }
-
-/* Layout for chart + side legend */
-.growth-card-main { display:flex; flex-direction:column; gap:12px; align-items:stretch; }
-.bottom-legend { display:flex; gap:16px; align-items:center; justify-content:flex-start; margin-top:8px; padding-top:8px; border-top:1px dashed rgba(0,0,0,0.04); }
-.bottom-legend .legend-item { display:flex; gap:10px; align-items:center; color:#2f6f2b; font-weight:600; padding:6px 8px; border-radius:8px; }
-.bottom-legend .legend-swatch { width:14px; height:14px; border-radius:4px; box-shadow: 0 1px 0 rgba(255,255,255,0.3); }
-
-@media (max-width: 900px) {
-	.growth-card-main { flex-direction:column; }
-	.bottom-legend { justify-content:center; flex-wrap:wrap; }
-}
-
-/* Highlight helper for focus after navigation */
-.highlight { box-shadow: 0 8px 30px rgba(34,139,34,0.12); border: 2px solid rgba(79, 176, 79, 0.18); transition: box-shadow 0.3s ease, border 0.3s ease; }
-.growth-legend .legend-swatch { width:14px; height:14px; border-radius:4px; display:inline-block; box-shadow: 0 1px 0 rgba(255,255,255,0.3); }
-.growth-time-controls { display:flex; gap:10px; align-items:center; }
-.growth-time-controls .time-btn { background: rgba(255,255,255,0.85); border: none; padding:8px 14px; border-radius:14px; cursor:pointer; box-shadow: 0 6px 18px rgba(34, 139, 34, 0.08); font-weight:700; color:#2f6f2b; }
-
-.growth-controls-column { display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
-.growth-controls-column .growth-metric-controls { margin-bottom:4px; }
-
-@media (max-width: 700px) {
-	.growth-controls-column { align-items:center; }
-	.growth-metric-controls { flex-wrap:wrap; justify-content:center; }
-	.growth-time-controls { justify-content:center; }
-}
-.growth-time-controls .time-btn.active { background: #ffffff; box-shadow: 0 8px 24px rgba(34, 139, 34, 0.14); transform: translateY(-2px); }
-.growth-metric-controls { display:flex; gap:8px; align-items:center; margin-right:8px; }
-.growth-metric-controls .metric-btn { background: transparent; border: 1px solid rgba(255,255,255,0.6); padding:8px 12px; border-radius:12px; cursor:pointer; font-weight:700; color:#275a2a; box-shadow: 0 4px 10px rgba(0,0,0,0.04); }
-.growth-metric-controls .metric-btn.active { background: #ffffff; border-color: rgba(0,0,0,0.06); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
-.growth-card-body { padding-top:6px; }
-.comparison-graph-card { background: #ffffff; border-radius:10px; padding:18px; box-shadow: 0 8px 26px rgba(7, 49, 14, 0.06); border: 1px solid rgba(230, 245, 230, 0.8); position:relative; }
-.comparison-graph-card canvas { width:100%; height:360px; display:block; border-radius:8px; }
-.canvas-hover-tooltip { position:absolute; pointer-events:none; background:#ffffff; padding:10px 12px; border-radius:8px; box-shadow: 0 8px 30px rgba(0,0,0,0.12); font-size:13px; color:#213223; border:1px solid rgba(0,0,0,0.06); }
-
-@media (max-width: 900px) {
-	.comparison-graph-card canvas { height:240px; }
-	.growth-card-header h2 { font-size:18px; }
-	.growth-time-controls .time-btn { padding:6px 10px; }
-}
-
 .calibration-mode-inline { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
 .calibration-mode-label { color: #2f3a2f; font-weight: 600; }
 .calibration-mode-inline .mode-buttons { display: flex; gap: 8px; }
@@ -584,7 +519,7 @@ html, body { overflow-x: hidden; }
 /* Allow horizontal scrolling on narrow viewports so layout remains intact
 	 instead of squeezing everything. The content keeps a sensible min-width
 	 and the page becomes horizontally scrollable on small devices. */
-@media (max-width: 900px) {
+@media (max-width: 900px) and (min-width: 769px) {
 	html, body {
 		overflow-x: auto;
 		-webkit-overflow-scrolling: touch;
@@ -1329,23 +1264,6 @@ body.sidebar-collapsed .brand{
 .sidebar-dropdown.open .caret {
 	transform: rotate(180deg);
 }
-
-/* History Dropdown Styles (same behavior as prediction) */
-.sidebar-dropdown1 .dropdown-menu1 {
-	display: none;
-	list-style: none;
-	padding: 8px 0;
-	margin: 8px 0 0 0;
-	background: #f5f7fc;
-	border-radius: 8px;
-	border: 1px solid #e4ecff;
-}
-.sidebar-dropdown1.open .dropdown-menu1 { display: block; }
-.sidebar.collapsed .sidebar-dropdown1 .dropdown-menu1 { display: none !important; }
-.sidebar-dropdown1 .dropdown-menu1 a { display:block; padding:10px 16px; color:#1d2330; font-size:13px; text-decoration:none; }
-.sidebar-dropdown1 .dropdown-menu1 a:hover { background:#e4ecff; color:#35530a; }
-.sidebar-dropdown1 .caret { display:inline-block; transition: transform 0.3s ease; margin-left:4px; }
-.sidebar-dropdown1.open .caret { transform: rotate(180deg); }
 
 .sidebar-select{
     width:100%;
@@ -3144,12 +3062,12 @@ body.sidebar-collapsed .brand{
     display:flex;
     flex-direction:column;
     gap:12px;
-	height: 40%;
+	height: 34%;
 }
 
 .actuators{
     display:grid;
-    grid-template-columns:repeat(5,1fr);
+    grid-template-columns:repeat(6,1fr);
     gap:12px;
 	height:75%;
 	
@@ -3205,7 +3123,7 @@ body.sidebar-collapsed .brand{
 	border: 1px solid rgba(255, 255, 255, 0.4);
 	border-radius:16px;
 	padding:12px;
-	max-width:90%;
+	max-width:700px;
 	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 	margin-top: 7px;
 	margin-left: auto;
@@ -3290,36 +3208,6 @@ body.sidebar-collapsed .brand{
 .nutrient-btn:focus-visible {
 	outline: none;
 	box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.25), 0 6px 16px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.5);
-}
-
-/* Compact layout: make the four nutrient items sit flush together */
-.nutrition-solution-card .nutrient-grid{
-	justify-content: center;
-	gap: 0; /* remove spacing so items touch */
-	flex-wrap: nowrap; /* keep them on one row */
-}
-
-.nutrition-solution-card .nutrient-grid{
-	justify-content: center;
-	gap: 15px; /* spacing between items */
-	flex-wrap: nowrap; /* keep them on one row */
-}
-.nutrition-solution-card .nutrient-item{
-	flex: 0 0 calc((100% - 45px) / 4); /* four items with 15px gaps */
-	border-radius: 10px; /* rounded corners */
-	padding: 14px 8px;
-	box-sizing: border-box;
-	height: 120px;
-}
-
-/* Round only the outer corners for a connected pill-like group */
-.nutrition-solution-card .nutrient-item:first-child{
-	border-top-left-radius: 10px;
-	border-bottom-left-radius: 10px;
-}
-.nutrition-solution-card .nutrient-item:last-child{
-	border-top-right-radius: 10px;
-	border-bottom-right-radius: 10px;
 }
 .state.off{
     background:#c62828;
@@ -3670,36 +3558,6 @@ body.sidebar-collapsed .brand{
 	padding: 0;
 	border: none;
 }
-
-/* Growth params grid and canvas sizing */
-.growth-params-grid {
-	width: 100%;
-	box-sizing: border-box;
-}
-.growth-params-grid canvas {
-	width: 100% !important;
-	height: 360px !important;
-	display: block;
-	border-radius: 12px;
-	background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(245,250,248,0.95));
-	padding: 8px;
-}
-
-/* Refresh button styling */
-#refreshGrowthChart {
-	background: linear-gradient(180deg,#ffffff,#f3fff3);
-	border: 1px solid rgba(60,120,40,0.12);
-	padding: 8px 12px;
-	border-radius: 10px;
-	cursor: pointer;
-	font-weight: 700;
-}
-
-#refreshGrowthChart:hover { transform: translateY(-1px); box-shadow: 0 6px 12px rgba(0,0,0,0.06); }
-
-/* Chart legend (local) */
-.comparison-graph-card .chart-legend { display:flex; gap:18px; align-items:center; padding:12px 18px; }
-.comparison-graph-card .chart-legend div { font-weight:600; color:#2f4f2f; }
 
 .time-period-buttons {
 	display: flex;
@@ -5051,4 +4909,948 @@ body.sidebar-collapsed .brand{
 	font-size: 18px;
 	font-weight: 700;
 	color: #35530a;
+}
+
+/* ==================== RELAY CONTROL STYLES ==================== */
+#manual.tab-content {
+	padding: 20px;
+}
+
+.manual-header {
+	margin-bottom: 32px;
+	padding: 20px;
+	background: linear-gradient(135deg, #5fa63a, #3b7a2a);
+	border-radius: 12px;
+	color: white;
+}
+
+.manual-header h2 {
+	margin: 0 0 8px 0;
+	font-size: 28px;
+	font-weight: 700;
+}
+
+.manual-header p {
+	margin: 0;
+	font-size: 14px;
+	opacity: 0.9;
+}
+
+.relay-control-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	gap: 16px;
+	margin-top: 20px;
+}
+
+.relay-card {
+	background: white;
+	border: 2px solid #e8ecf4;
+	border-radius: 12px;
+	overflow: hidden;
+	transition: all 0.3s ease;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.relay-card:hover {
+	border-color: #5fa63a;
+	box-shadow: 0 4px 16px rgba(95, 166, 58, 0.15);
+	transform: translateY(-2px);
+}
+
+.relay-header {
+	background: linear-gradient(135deg, #f0f4f8, #e8ecf4);
+	padding: 12px 16px;
+	border-bottom: 2px solid #e8ecf4;
+}
+
+.relay-header h3 {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 600;
+	color: #35530a;
+}
+
+.relay-body {
+	padding: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	align-items: center;
+}
+
+.relay-state {
+	font-size: 18px;
+	font-weight: 700;
+	padding: 12px 16px;
+	border-radius: 8px;
+	text-align: center;
+	width: 100%;
+	transition: all 0.3s ease;
+	font-family: 'Poppins', sans-serif;
+}
+
+.relay-state.state-off {
+	background: #fee;
+	color: #c33;
+}
+
+.relay-state.state-on {
+	background: #efe;
+	color: #3a7;
+}
+
+.relay-toggle-btn {
+	background: linear-gradient(180deg, #5fa63a, #3b7a2a);
+	color: white;
+	border: none;
+	padding: 10px 20px;
+	border-radius: 8px;
+	font-weight: 600;
+	font-size: 14px;
+	cursor: pointer;
+	transition: all 0.3s ease;
+	box-shadow: 0 2px 8px rgba(59, 122, 42, 0.2);
+	width: 100%;
+}
+
+.relay-toggle-btn:hover {
+	background: linear-gradient(180deg, #6fb54a, #2b6a1a);
+	box-shadow: 0 4px 12px rgba(59, 122, 42, 0.3);
+	transform: translateY(-1px);
+}
+
+.relay-toggle-btn:active {
+	transform: translateY(0);
+}
+
+/* ==================== OVERRIDE MODE STYLES ==================== */
+/* Manual mode - user controls relays directly */
+.actuator-card.manual-mode {
+	border: 2px solid #ff9800;
+	box-shadow: 0 0 20px rgba(255, 152, 0, 0.2);
+}
+
+.actuator-card.manual-mode .card-header {
+	color: #ff9800;
+}
+
+.actuator-card.manual-mode .actuator-header::after {
+	content: ' (MANUAL MODE)';
+	color: #ff9800;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+/* Auto mode - sensor readings control actuators */
+.actuator-card.auto-mode {
+	border: 2px solid #4caf50;
+}
+
+.actuator-card.auto-mode .actuator-header::after {
+	content: ' (AUTO MODE)';
+	color: #4caf50;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+/* Actuator toggle enabled in manual mode */
+.actuator-toggle.manual-enabled {
+	cursor: pointer;
+}
+
+.actuator-toggle.manual-enabled .toggle-slider {
+	box-shadow: 0 0 8px rgba(255, 152, 0, 0.5);
+}
+
+/* Override toggle styling */
+.override-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.override-label {
+	font-weight: 600;
+	font-size: 12px;
+	color: #666;
+}
+
+.actuator-override .toggle-slider {
+	background: #ccc;
+}
+
+.actuator-override input:checked + .toggle-slider {
+	background: #ff9800;
+}
+
+/* ==================== MOBILE RESPONSIVE STYLES ==================== */
+/* CRITICAL: Override all min-width rules for mobile */
+@media (max-width: 768px) {
+    /* Reset ALL problematic widths */
+    html, body {
+        overflow-x: hidden !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+    }
+    
+    * {
+        max-width: 100vw;
+    }
+    
+    /* Remove ALL min-width constraints */
+    .main,
+    .dashboard-grid,
+    .training-side-by-side,
+    .prediction-graphs-two-column,
+    .plants-graphs-container,
+    .cal-card,
+    .params-card,
+    .plant-graph-card,
+    .card,
+    .sensor-card,
+    .actuator-card,
+    .mini-graph-card,
+    .calibration-section,
+    .input-panel,
+    .calibration-cards-row,
+    .inputs-grid,
+    .calibration-values {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* Hide sidebar by default on mobile */
+    .sidebar {
+        transform: translateX(-100%);
+        position: fixed;
+        z-index: 1000;
+        width: 280px !important;
+        max-width: 85vw !important;
+        height: calc(100vh - 56px);
+        top: 56px;
+        left: 0;
+        background: var(--sidebar-bg, rgba(255,255,255,0.95));
+        box-shadow: 4px 0 20px rgba(0,0,0,0.15);
+    }
+    
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
+    
+    /* Main content takes full width - NO margin */
+    .main {
+        margin-left: 0 !important;
+        padding: 12px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+    }
+    
+    .sidebar.collapsed ~ .main {
+        margin-left: 0 !important;
+    }
+    
+    /* Show burger menu */
+    .burger {
+        display: flex !important;
+    }
+    
+    /* Tab content full width */
+    .tab-content {
+        padding: 0 !important;
+        width: 100% !important;
+    }
+    
+    .tab-content h2 {
+        font-size: 18px;
+        padding: 10px 0;
+        margin: 0;
+    }
+    
+    /* Dashboard grid - single column */
+    .dashboard-grid,
+    .grid,
+    .sensors-grid,
+    .sensor-readings-grid,
+    .actuator-grid {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 12px !important;
+        width: 100% !important;
+    }
+    
+    /* Cards full width */
+    .card,
+    .sensor-card,
+    .actuator-card,
+    .mini-graph-card {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 14px !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* Mini graphs row - stack vertically */
+    .mini-graphs-row {
+        flex-direction: column !important;
+        gap: 12px !important;
+        width: 100% !important;
+    }
+    
+    .mini-graph-card {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+    
+    /* Readings grid inside cards */
+    .readings-grid,
+    .sensor-readings .readings-grid {
+        grid-template-columns: 1fr 1fr !important;
+        width: 100% !important;
+    }
+    
+    /* Calibration fixes */
+    .cal-card {
+        width: 100% !important;
+        padding: 12px !important;
+    }
+    
+    .calibration-cards-row {
+        flex-direction: column !important;
+        gap: 12px !important;
+    }
+    
+    .cal-card.sensor-readings {
+        width: 100% !important;
+        margin-left: 0 !important;
+    }
+    
+    /* Calibration inputs */
+    .input-group {
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+    
+    .input-group input,
+    .inputdosaturation,
+    .inputBuffer {
+        width: 100% !important;
+        font-size: 16px !important;
+    }
+    
+    /* Training section */
+    .training-side-by-side {
+        flex-direction: column !important;
+        gap: 12px !important;
+    }
+    
+    .training-side-by-side > * {
+        width: 100% !important;
+        flex: none !important;
+    }
+    
+    /* Prediction graphs */
+    .prediction-graphs-two-column {
+        flex-direction: column !important;
+        gap: 12px !important;
+    }
+    
+    .farming-method-container {
+        width: 100% !important;
+        flex: none !important;
+    }
+    
+    /* Plant graphs */
+    .plants-graphs-container {
+        flex-direction: column !important;
+    }
+    
+    .plant-graph-card {
+        width: 100% !important;
+    }
+    
+    /* Metrics row - scrollable horizontally */
+    .metrics-row {
+        display: flex !important;
+        overflow-x: auto !important;
+        gap: 8px !important;
+        padding-bottom: 8px !important;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .metric-card {
+        flex-shrink: 0 !important;
+        width: 100px !important;
+        min-width: 100px !important;
+    }
+    
+    /* Right cards container */
+    .right-cards-container,
+    .mid-cards-container {
+        width: 100% !important;
+        flex: none !important;
+    }
+    
+    /* Topbar */
+    .topbar {
+        padding: 0 10px !important;
+        height: 56px !important;
+    }
+    
+    .brand-logo {
+        height: 32px;
+    }
+    
+    .topbar-clock {
+        font-size: 11px;
+    }
+    
+    /* Calibration tabs */
+    .calibrate-tabs,
+    .training-tabs {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+    }
+    
+    .calibrate-tab-btn,
+    .training-tab-btn {
+        font-size: 13px !important;
+        padding: 8px 12px !important;
+        flex: 1 1 auto !important;
+        text-align: center !important;
+    }
+    
+    /* Charts responsive */
+    canvas {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+    
+    /* Tables scroll */
+    table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        width: 100% !important;
+    }
+}
+
+/* Extra small phones */
+@media (max-width: 480px) {
+    body {
+        padding-top: 50px !important;
+    }
+    
+    .topbar {
+        height: 50px !important;
+    }
+    
+    .sidebar {
+        top: 50px !important;
+        height: calc(100vh - 50px) !important;
+    }
+    
+    /* Single column sensor cards */
+    .readings-grid,
+    .sensor-readings .readings-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* Smaller text */
+    .sensor-value,
+    .val-display {
+        font-size: 22px !important;
+    }
+    
+    .card {
+        padding: 10px !important;
+        border-radius: 10px !important;
+    }
+    
+    .tab-content h2 {
+        font-size: 16px !important;
+    }
+    
+    /* Buttons touch friendly */
+    .btn,
+    button {
+        padding: 12px 16px !important;
+        font-size: 14px !important;
+        min-height: 44px !important;
+    }
+    
+    /* Toggle switches */
+    .toggle-switch {
+        transform: scale(0.95);
+    }
+    
+    /* Actuator rows */
+    .actuator-row {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+    
+    .actuator-toggle {
+        width: 100% !important;
+        justify-content: space-between !important;
+    }
+}
+
+/* Overlay for mobile sidebar */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
+@media (max-width: 480px) {
+    .sidebar-overlay {
+        top: 50px;
+    }
+}
+
+/* Smooth sidebar transition */
+@media (max-width: 768px) {
+    .sidebar {
+        transition: transform 0.3s ease-in-out !important;
+    }
+}
+
+/* Modal responsive */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95vw !important;
+        max-width: 95vw !important;
+        margin: 10px auto !important;
+        padding: 16px !important;
+    }
+    
+    .modal-title {
+        font-size: 18px;
+    }
+}
+
+/* Notification positioning for mobile */
+@media (max-width: 768px) {
+    .notification-container {
+        left: 10px !important;
+        right: 10px !important;
+        bottom: 10px !important;
+        width: auto !important;
+    }
+    
+    .notification {
+        font-size: 13px;
+        padding: 10px 14px;
+    }
+}
+
+/* ==================== SIMPLIFIED CALIBRATION STYLES ==================== */
+.simple-cal-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px 0;
+}
+
+.cal-status-card, .cal-live-card, .cal-points-card, .cal-result-card {
+    background: rgba(255,255,255,0.95);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.cal-status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.cal-status-title {
+    font-weight: 600;
+    font-size: 16px;
+    color: #1d2330;
+}
+
+.cal-status-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.cal-status-badge.calibrated {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.cal-status-values {
+    display: flex;
+    gap: 24px;
+}
+
+.cal-stat {
+    display: flex;
+    flex-direction: column;
+}
+
+.cal-stat-label {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.cal-stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1d2330;
+}
+
+/* Live voltage card */
+.cal-live-card {
+    background: linear-gradient(135deg, #1a4d2e, #2d6a4f);
+    color: white;
+    text-align: center;
+}
+
+.cal-live-header {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-bottom: 8px;
+}
+
+.cal-live-value {
+    font-size: 48px;
+    font-weight: 700;
+    font-family: 'SF Mono', 'Consolas', monospace;
+}
+
+.cal-live-hint {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-top: 4px;
+}
+
+/* Calibration points */
+.cal-points-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    font-weight: 600;
+    color: #1d2330;
+}
+
+.cal-point-select {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background: white;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.cal-temp-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #f3f4f6;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    font-size: 14px;
+}
+
+.cal-temp-input {
+    width: 80px;
+    padding: 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 16px;
+    text-align: center;
+}
+
+.cal-point {
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.cal-point.captured {
+    border-color: #22c55e;
+    background: #f0fdf4;
+}
+
+.cal-point-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.cal-point.captured .cal-point-header {
+    background: #dcfce7;
+}
+
+.cal-point-num {
+    width: 28px;
+    height: 28px;
+    background: #1a4d2e;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.cal-point-label {
+    flex: 1;
+    font-weight: 600;
+    color: #1d2330;
+}
+
+.cal-point-status {
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.cal-point.captured .cal-point-status {
+    color: #22c55e;
+}
+
+.cal-point-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.cal-point-voltage {
+    font-size: 14px;
+    color: #4b5563;
+}
+
+.cal-point-voltage span {
+    font-weight: 700;
+    color: #1d2330;
+}
+
+.cal-capture-btn {
+    padding: 12px 20px;
+    background: #1a4d2e;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.cal-capture-btn:hover {
+    background: #145239;
+}
+
+.cal-capture-btn:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+}
+
+.cal-standard-input {
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 15px;
+    width: 100%;
+}
+
+/* Result card */
+.cal-result-card {
+    background: #ecfdf5;
+    border: 2px solid #22c55e;
+}
+
+.cal-result-header {
+    font-size: 16px;
+    font-weight: 600;
+    color: #065f46;
+    margin-bottom: 12px;
+}
+
+.cal-result-values {
+    display: flex;
+    gap: 32px;
+}
+
+.cal-result-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.cal-result-item span:first-child {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.cal-result-item span:last-child {
+    font-size: 28px;
+    font-weight: 700;
+    color: #065f46;
+}
+
+/* Action buttons */
+.cal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.cal-btn {
+    padding: 14px 28px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.cal-btn-primary {
+    background: #1a4d2e;
+    color: white;
+}
+
+.cal-btn-primary:hover:not(:disabled) {
+    background: #145239;
+}
+
+.cal-btn-primary:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+}
+
+.cal-btn-secondary {
+    background: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+}
+
+.cal-btn-secondary:hover {
+    background: #e5e7eb;
+}
+
+/* Success modal */
+.cal-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.cal-modal-content {
+    background: white;
+    padding: 32px;
+    border-radius: 20px;
+    text-align: center;
+    max-width: 320px;
+}
+
+.cal-modal-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.cal-modal-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1d2330;
+    margin-bottom: 8px;
+}
+
+.cal-modal-msg {
+    font-size: 14px;
+    color: #6b7280;
+    margin-bottom: 20px;
+}
+
+/* Calibration Success Modal */
+.cal-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.cal-modal-content {
+    background: #1e2936;
+    border-radius: 16px;
+    padding: 32px;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+}
+
+.cal-modal-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.cal-modal-content h3 {
+    color: #00d9ff;
+    margin-bottom: 12px;
+}
+
+.cal-modal-content p {
+    color: #b4c6e0;
+    margin-bottom: 24px;
+}
+
+.cal-modal-close {
+    background: #00d9ff;
+    color: #0a1929;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.cal-modal-close:hover {
+    background: #00bcd4;
 }

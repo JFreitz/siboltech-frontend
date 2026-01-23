@@ -1,47 +1,3 @@
-// === SIBOLTECH API Configuration ===
-const RELAY_API_URL = 'https://likelihood-glucose-struck-representing.trycloudflare.com/api';
-
-// Fetch real sensor data from API
-async function fetchSensorData() {
-    try {
-        const res = await fetch(`${RELAY_API_URL}/latest`);
-        const data = await res.json();
-        
-        // Update dashboard sensor values
-        if (data.ph !== undefined) {
-            document.querySelectorAll('#val-ph, [data-sensor="ph"] .value').forEach(el => {
-                if (el) el.textContent = data.ph.toFixed(2);
-            });
-        }
-        if (data.do !== undefined) {
-            document.querySelectorAll('#val-do, [data-sensor="do"] .value').forEach(el => {
-                if (el) el.textContent = data.do.toFixed(2) + ' mg/L';
-            });
-        }
-        if (data.temp !== undefined) {
-            document.querySelectorAll('#val-temp, [data-sensor="temp"] .value').forEach(el => {
-                if (el) el.textContent = data.temp.toFixed(1) + ' °C';
-            });
-        }
-        if (data.hum !== undefined) {
-            document.querySelectorAll('#val-hum, [data-sensor="hum"] .value').forEach(el => {
-                if (el) el.textContent = data.hum.toFixed(1) + ' %';
-            });
-        }
-        if (data.tds !== undefined) {
-            document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => {
-                if (el) el.textContent = data.tds.toFixed(0) + ' ppm';
-            });
-        }
-    } catch (e) {
-        console.log('API fetch error:', e);
-    }
-}
-
-// Start fetching sensor data
-setInterval(fetchSensorData, 3000);
-setTimeout(fetchSensorData, 500);
-
 // --- Calibrate UI logic ---
 (function initCalibrate() {
 	const calTab = document.getElementById('calibrate');
@@ -125,12 +81,41 @@ setTimeout(fetchSensorData, 500);
 
 		if (!toggle) return;
 
-		const sensorState = state[sensorType] || { mode: '1', currentPoint: 1, data: [] };
+		toggle.addEventListener('change', () => {
+			const isChecked = toggle.checked;
+			if (toggleText) toggleText.textContent = isChecked ? 'ON' : 'OFF';
+			config.sections.forEach(id => {
+				const el = document.getElementById(id);
+				if (el) {
+					if (id.includes('ModeSection')) el.style.display = isChecked ? 'flex' : 'none';
+					else el.style.display = isChecked ? 'block' : 'none';
+				}
+			});
+			
+			// When turning ON, reset inputs to clear previous data
+			if (isChecked) {
+				resetInputs(sensorType);
+			} 
+			// When turning OFF, clear all input data and reset state
+			else {
+				state[sensorType].data = [];
+				state[sensorType].currentPoint = 1;
+			}
+		});
+	}
+
+	function resetInputs(sensorType) {
+		const config = sensorConfigs[sensorType];
 		const container = document.getElementById(config.containerId);
 		if (!container) return;
 
-		const applyBtnHtml = sensorState.mode === '1' ? '' : `<button class="btn btn-apply" id="${config.applyBtnId}">Apply</button>`;
+		state[sensorType].currentPoint = 1;
+		state[sensorType].data = [];
 
+		const sensorState = state[sensorType];
+		const isOnePoint = sensorState.mode === '1';
+		const applyBtnHtml = !isOnePoint ? `<button class="btn btn-apply" id="${config.applyBtnId}">Apply</button>` : '';
+		
 		let specialInputHtml = '';
 		if (sensorType === 'do') {
 			const satValue = sensorState.mode === '2' ? '0' : '100';
@@ -162,8 +147,6 @@ setTimeout(fetchSensorData, 500);
 				${applyBtnHtml}
 			</div>
 		`;
-
-		if (toggleText) toggleText.textContent = (toggle.checked ? 'ON' : 'OFF');
 	}
 
 	function addInputRow(sensorType, pointNum) {
@@ -697,11 +680,26 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	
 
+	// Create overlay for mobile sidebar
+	let overlay = document.querySelector('.sidebar-overlay');
+	if (!overlay) {
+		overlay = document.createElement('div');
+		overlay.className = 'sidebar-overlay';
+		document.body.appendChild(overlay);
+	}
+	
+	// Close sidebar when clicking overlay
+	overlay.addEventListener('click', () => {
+		sidebar.classList.remove('mobile-open');
+		overlay.classList.remove('active');
+	});
+
 	// Toggle sidebar (collapse/expand on desktop, open/close on mobile)
 	burger.addEventListener('click', ()=>{
-		// For mobile (small screens), use 'open' class for slide in/out
-		if(window.innerWidth <= 900){
-			sidebar.classList.toggle('open');
+		// For mobile (small screens), use 'mobile-open' class for slide in/out
+		if(window.innerWidth <= 768){
+			const isOpen = sidebar.classList.toggle('mobile-open');
+			overlay.classList.toggle('active', isOpen);
 		} else {
 			// For desktop, use 'collapsed' class for collapse/expand
 			sidebar.classList.toggle('collapsed');
@@ -729,7 +727,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			
 			// Special handling for prediction tab - toggle dropdown
 			const predictionItem = document.querySelector('.sidebar-dropdown');
-			const historyItem = document.querySelector('.sidebar-dropdown1');
 			if(t === 'predicting') {
 				if(predictionItem) {
 					const isOpen = predictionItem.classList.toggle('open');
@@ -750,28 +747,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				}
 				return;
 			}
-
-			// Special handling for history tab - toggle dropdown
-			if(t === 'history') {
-				if(historyItem) {
-					const isOpen = historyItem.classList.toggle('open');
-					if(isOpen) {
-						document.querySelectorAll('[data-tab]').forEach(x=>x.classList.remove('active'));
-						a.classList.add('active');
-						contents.forEach(c=>c.classList.remove('active'));
-						const target = document.getElementById(t);
-						if(target) target.classList.add('active');
-						// mark first history subitem active
-						document.querySelectorAll('.history').forEach(h => h.classList.remove('active'));
-						document.querySelector('.history')?.classList.add('active');
-					}
-				}
-				return;
-			}
 			
-			// Close prediction and history dropdowns when switching to other tabs
-			if(t !== 'predicting' && predictionItem) predictionItem.classList.remove('open');
-			if(t !== 'history' && historyItem) historyItem.classList.remove('open');
+			// Close prediction dropdown when switching to other tabs
+			if(t !== 'predicting' && predictionItem) {
+				predictionItem.classList.remove('open');
+			}
 			
 			document.querySelectorAll('[data-tab]').forEach(x=>x.classList.remove('active'));
 			a.classList.add('active');
@@ -795,7 +775,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			}
 			
 			// close mobile sidebar after selection
-			if(window.innerWidth <= 900) sidebar.classList.remove('open');
+			if(window.innerWidth <= 768) { sidebar.classList.remove('mobile-open'); document.querySelector('.sidebar-overlay')?.classList.remove('active'); }
 			// If calibrate selected, focus first input
 			if(t === 'calibrate'){
 				setTimeout(()=>document.getElementById('calSensor')?.focus(),200);
@@ -807,14 +787,64 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	const historyBoard = document.querySelector('.history-board');
 	if (historyBoard) {
 		const historyState = { method: 'aero', plant: '1', interval: 'Daily' };
-		const historyEmptyCell = historyBoard.querySelector('.history-empty');
+		const historyTableBody = historyBoard.querySelector('.history-table-wrap[data-history-view="sensor"] tbody');
+
+		// Fetch and display sensor history data
+		async function fetchSensorHistory() {
+			const interval = historyState.interval === 'Daily' ? 'daily' : '15min';
+			const days = interval === 'daily' ? 30 : 1; // 30 days for daily, 1 day for 15min
+			
+			try {
+				const response = await fetch(`${RELAY_API_URL}/history?interval=${interval}&days=${days}&limit=50`);
+				if (!response.ok) throw new Error('Failed to fetch history');
+				
+				const data = await response.json();
+				
+				if (data.success && data.readings && data.readings.length > 0) {
+					renderHistoryTable(data.readings);
+				} else {
+					showHistoryEmpty();
+				}
+			} catch (err) {
+				console.error('History fetch error:', err);
+				showHistoryEmpty();
+			}
+		}
+		
+		// Render history data to the table
+		function renderHistoryTable(readings) {
+			if (!historyTableBody) return;
+			
+			const rows = readings.map(r => `
+				<tr>
+					<td>${r.timestamp || '-'}</td>
+					<td>${r.ph !== null ? r.ph : '-'}</td>
+					<td>${r.do !== null ? r.do + ' mg/L' : '-'}</td>
+					<td>${r.tds !== null ? r.tds + ' ppm' : '-'}</td>
+					<td>${r.temp !== null ? r.temp + ' °C' : '-'}</td>
+					<td>${r.humidity !== null ? r.humidity + ' %' : '-'}</td>
+					<td colspan="5" class="plant-data-na">-</td>
+				</tr>
+			`).join('');
+			
+			historyTableBody.innerHTML = rows;
+		}
+		
+		// Show empty state message
+		function showHistoryEmpty() {
+			if (!historyTableBody) return;
+			const methodLabel = historyBoard.querySelector('[data-history-tab].active')?.textContent?.trim() || 'Aeroponics';
+			const intervalLabel = historyState.interval;
+			historyTableBody.innerHTML = `
+				<tr>
+					<td colspan="11" class="history-empty">No sensor data available for ${intervalLabel} interval (${methodLabel}).</td>
+				</tr>
+			`;
+		}
 
 		const updateHistoryEmpty = () => {
-			if (!historyEmptyCell) return;
-			const methodLabel = historyBoard.querySelector('[data-history-tab].active')?.textContent?.trim() || 'Aeroponics';
-			const intervalLabel = historyBoard.querySelector('.history-chip.active')?.textContent?.trim() || 'Daily';
-			const plantLabel = historyBoard.querySelector('.history-pill.active')?.textContent?.trim() || '1';
-			historyEmptyCell.textContent = `No data yet for Plant ${plantLabel} (${intervalLabel}, ${methodLabel}).`;
+			// Now fetches real data instead of just showing empty
+			fetchSensorHistory();
 		};
 
 		historyBoard.querySelectorAll('[data-history-tab]').forEach(btn => {
@@ -823,13 +853,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				historyBoard.querySelectorAll('[data-history-tab]').forEach(b => b.classList.remove('active'));
 				btn.classList.add('active');
 				historyState.method = btn.getAttribute('data-history-tab') || historyState.method;
-				updateHistoryEmpty();
+				
 				// Toggle history table views based on selected method
 				const view = historyState.method === 'trad' ? 'plant' : 'sensor';
 				historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
 					if (w.getAttribute('data-history-view') === view) w.style.display = '';
 					else w.style.display = 'none';
 				});
+				
+				// Fetch data for sensor view
+				if (view === 'sensor') {
+					fetchSensorHistory();
+				}
 			});
 		});
 
@@ -845,7 +880,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				historyBoard.querySelectorAll('.history-pill').forEach(p => p.classList.remove('active'));
 				pill.classList.add('active');
 				historyState.plant = pill.textContent.trim();
-				updateHistoryEmpty();
+				// Plant selection doesn't affect sensor data, but refresh anyway
+				fetchSensorHistory();
 			});
 		});
 
@@ -854,66 +890,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				historyBoard.querySelectorAll('.history-chip').forEach(c => c.classList.remove('active'));
 				chip.classList.add('active');
 				historyState.interval = chip.textContent.trim();
-				updateHistoryEmpty();
+				// Fetch new data when interval changes
+				fetchSensorHistory();
 			});
 		});
 
-		updateHistoryEmpty();
-
-		// Sidebar history menu (Plant / Actuator) click handlers
-		const sidebarHistoryItems = document.querySelectorAll('#historyMenu .history');
-		if(sidebarHistoryItems && sidebarHistoryItems.length) {
-			sidebarHistoryItems.forEach(item => {
-				item.addEventListener('click', (e) => {
-					e.preventDefault();
-					const metric = item.getAttribute('data-metric'); // 'Plant' or 'Actuator'
-					// Do not navigate to other tabs or dashboard when submenu items are clicked.
-					// Update history board view in-place instead.
-					if (metric && metric.toLowerCase().includes('actuator')) {
-						// When Actuator submenu is clicked, open History and show the sensor/history table.
-						const historyAnchor = document.querySelector('[data-tab="history"]');
-						if (historyAnchor) {
-							document.querySelectorAll('[data-tab]').forEach(x => x.classList.remove('active'));
-							historyAnchor.classList.add('active');
-							document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-							const histSec = document.getElementById('history');
-							if (histSec) histSec.classList.add('active');
-						}
-						// Show sensor view (the main history table with sensor+plant columns)
-						historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
-							if (w.getAttribute('data-history-view') === 'sensor') w.style.display = '';
-							else w.style.display = 'none';
-						});
-					} else if (metric && metric.toLowerCase() === 'plant') {
-						// Ensure History tab is active
-						const historyAnchor = document.querySelector('[data-tab="history"]');
-						if (historyAnchor) {
-							document.querySelectorAll('[data-tab]').forEach(x => x.classList.remove('active'));
-							historyAnchor.classList.add('active');
-							document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-							const histSec = document.getElementById('history');
-							if (histSec) histSec.classList.add('active');
-						}
-
-						// Always show both sensor and plant table views together
-						historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
-							w.style.display = '';
-						});
-					} else {
-						// Other metrics: show sensor view by default
-						historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
-							if (w.getAttribute('data-history-view') === 'sensor') w.style.display = '';
-							else w.style.display = 'none';
-						});
-					}
-					// Update active state for sidebar items
-					sidebarHistoryItems.forEach(s => s.classList.remove('active'));
-					item.classList.add('active');
-					// Update empty message if needed
-					updateHistoryEmpty();
-				});
-			});
-		}
+		// Initial load
+		fetchSensorHistory();
 	}
 
 	// Prediction dropdown option click handlers
@@ -930,7 +913,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			generatePlantGraphs(metric, selectedMethod);
 			
 			// Close mobile sidebar if open
-			if(window.innerWidth <= 900) sidebar.classList.remove('open');
+			if(window.innerWidth <= 768) { sidebar.classList.remove('mobile-open'); document.querySelector('.sidebar-overlay')?.classList.remove('active'); }
 		});
 	});
 
@@ -1392,14 +1375,39 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	let actuatorOverride = false;
 
-	function updateSensorsAndActuators(){
-		// sample values - replace with real sensor API later
-		// widen ranges so warnings/critical states appear more often during demo
-		const phValue = (6 + Math.random()*2).toFixed(2);      // 6.00 - 7.99
-		const doValue = (6 + Math.random()*4).toFixed(1);       // 6.0 - 9.9
-		const tempValue = (22 + Math.random()*8).toFixed(1);    // 22.0 - 29.9
-		const humValue = Math.floor(45 + Math.random()*45);     // 45 - 89
-		const tdsValue = (0.3 + Math.random()*2.2).toFixed(2);  // 0.30 - 2.50
+	// Fetch real sensor data from API
+	async function fetchSensorData() {
+		try {
+			const response = await fetch(`${RELAY_API_URL}/latest`);
+			if (!response.ok) throw new Error('Failed to fetch sensor data');
+			return await response.json();
+		} catch (err) {
+			console.error('Sensor fetch error:', err);
+			return null;
+		}
+	}
+
+	async function updateSensorsAndActuators(){
+		// Fetch real sensor data from API
+		const sensorData = await fetchSensorData();
+		
+		let phValue, doValue, tempValue, humValue, tdsValue;
+		
+		if (sensorData) {
+			// Use real API data
+			phValue = sensorData.ph?.value?.toFixed(2) || '0.00';
+			doValue = sensorData.do_mg_l?.value?.toFixed(1) || '0.0';
+			tempValue = sensorData.temperature_c?.value?.toFixed(1) || '0.0';
+			humValue = Math.round(sensorData.humidity?.value || 0);
+			tdsValue = Math.round(sensorData.tds_ppm?.value || 0);
+		} else {
+			// Fallback to last known values or zeros
+			phValue = '0.00';
+			doValue = '0.0';
+			tempValue = '0.0';
+			humValue = 0;
+			tdsValue = 0;
+		}
 		
 		// push live readings to all mirrored UI blocks (dashboard, training, sensors tab)
 		const setValueAll = (key, val) => {
@@ -1425,30 +1433,64 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		updateSensorAlert('hum', humValue);
 		updateSensorAlert('tds', tdsValue);
 
-		// actuators - only auto-adjust when override is OFF
+		// Actuators - sync with relay status from API (no random)
 		if(!actuatorOverride){
-			setActuatorState('act-water', Math.random()>0.2 ? 'ON':'OFF');
-			setActuatorState('act-air', Math.random()>0.5 ? 'ON':'OFF');
-			// Track both exhaust fans separately (in/out)
-			setActuatorState('act-fan-in', Math.random()>0.4 ? 'ON':'OFF');
-			setActuatorState('act-fan-out', Math.random()>0.4 ? 'ON':'OFF');
-			setActuatorState('act-lights-aerponics', Math.random()>0.3 ? 'ON':'OFF');
-			setActuatorState('act-lights-dwc', Math.random()>0.3 ? 'ON':'OFF');
+			// Fetch relay status and sync actuator UI
+			try {
+				const relayResponse = await fetch(`${RELAY_API_URL}/relay/status`);
+				if (relayResponse.ok) {
+					const relayData = await relayResponse.json();
+					if (relayData.relays) {
+						relayData.relays.forEach(relay => {
+							const actuatorId = RELAY_TO_ACTUATOR[relay.id];
+							if (actuatorId) {
+								setActuatorStateUI(actuatorId, relay.state ? 'ON' : 'OFF');
+							}
+						});
+					}
+				}
+			} catch (err) {
+				console.error('Relay status fetch error:', err);
+			}
+			
+			// Auto-activate nutrient relays based on sensor thresholds
+			checkNutrientAutoActivation(parseFloat(phValue), parseFloat(tdsValue));
 		}
 	}
+	
+	// Helper to update actuator UI without sending to API
+	function setActuatorStateUI(id, state) {
+		const checkbox = document.getElementById(id);
+		if(!checkbox) return;
+		const label = checkbox.closest('.toggle-switch');
+		const toggleText = label ? label.querySelector('.toggle-text') : null;
+		const isOn = (state === 'ON');
+		
+		checkbox.checked = isOn;
+		if(toggleText) toggleText.textContent = state;
+	}
 
-	// helper: set actuator state text + checkbox
+	// helper: set actuator state text + checkbox AND send to relay API
 	function setActuatorState(id, state){
 		const checkbox = document.getElementById(id);
 		if(!checkbox) return;
 		const label = checkbox.closest('.toggle-switch');
 		const toggleText = label ? label.querySelector('.toggle-text') : null;
+		const isOn = (state === 'ON');
 		
-		checkbox.checked = (state === 'ON');
+		checkbox.checked = isOn;
 		if(toggleText) toggleText.textContent = state;
+		
+		// Also update the physical relay via API (only in auto mode)
+		const relayNum = typeof ACTUATOR_TO_RELAY !== 'undefined' ? ACTUATOR_TO_RELAY[id] : null;
+		if(relayNum && !actuatorOverride) {
+			// Send to relay API for auto-control
+			toggleRelay(relayNum, isOn, null);
+		}
 	}
 
-	// Add event listeners to actuator toggles to update text
+	// Add event listeners to actuator toggles to update text (moved to setupActuatorRelayControl)
+	// Keeping basic text update for manual override mode
 	document.querySelectorAll('.actuator-toggle input[type="checkbox"]').forEach(checkbox => {
 		checkbox.addEventListener('change', () => {
 			const label = checkbox.closest('.toggle-switch');
@@ -1456,10 +1498,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			if(toggleText) {
 				toggleText.textContent = checkbox.checked ? 'ON' : 'OFF';
 			}
+			// If override is ON, send to relay API
+			if(actuatorOverride) {
+				const relayNum = typeof ACTUATOR_TO_RELAY !== 'undefined' ? ACTUATOR_TO_RELAY[checkbox.id] : null;
+				if(relayNum) {
+					toggleRelay(relayNum, checkbox.checked, null);
+				}
+			}
 		});
 	});
 
-	// Override toggle: when ON, freeze auto-updates to actuators; manual toggles still work
+	// Override toggle: when ON, freeze auto-updates to actuators; manual toggles control relays directly
 	const overrideToggle = document.getElementById('actuatorOverrideToggle');
 	if(overrideToggle){
 		const updateOverrideState = () => {
@@ -1467,13 +1516,185 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			const textEl = label ? label.querySelector('.toggle-text') : null;
 			actuatorOverride = overrideToggle.checked;
 			if(textEl) textEl.textContent = actuatorOverride ? 'ON' : 'OFF';
+			
+			// Visual feedback: change actuator card styling based on mode
+			const actuatorCard = document.querySelector('.actuator-card');
+			if(actuatorCard) {
+				if(actuatorOverride) {
+					actuatorCard.classList.add('manual-mode');
+					actuatorCard.classList.remove('auto-mode');
+				} else {
+					actuatorCard.classList.add('auto-mode');
+					actuatorCard.classList.remove('manual-mode');
+				}
+			}
+			
+			// Enable/disable actuator toggles visual cue
+			document.querySelectorAll('.actuator-toggle').forEach(toggle => {
+				if(actuatorOverride) {
+					toggle.classList.add('manual-enabled');
+				} else {
+					toggle.classList.remove('manual-enabled');
+				}
+			});
+			
+			console.log(`Override mode: ${actuatorOverride ? 'MANUAL' : 'AUTO'}`);
 		};
 		overrideToggle.addEventListener('change', updateOverrideState);
 		updateOverrideState();
 	}
 
-	// Nutrient solution quick actions
-	function showNutrientNotification(label){
+	// Nutrient solution quick actions with 2-second pulse mode
+	// Threshold-based logic with HYSTERESIS and MOVING AVERAGE to prevent noise-triggered activations
+	// - pH Up: activates when pH < 5.5, deactivates when pH > 5.8
+	// - pH Down: activates when pH > 6.5, deactivates when pH < 6.2
+	// - Leafy Green: activates when TDS < 600, deactivates when TDS > 650
+	const NUTRIENT_THRESHOLDS = {
+		'btn-ph-up': { 
+			sensor: 'ph', 
+			condition: 'below', 
+			triggerOn: 5.5,      // Activate when below this
+			triggerOff: 5.8,     // Deactivate when above this (hysteresis)
+			consecutiveRequired: 3  // Require 3 consecutive readings
+		},
+		'btn-ph-down': { 
+			sensor: 'ph', 
+			condition: 'above', 
+			triggerOn: 6.5,      // Activate when above this
+			triggerOff: 6.2,     // Deactivate when below this (hysteresis)
+			consecutiveRequired: 3
+		},
+		'btn-leafy-green': { 
+			sensor: 'tds', 
+			condition: 'below', 
+			triggerOn: 600,      // Activate when below this
+			triggerOff: 650,     // Deactivate when above this (hysteresis)
+			consecutiveRequired: 3
+		}
+	};
+
+	const NUTRIENT_PULSE_DURATION = 2000; // 2 seconds
+	const NUTRIENT_AUTO_COOLDOWN = 30000; // 30 seconds cooldown between auto-activations
+	const MOVING_AVG_WINDOW = 5; // Number of readings to average
+
+	// State tracking for anti-fluctuation
+	const nutrientLastActivation = {
+		'btn-ph-up': 0,
+		'btn-ph-down': 0,
+		'btn-leafy-green': 0
+	};
+	
+	// Moving average buffers
+	const sensorHistory = {
+		ph: [],
+		tds: []
+	};
+	
+	// Consecutive threshold breach counter
+	const consecutiveBreaches = {
+		'btn-ph-up': 0,
+		'btn-ph-down': 0,
+		'btn-leafy-green': 0
+	};
+	
+	// Track if nutrient is currently "active" (for hysteresis)
+	const nutrientActiveState = {
+		'btn-ph-up': false,
+		'btn-ph-down': false,
+		'btn-leafy-green': false
+	};
+
+	// Calculate moving average
+	function updateMovingAverage(sensor, newValue) {
+		const history = sensorHistory[sensor];
+		history.push(newValue);
+		if (history.length > MOVING_AVG_WINDOW) {
+			history.shift(); // Remove oldest
+		}
+		return history.reduce((a, b) => a + b, 0) / history.length;
+	}
+
+	// Check sensor readings with anti-fluctuation logic
+	function checkNutrientAutoActivation(phValue, tdsValue) {
+		const now = Date.now();
+		
+		// Update moving averages
+		const avgPH = updateMovingAverage('ph', phValue);
+		const avgTDS = updateMovingAverage('tds', tdsValue);
+		const avgValues = { ph: avgPH, tds: avgTDS };
+		
+		Object.entries(NUTRIENT_THRESHOLDS).forEach(([btnId, config]) => {
+			const { sensor, condition, triggerOn, triggerOff, consecutiveRequired } = config;
+			const avgValue = avgValues[sensor];
+			if (avgValue === undefined || isNaN(avgValue)) return;
+			
+			// Check if threshold is exceeded (using averaged value)
+			let thresholdBreached = false;
+			if (condition === 'below' && avgValue < triggerOn) {
+				thresholdBreached = true;
+			} else if (condition === 'above' && avgValue > triggerOn) {
+				thresholdBreached = true;
+			}
+			
+			// Check if we should deactivate (hysteresis - crossed back over triggerOff)
+			let shouldDeactivate = false;
+			if (nutrientActiveState[btnId]) {
+				if (condition === 'below' && avgValue > triggerOff) {
+					shouldDeactivate = true;
+				} else if (condition === 'above' && avgValue < triggerOff) {
+					shouldDeactivate = true;
+				}
+			}
+			
+			// Update consecutive breach counter
+			if (thresholdBreached && !nutrientActiveState[btnId]) {
+				consecutiveBreaches[btnId]++;
+			} else if (!thresholdBreached || shouldDeactivate) {
+				consecutiveBreaches[btnId] = 0;
+				if (shouldDeactivate) {
+					nutrientActiveState[btnId] = false;
+					console.log(`[Hysteresis] ${btnId} deactivated: ${sensor} avg=${avgValue.toFixed(2)} crossed ${triggerOff}`);
+				}
+			}
+			
+			// Only activate if:
+			// 1. Threshold breached for consecutive readings
+			// 2. Cooldown period passed
+			// 3. Not already in active state
+			const shouldActivate = 
+				consecutiveBreaches[btnId] >= consecutiveRequired &&
+				!nutrientActiveState[btnId] &&
+				(now - nutrientLastActivation[btnId]) > NUTRIENT_AUTO_COOLDOWN;
+			
+			if (shouldActivate) {
+				const btn = document.getElementById(btnId);
+				if (btn && !btn.disabled) {
+					nutrientLastActivation[btnId] = now;
+					nutrientActiveState[btnId] = true;
+					consecutiveBreaches[btnId] = 0;
+					
+					const label = btnId === 'btn-ph-up' ? 'pH Up' : 
+					              btnId === 'btn-ph-down' ? 'pH Down' : 'Leafy Green';
+					console.log(`[Auto-activate] ${label}: ${sensor} avg=${avgValue.toFixed(2)} ${condition} ${triggerOn} (${consecutiveRequired} consecutive readings)`);
+					
+					// Disable button during pulse
+					btn.disabled = true;
+					btn.classList.add('is-dosing');
+					
+					// Pulse the relay (2 seconds ON then OFF)
+					pulseNutrientRelay(btnId, label, true);
+					
+					// Re-enable after pulse
+					setTimeout(() => {
+						btn.disabled = false;
+						btn.classList.remove('is-dosing');
+					}, NUTRIENT_PULSE_DURATION + 500);
+				}
+			}
+		});
+	}
+
+	function showNutrientNotification(label, isAuto = false){
 		const container = document.getElementById('notificationContainer');
 		if(!container) return;
 		const notif = document.createElement('div');
@@ -1482,7 +1703,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			<div class="notification-icon">💧</div>
 			<div class="notification-content">
 				<div class="notification-title">Nutrient Solution</div>
-				<div class="notification-message">${label} triggered</div>
+				<div class="notification-message">${label} ${isAuto ? '(auto)' : ''} - 2s pulse</div>
 			</div>
 		`;
 		container.appendChild(notif);
@@ -1493,28 +1714,58 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		}, 2500);
 	}
 
+	// Pulse a nutrient relay: ON for 2 seconds, then OFF
+	async function pulseNutrientRelay(btnId, label, isAuto = false) {
+		const relayNum = ACTUATOR_TO_RELAY[btnId];
+		if (!relayNum) return;
+
+		try {
+			// Turn ON
+			await fetch(`${RELAY_API_URL}/relay/${relayNum}/on`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' }
+			});
+			showNutrientNotification(label, isAuto);
+			console.log(`Nutrient ${label} relay ${relayNum} ON`);
+
+			// After 2 seconds, turn OFF
+			setTimeout(async () => {
+				await fetch(`${RELAY_API_URL}/relay/${relayNum}/off`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' }
+				});
+				console.log(`Nutrient ${label} relay ${relayNum} OFF`);
+			}, NUTRIENT_PULSE_DURATION);
+		} catch (err) {
+			console.error(`Failed to pulse nutrient relay: ${err}`);
+		}
+	}
+
 	function setupNutrientButtons(){
 		const actions = [
 			{ id: 'btn-ph-up', label: 'pH Up' },
 			{ id: 'btn-ph-down', label: 'pH Down' },
-			{ id: 'btn-leafy-green', label: 'Leafy Green' },
-			{ id: 'btn-misting-pump', label: 'Misting Pump' }
+			{ id: 'btn-leafy-green', label: 'Leafy Green' }
 		];
 
 		actions.forEach(action => {
 			const btn = document.getElementById(action.id);
 			if(!btn) return;
-			btn.addEventListener('click', () => {
+			btn.addEventListener('click', async () => {
 				if(btn.disabled) return;
 				btn.disabled = true;
 				btn.classList.add('is-dosing');
 				btn.setAttribute('aria-pressed', 'true');
-				showNutrientNotification(action.label);
+				
+				// Pulse relay for 2 seconds (ON then OFF)
+				await pulseNutrientRelay(action.id, action.label);
+				
+				// Re-enable button after pulse duration + cooldown
 				setTimeout(() => {
 					btn.disabled = false;
 					btn.classList.remove('is-dosing');
 					btn.setAttribute('aria-pressed', 'false');
-				}, 5000);
+				}, NUTRIENT_PULSE_DURATION + 500);
 			});
 		});
 	}
@@ -1638,7 +1889,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		toggleDeleteButtonsVisibility('#aeroponicsPlantsList');
 	}, 100);
 	
-	setInterval(()=>{ drawMini('mini1'); drawMini('mini2'); drawMini('mini3'); updateSensorsAndActuators(); }, 5000);
+	setInterval(()=>{ drawMini('mini1'); drawMini('mini2'); drawMini('mini3'); updateSensorsAndActuators(); }, 3000);  // Poll every 3 seconds for faster updates
 	
 	// Handle window resize for responsive canvas
 	let resizeTimeout;
@@ -1659,17 +1910,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			timeButtons.forEach(b => b.classList.remove('active'));
 			btn.classList.add('active');
 			currentDays = parseInt(btn.getAttribute('data-days'));
-			drawComparisonGraph();
-		});
-	});
-
-	// Metric button handlers (height, width, length, leaves, branches)
-	const metricButtons = document.querySelectorAll('.metric-btn');
-	metricButtons.forEach(btn => {
-		btn.addEventListener('click', () => {
-			metricButtons.forEach(b => b.classList.remove('active'));
-			btn.classList.add('active');
-			currentMetric = btn.getAttribute('data-metric') || 'height';
 			drawComparisonGraph();
 		});
 	});
@@ -1723,7 +1963,7 @@ setTimeout(() => {
 							<span class="sensor-label-text1">No</span>
 							<span class="sensor-number-display1">${rowNum}</span>
 						</label>
-						<button class="row-delete-btn" title="Delete row"><img src="../negativesign.png" alt="Delete"></button>
+						<button class="row-delete-btn" title="Delete row"><img src="negativesign.png" alt="Delete"></button>
 					</div>
 					<div class="sensor-column1">
 						<label class="sensor-input-label1">
@@ -1787,7 +2027,7 @@ setTimeout(() => {
 						<span class="sensor-label-text1">No</span>
 						<span class="sensor-number-display1">${rowNum}</span>
 					</label>
-					<button class="row-delete-btn" title="Delete row"><img src="../negativesign.png" alt="Delete"></button>
+					<button class="row-delete-btn" title="Delete row"><img src="negativesign.png" alt="Delete"></button>
 				</div>
 				<div class="sensor-column1">
 					<label class="sensor-input-label1">
@@ -1851,7 +2091,7 @@ setTimeout(() => {
 						<span class="sensor-label-text1">No</span>
 						<span class="sensor-number-display1">${rowNum}</span>
 					</label>
-					<button class="row-delete-btn" title="Delete row"><img src="../negativesign.png" alt="Delete"></button>
+					<button class="row-delete-btn" title="Delete row"><img src="negativesign.png" alt="Delete"></button>
 				</div>
 				<div class="sensor-column1">
 					<label class="sensor-input-label1">
@@ -2005,7 +2245,7 @@ setTimeout(() => {
 						<span class="sensor-label-text1">No</span>
 						<span class="sensor-number-display1">1</span>
 					</label>
-					<button class="row-delete-btn" title="Delete row"><img src="../negativesign.png" alt="Delete"></button>
+					<button class="row-delete-btn" title="Delete row"><img src="negativesign.png" alt="Delete"></button>
 				</div>
 				<div class="sensor-column1">
 					<label class="sensor-input-label1">
@@ -2877,30 +3117,18 @@ setTimeout(() => {
 }, 500);
 
 // Comparison Graph Functionality
-let currentDays = 7;
-let currentMetric = 'height';
+let currentDays = 1;
 let graphData = {
 	aeroponic: [],
 	dwc: [],
 	traditional: []
 };
 
-function generateGraphData(days, metric) {
+function generateGraphData(days) {
 	const points = Math.min(days * 4, 120); // Max 120 points for smoothness
-
-	// Pick base values per metric to simulate different scales
-	const metricBases = {
-		height: { aero: 50, dwc: 45, trad: 40, unit: 'cm' },
-		width: { aero: 30, dwc: 28, trad: 26, unit: 'cm' },
-		length: { aero: 40, dwc: 36, trad: 34, unit: 'cm' },
-		leaves: { aero: 20, dwc: 16, trad: 12, unit: 'count' },
-		branches: { aero: 6, dwc: 5, trad: 4, unit: 'count' }
-	};
-
-	const m = metricBases[metric] || metricBases.height;
-
+	
 	// Aeroponic - fastest growth, highest values
-	const aeroponicBase = m.aero;
+	const aeroponicBase = 50;
 	const aeroponicData = window.randomWalk(points, aeroponicBase, 8)
 		.map((v, i) => Math.max(30, Math.min(100, v + (i / points) * 15)));
 	
@@ -2910,7 +3138,7 @@ function generateGraphData(days, metric) {
 		.map((v, i) => Math.max(25, Math.min(90, v + (i / points) * 12)));
 	
 	// Traditional - slowest growth
-	const traditionalBase = m.trad;
+	const traditionalBase = 40;
 	const traditionalData = window.randomWalk(points, traditionalBase, 6)
 		.map((v, i) => Math.max(20, Math.min(80, v + (i / points) * 10)));
 	
@@ -2930,11 +3158,6 @@ function drawComparisonGraph() {
 	if(!container) return;
 	
 	const containerRect = container.getBoundingClientRect();
-	// If the container is not visible (width/height 0 because tab hidden), retry shortly
-	if ((containerRect.width || 0) < 120 || (containerRect.height || 0) < 80) {
-		setTimeout(drawComparisonGraph, 250);
-		return;
-	}
 	const containerWidth = containerRect.width - 40; // Account for padding
 	const containerHeight = containerRect.height - 40;
 	
@@ -2952,8 +3175,8 @@ function drawComparisonGraph() {
 	const plotW = w - leftPad - rightPad;
 	const plotH = h - topPad - bottomPad;
 	
-	// Generate data based on current days and selected metric
-	const data = generateGraphData(currentDays, currentMetric);
+	// Generate data based on current days
+	const data = generateGraphData(currentDays);
 	graphData = data;
 	
 	// Find min and max for scaling
@@ -2961,45 +3184,42 @@ function drawComparisonGraph() {
 	const min = Math.min(...allValues);
 	const max = Math.max(...allValues);
 	const range = max - min || 1;
-
-	// helper: convert hex to rgba string
-	function hexToRgba(hex, a){
-		const h = hex.replace('#','');
-		const r = parseInt(h.substring(0,2),16);
-		const g = parseInt(h.substring(2,4),16);
-		const b = parseInt(h.substring(4,6),16);
-		return `rgba(${r}, ${g}, ${b}, ${a})`;
-	}
 	
-	// Draw grid lines (soft, dashed horizontal lines)
+	// Draw grid lines
+	ctx.strokeStyle = '#e8ecf4';
 	ctx.lineWidth = 1;
-	ctx.setLineDash([6,6]);
+	ctx.setLineDash([4, 4]);
+	
+	// Horizontal grid lines
 	for(let i = 0; i <= 5; i++) {
 		const y = topPad + (i / 5) * plotH;
 		ctx.beginPath();
 		ctx.moveTo(leftPad, y);
 		ctx.lineTo(w - rightPad, y);
-		ctx.strokeStyle = hexToRgba('#cbd6df', 1);
 		ctx.stroke();
-
-		// Y-axis labels for each grid line
-		const val = (max - (i / 5) * range);
-		ctx.fillStyle = '#6c7380';
-		ctx.font = '12px Poppins, sans-serif';
-		ctx.textAlign = 'right';
-		ctx.fillText(val.toFixed(1), leftPad - 12, y + 4);
+		
+		// Y-axis labels
+		if(i === 0 || i === 5 || i === 2.5) {
+			const val = max - (i / 5) * range;
+			ctx.fillStyle = '#6c7380';
+			ctx.font = '11px Poppins, sans-serif';
+			ctx.textAlign = 'right';
+			ctx.setLineDash([]);
+			ctx.fillText(Math.round(val).toString(), leftPad - 10, y + 4);
+			ctx.setLineDash([4, 4]);
+		}
 	}
-
-	ctx.setLineDash([]);
-	// vertical faint separators
-	for(let i = 0; i <= 5; i++){
+	
+	// Vertical grid lines
+	ctx.strokeStyle = '#f0f4f8';
+	for(let i = 0; i <= 5; i++) {
 		const x = leftPad + (i / 5) * plotW;
 		ctx.beginPath();
 		ctx.moveTo(x, topPad);
 		ctx.lineTo(x, h - bottomPad);
-		ctx.strokeStyle = hexToRgba('#eef3f7', 1);
 		ctx.stroke();
 	}
+	ctx.setLineDash([]);
 	
 	// Draw lines for each method
 	const methods = [
@@ -3016,12 +3236,12 @@ function drawComparisonGraph() {
 			points.push({ x, y, val });
 		});
 		
-		// Draw gradient fill using rgba
-		const gradient = ctx.createLinearGradient(0, topPad, 0, h - bottomPad);
-		gradient.addColorStop(0, hexToRgba(method.color, 0.18));
-		gradient.addColorStop(0.6, hexToRgba(method.color, 0.08));
-		gradient.addColorStop(1, hexToRgba(method.color, 0.02));
-
+		// Draw gradient fill
+		const gradient = ctx.createLinearGradient(leftPad, topPad, leftPad, h - bottomPad);
+		const color = method.color;
+		gradient.addColorStop(0, color + '30');
+		gradient.addColorStop(1, color + '00');
+		
 		ctx.beginPath();
 		points.forEach((point, i) => {
 			if(i === 0) ctx.moveTo(point.x, point.y);
@@ -3037,8 +3257,8 @@ function drawComparisonGraph() {
 		ctx.closePath();
 		ctx.fillStyle = gradient;
 		ctx.fill();
-
-		// Draw smoothed line with soft shadow
+		
+		// Draw line
 		ctx.beginPath();
 		points.forEach((point, i) => {
 			if(i === 0) ctx.moveTo(point.x, point.y);
@@ -3049,13 +3269,13 @@ function drawComparisonGraph() {
 				ctx.quadraticCurveTo(prevPoint.x, prevPoint.y, cpX, cpY);
 			}
 		});
-
+		
 		ctx.strokeStyle = method.color;
-		ctx.lineWidth = 3.5;
+		ctx.lineWidth = 3;
 		ctx.lineCap = 'round';
 		ctx.lineJoin = 'round';
-		ctx.shadowColor = hexToRgba(method.color, 0.18);
-		ctx.shadowBlur = 18;
+		ctx.shadowColor = method.color + '40';
+		ctx.shadowBlur = 8;
 		ctx.stroke();
 		ctx.shadowBlur = 0;
 		
@@ -3063,25 +3283,14 @@ function drawComparisonGraph() {
 		method.points = points;
 	});
 	
-	// Draw data points at key positions with glow and white center
+	// Draw data points at key positions
 	methods.forEach(method => {
 		method.points.forEach((point, i) => {
 			if(i % Math.ceil(method.points.length / 8) === 0 || i === method.points.length - 1) {
-				// outer glow
 				ctx.beginPath();
-				ctx.arc(point.x, point.y, 7, 0, Math.PI * 2);
-				ctx.fillStyle = hexToRgba(method.color, 0.12);
-				ctx.fill();
-
-				// white center
-				ctx.beginPath();
-				ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+				ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
 				ctx.fillStyle = '#ffffff';
 				ctx.fill();
-
-				// colored ring
-				ctx.beginPath();
-				ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
 				ctx.strokeStyle = method.color;
 				ctx.lineWidth = 2;
 				ctx.stroke();
@@ -3100,17 +3309,14 @@ function drawComparisonGraph() {
 		ctx.fillText(`Day ${day}`, x, h - bottomPad + 20);
 	}
 	
-	// Y-axis label (based on metric)
-	const metricLabels = { height: 'Height', width: 'Weight', length: 'Length', leaves: 'No. of Leaves', branches: 'No. of Branches' };
-	const unitMap = { height: (data && data.unit) ? data.unit : 'units' };
-	const yLabel = metricLabels[currentMetric] || 'Value';
+	// Y-axis label
 	ctx.save();
 	ctx.translate(20, h / 2);
 	ctx.rotate(-Math.PI / 2);
 	ctx.fillStyle = '#6c7380';
 	ctx.font = '12px Poppins, sans-serif';
 	ctx.textAlign = 'center';
-	ctx.fillText(yLabel, 0, 0);
+	ctx.fillText('Growth Rate (%)', 0, 0);
 	ctx.restore();
 	
 	// Store methods for hover detection
@@ -3543,449 +3749,534 @@ function populateRandomVoltages() {
 	});
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-	populateRandomVoltages();
-});
+// ==================== RELAY CONTROL ====================
+const RELAY_API_URL = 'https://likelihood-glucose-struck-representing.trycloudflare.com/api';
 
-// --- Growth State Chart (averages of 6 plants per method) ---
-function getAverageForMethod(methodContainerId, field) {
-	const selector = `#${methodContainerId} .sensor-input1[data-field="${field}"]`;
-	const inputs = document.querySelectorAll(selector);
-	if(!inputs || inputs.length === 0) return 0;
-	let sum = 0, count = 0;
-	inputs.forEach(i => {
-		const val = parseFloat(i.value);
-		if(!Number.isNaN(val)) { sum += val; count++; }
-	});
-	return count > 0 ? (sum / count) : 0;
-}
+// Mapping between dashboard actuator IDs and relay numbers
+const ACTUATOR_TO_RELAY = {
+	'act-water': 1,        // Misting Pump
+	'act-air': 2,          // Air Pump
+	'act-fan-in': 3,       // Exhaust Fan (In)
+	'act-fan-out': 4,      // Exhaust Fan (Out)
+	'act-lights-aerponics': 5, // Grow Lights (Aeroponics)
+	'act-lights-dwc': 6,   // Grow Lights (DWC)
+	'btn-ph-up': 7,        // pH Up (nutrient) - GPIO 18
+	'btn-ph-down': 8,      // pH Down (nutrient) - GPIO 19
+	'btn-leafy-green': 9   // Leafy Green (nutrient) - GPIO 23
+};
 
-function computeAverages() {
-	// order: Height, Weight (mapped to width), Length, No. of Leaves, No. of Branches
-	const metrics = ['height','width','length','leaves','branches'];
-	const methods = [
-		{ id: 'aeroponicsParams', label: 'Aeroponics' },
-		{ id: 'dwcParams', label: 'DWC' },
-		{ id: 'traditionalParams', label: 'Traditional' }
-	];
+const RELAY_TO_ACTUATOR = Object.fromEntries(
+	Object.entries(ACTUATOR_TO_RELAY).map(([k, v]) => [v, k])
+);
 
-	const results = methods.map(m => {
-		return metrics.map(metric => {
-			return Number(parseFloat(getAverageForMethod(m.id, metric)).toFixed(2));
+async function toggleRelay(relayNum, newState, stateEl) {
+	try {
+		const action = newState ? 'on' : 'off';
+		const response = await fetch(`${RELAY_API_URL}/relay/${relayNum}/${action}`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' }
 		});
-	});
-	return { labels: ['Height','Weight','Length','No. of Leaves','No. of Branches'], datasets: results };
+		
+		if (response.ok) {
+			// Update Manual tab relay card
+			if (stateEl) {
+				stateEl.classList.remove('state-off', 'state-on');
+				stateEl.classList.add(newState ? 'state-on' : 'state-off');
+				stateEl.textContent = newState ? 'ON' : 'OFF';
+			}
+			// Also update dashboard actuator toggle if exists
+			const actuatorId = RELAY_TO_ACTUATOR[relayNum];
+			if (actuatorId) {
+				syncActuatorUI(actuatorId, newState);
+			}
+		} else {
+			console.error(`Failed to toggle relay ${relayNum}`);
+		}
+	} catch (error) {
+		console.error(`Error toggling relay ${relayNum}:`, error);
+	}
 }
 
-let growthChartInstance = null;
-function setupGrowthChart() {
-	const ctx = document.getElementById('growthStateChart');
-	if(!ctx) return;
+// Sync actuator UI (dashboard toggle) with relay state
+function syncActuatorUI(actuatorId, state) {
+	const checkbox = document.getElementById(actuatorId);
+	if (!checkbox) return;
+	checkbox.checked = state;
+	const label = checkbox.closest('.toggle-switch');
+	const toggleText = label ? label.querySelector('.toggle-text') : null;
+	if (toggleText) toggleText.textContent = state ? 'ON' : 'OFF';
+}
 
-	const data = computeAverages();
-	const colors = ['#4CAF50','#2196F3','#FF9800'];
-	const methodLabels = ['Aeroponics','DWC','Traditional'];
-
-	const ctx2d = ctx.getContext('2d');
-	const datasets = data.datasets.map((arr, idx) => {
-		// create a soft vertical gradient for the filled area
-		const g = ctx2d.createLinearGradient(0, 0, 0, 360);
-		g.addColorStop(0, colors[idx] + '22');
-		g.addColorStop(0.6, colors[idx] + '12');
-		g.addColorStop(1, colors[idx] + '04');
-
-		return {
-			label: methodLabels[idx],
-			data: arr,
-			borderColor: colors[idx],
-			backgroundColor: g,
-			tension: 0.35,
-			fill: true,
-			pointRadius: 6,
-			pointBackgroundColor: '#ffffff',
-			pointBorderColor: colors[idx],
-			borderWidth: 2
-		};
-	});
-
-	if(growthChartInstance) {
-		growthChartInstance.data.labels = data.labels;
-		growthChartInstance.data.datasets = datasets;
-		growthChartInstance.update();
-		return;
+// Sync Manual tab relay card UI with state
+function syncRelayCardUI(relayNum, state) {
+	const card = document.querySelector(`[data-relay-id="${relayNum}"]`);
+	const stateEl = card?.querySelector('.relay-state');
+	if (stateEl) {
+		stateEl.classList.remove('state-off', 'state-on');
+		stateEl.classList.add(state ? 'state-on' : 'state-off');
+		stateEl.textContent = state ? 'ON' : 'OFF';
 	}
+}
 
-	growthChartInstance = new Chart(ctx2d, {
-		type: 'line',
-		data: { labels: data.labels, datasets },
-		options: {
-			responsive: true,
-			maintainAspectRatio: false,
-			interaction: { mode: 'index', intersect: false },
-			scales: {
-				y: {
-					beginAtZero: false,
-					grid: { color: 'rgba(0,0,0,0.04)', borderDash: [6,6] },
-					ticks: { color: '#4b5c3a', font: { weight: 600 } }
-				},
-				x: { grid: { display: false }, ticks: { color: '#3b7a2a', font: { weight: 600 } } }
-			},
-			plugins: {
-				legend: { position: 'top', labels: { usePointStyle: true, padding: 12 } },
-				tooltip: {
-					enabled: true,
-					backgroundColor: '#ffffff',
-					titleColor: '#2f4f2f',
-					bodyColor: '#28402a',
-					borderColor: 'rgba(0,0,0,0.06)',
-					borderWidth: 1,
-					boxPadding: 6,
-					callbacks: {
-						label: function(context) {
-							const label = context.dataset.label || '';
-							const value = context.formattedValue;
-							return label + ': ' + value;
-						}
+async function loadRelayStatus() {
+	try {
+		const response = await fetch(`${RELAY_API_URL}/relay/status`);
+		if (response.ok) {
+			const data = await response.json();
+			if (data.relays) {
+				data.relays.forEach(relay => {
+					// Update Manual tab relay cards
+					syncRelayCardUI(relay.id, relay.state);
+					// Update Dashboard actuator toggles
+					const actuatorId = RELAY_TO_ACTUATOR[relay.id];
+					if (actuatorId) {
+						syncActuatorUI(actuatorId, relay.state);
 					}
-				}
+				});
 			}
 		}
-	});
-
-	// Auto-update when training inputs change
-	const inputSelector = '#aeroponicsParams .sensor-input1, #dwcParams .sensor-input1, #traditionalParams .sensor-input1';
-	document.querySelectorAll(inputSelector).forEach(inp => {
-		inp.addEventListener('input', () => {
-			const updated = computeAverages();
-			growthChartInstance.data.datasets.forEach((ds, i) => ds.data = updated.datasets[i]);
-			growthChartInstance.update();
-		});
-	});
-
-	// Refresh button
-	const refreshBtn = document.getElementById('refreshGrowthChart');
-	if(refreshBtn) refreshBtn.addEventListener('click', () => setupGrowthChart());
+	} catch (error) {
+		console.error('Error loading relay status:', error);
+	}
 }
 
-// initialize chart after DOM ready
+// Setup relay button listeners when page loads (Manual tab)
+function setupRelayButtons() {
+	const relayCards = document.querySelectorAll('[data-relay-id]');
+	relayCards.forEach(card => {
+		const btn = card.querySelector('.relay-toggle-btn');
+		if (btn) {
+			btn.addEventListener('click', () => {
+				const relayNum = parseInt(card.dataset.relayId);
+				const stateEl = card.querySelector('.relay-state');
+				const currentState = stateEl?.textContent === 'ON';
+				toggleRelay(relayNum, !currentState, stateEl);
+			});
+		}
+	});
+}
+
+// Setup dashboard actuator toggle listeners to control real relays
+function setupActuatorRelayControl() {
+	document.querySelectorAll('.actuator-toggle input[type="checkbox"]').forEach(checkbox => {
+		checkbox.addEventListener('change', () => {
+			const relayNum = ACTUATOR_TO_RELAY[checkbox.id];
+			if (relayNum) {
+				const newState = checkbox.checked;
+				// Only send to API if override is ON (manual mode)
+				const overrideToggle = document.getElementById('actuatorOverrideToggle');
+				if (overrideToggle && overrideToggle.checked) {
+					toggleRelay(relayNum, newState, null);
+				}
+			}
+			// Update toggle text
+			const label = checkbox.closest('.toggle-switch');
+			const toggleText = label ? label.querySelector('.toggle-text') : null;
+			if (toggleText) toggleText.textContent = checkbox.checked ? 'ON' : 'OFF';
+		});
+	});
+}
+
+// Poll relay status periodically to keep UI in sync
+function startRelayStatusPolling() {
+	loadRelayStatus(); // Initial load
+	setInterval(loadRelayStatus, 2000); // Poll every 2 seconds
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-	setupGrowthChart();
-	// build the small metric charts grid
-	buildMetricMiniCharts();
+	populateRandomVoltages();
+	setupRelayButtons();
+	setupActuatorRelayControl();
+	startRelayStatusPolling();
 });
 
-// --- Mini metric charts (per-metric, show values for 6 plants per method) ---
-const miniCharts = {};
-function getPerPlantValues(methodId, field){
-	const selector = `#${methodId} .sensor-input1[data-field="${field}"]`;
-	const inputs = document.querySelectorAll(selector);
-	const vals = [];
-	inputs.forEach(i => {
-		const v = parseFloat(i.value);
-		vals.push(Number.isFinite(v) ? v : 0);
-	});
-	// ensure length 6
-	while(vals.length < 6) vals.push(0);
-	return vals.slice(0,6);
-}
 
-function buildMetricMiniCharts(){
-	const metrics = [
-		{ id: 'height', label: 'Height' },
-		{ id: 'width', label: 'Weight' },
-		{ id: 'length', label: 'Length' },
-		{ id: 'leaves', label: 'No. of Leaves' },
-		{ id: 'branches', label: 'No. of Branches' }
-	];
-
-	const methods = [ {id:'aeroponicsParams', label:'Aeroponics', color:'#4CAF50'}, {id:'dwcParams', label:'DWC', color:'#2196F3'}, {id:'traditionalParams', label:'Traditional', color:'#FF9800'} ];
-
-	metrics.forEach(metric => {
-		const ctx = document.getElementById(`mini-chart-${metric.id}`);
-		if(!ctx) return;
-		const labels = ['P1','P2','P3','P4','P5','P6'];
-		const datasets = methods.map(m => ({
-			label: m.label,
-			data: getPerPlantValues(m.id, metric.id),
-			borderColor: m.color,
-			backgroundColor: m.color + '22',
-			tension: 0.4,
-			fill: true,
-			pointRadius: 4,
-			pointBackgroundColor: '#fff',
-			borderWidth: 2
-		}));
-
-		miniCharts[metric.id] = new Chart(ctx.getContext('2d'), {
-			type: 'line',
-			data: { labels, datasets },
-			options: { responsive: true, maintainAspectRatio: false, scales:{ y:{ beginAtZero: false, ticks:{ color:'#4b5c3a' } }, x:{ ticks:{ color:'#3b7a2a' } } }, plugins:{ legend:{ display:true, position:'top', labels:{boxWidth:10} } } }
-		});
-	});
-
-	// Overview chart: averages per metric per method
-	const overviewCtx = document.getElementById('mini-chart-overview');
-	if(overviewCtx){
-		const avg = computeAverages(); // returns labels and datasets (three arrays)
-		const labels = avg.labels;
-		const colors = ['#4CAF50','#2196F3','#FF9800'];
-		const methodLabels = ['Aeroponics','DWC','Traditional'];
-		const datasets = avg.datasets.map((arr, idx) => ({ label: methodLabels[idx], data: arr, borderColor: colors[idx], backgroundColor: colors[idx] + '22', tension:0.35, fill:true, pointRadius:4, pointBackgroundColor:'#fff' }));
-		miniCharts['overview'] = new Chart(overviewCtx.getContext('2d'), { type:'line', data:{labels,datasets}, options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:false, ticks:{ color:'#4b5c3a' } }, x:{ ticks:{ color:'#3b7a2a' } } }, plugins:{ legend:{ display:true, position:'top' } } } });
-	}
-
-	// Wire input updates to refresh mini charts
-	const inputSelector = '#aeroponicsParams .sensor-input1, #dwcParams .sensor-input1, #traditionalParams .sensor-input1';
-	document.querySelectorAll(inputSelector).forEach(inp => {
-		inp.addEventListener('input', () => updateMiniCharts());
-	});
-}
-
-function updateMiniCharts(){
-	const metrics = ['height','width','length','leaves','branches'];
-	const methods = [ {id:'aeroponicsParams'}, {id:'dwcParams'}, {id:'traditionalParams'} ];
-	metrics.forEach(metric => {
-		const chart = miniCharts[metric];
-		if(!chart) return;
-		chart.data.datasets.forEach((ds, idx) => {
-			ds.data = getPerPlantValues(methods[idx].id, metric);
-		});
-		chart.update();
-	});
-	// overview
-	if(miniCharts['overview']){
-		const avg = computeAverages();
-		miniCharts['overview'].data.datasets.forEach((ds, i) => ds.data = avg.datasets[i]);
-		miniCharts['overview'].update();
-	}
-}
-
-
-// ==================== CALIBRATION API INTEGRATION ====================
-(function initCalibrationAPI() {
-    // Load current calibration from API and display it
+// ==================== SIMPLIFIED CALIBRATION SYSTEM ====================
+(function initSimpleCalibration() {
+    const API_URL = typeof RELAY_API_URL !== 'undefined' ? RELAY_API_URL : 'https://likelihood-glucose-struck-representing.trycloudflare.com/api';
+    
+    // State for each sensor
+    const calState = {
+        ph: { points: [], voltage: null },
+        do: { points: [], voltage: null },
+        tds: { points: [], voltage: null }
+    };
+    
+    // Buffer values for pH
+    const phBuffers = [4.00, 6.86, 9.18];
+    
+    // Load current calibration from API
     async function loadCalibration() {
         try {
-            const res = await fetch(`${RELAY_API_URL}/calibration`);
+            const res = await fetch(`${API_URL}/calibration`);
             const data = await res.json();
             
-            // Update pH calibration display
-            if (data.ph) {
-                const slope = document.getElementById('calSlope');
-                const offset = document.getElementById('calOffsetVal');
-                if (slope) slope.textContent = data.ph.slope?.toFixed(4) || '--';
-                if (offset) offset.textContent = data.ph.offset?.toFixed(4) || '--';
-            }
-            
-            // Update DO calibration display
-            if (data.do) {
-                const slope = document.getElementById('calSlopeDO');
-                const offset = document.getElementById('calOffsetValDO');
-                if (slope) slope.textContent = data.do.slope?.toFixed(4) || '--';
-                if (offset) offset.textContent = data.do.offset?.toFixed(4) || '--';
-            }
-            
-            // Update TDS calibration display
-            if (data.tds) {
-                const slope = document.getElementById('calSlopeTDS');
-                const offset = document.getElementById('calOffsetValTDS');
-                if (slope) slope.textContent = data.tds.slope?.toFixed(4) || '--';
-                if (offset) offset.textContent = data.tds.offset?.toFixed(4) || '--';
+            // Update UI with current values
+            for (const sensor of ['ph', 'do', 'tds']) {
+                if (data[sensor]) {
+                    document.getElementById(`${sensor}CurrentSlope`).textContent = data[sensor].slope?.toFixed(4) || '--';
+                    document.getElementById(`${sensor}CurrentOffset`).textContent = data[sensor].offset?.toFixed(4) || '--';
+                    const badge = document.getElementById(`${sensor}CalStatus`);
+                    if (badge && data[sensor].slope !== 1.0) {
+                        badge.textContent = 'Calibrated';
+                        badge.classList.add('calibrated');
+                    }
+                }
             }
         } catch (e) {
-            console.log('Failed to load calibration:', e);
+            console.error('Failed to load calibration:', e);
         }
     }
     
-    // Fetch live voltage readings for calibration
+    // Fetch live voltage readings
     async function fetchVoltage() {
         try {
-            const res = await fetch(`${RELAY_API_URL}/voltage`);
+            const res = await fetch(`${API_URL}/voltage`);
             const data = await res.json();
             
-            // Update voltage displays
             if (data.ph?.voltage !== undefined) {
-                const el = document.getElementById('readingVoltage');
-                if (el) el.textContent = (data.ph.voltage * 1000).toFixed(1) + ' mV';
-                // Also fill voltage input if it exists and is empty
-                const inputs = document.querySelectorAll('#inputsContainer .inputVoltage');
-                inputs.forEach(inp => {
-                    if (inp && !inp.value) inp.value = (data.ph.voltage * 1000).toFixed(1);
-                });
+                document.getElementById('phLiveVoltage').textContent = data.ph.voltage.toFixed(4) + ' V';
+                calState.ph.voltage = data.ph.voltage;
             }
             if (data.do?.voltage !== undefined) {
-                const el = document.getElementById('readingVoltageDO');
-                if (el) el.textContent = (data.do.voltage * 1000).toFixed(1) + ' mV';
+                document.getElementById('doLiveVoltage').textContent = data.do.voltage.toFixed(4) + ' V';
+                calState.do.voltage = data.do.voltage;
             }
             if (data.tds?.voltage !== undefined) {
-                const el = document.getElementById('readingVoltageTDS');
-                if (el) el.textContent = (data.tds.voltage * 1000).toFixed(1) + ' mV';
+                document.getElementById('tdsLiveVoltage').textContent = data.tds.voltage.toFixed(4) + ' V';
+                calState.tds.voltage = data.tds.voltage;
             }
         } catch (e) {
-            console.log('Failed to fetch voltage:', e);
+            console.error('Failed to fetch voltage:', e);
+        }
+    }
+    
+    // Calculate slope and offset from captured points
+    // Get DO saturation value at given temperature (mg/L)
+    function getDOSaturation(tempC) {
+        // Benson & Krause equation approximation for freshwater at sea level
+        // https://www.waterontheweb.org/under/waterquality/oxygen.html
+        const temps = [0, 5, 10, 15, 20, 25, 30, 35, 40];
+        const sats = [14.6, 12.8, 11.3, 10.1, 9.1, 8.2, 7.5, 6.9, 6.4];
+        
+        // Linear interpolation
+        if (tempC <= 0) return sats[0];
+        if (tempC >= 40) return sats[sats.length - 1];
+        
+        for (let i = 0; i < temps.length - 1; i++) {
+            if (tempC >= temps[i] && tempC < temps[i + 1]) {
+                const ratio = (tempC - temps[i]) / (temps[i + 1] - temps[i]);
+                return sats[i] + ratio * (sats[i + 1] - sats[i]);
+            }
+        }
+        return 8.2; // Default 25°C
+    }
+    
+    // Get Nernst slope at given temperature (V/pH)
+    function getNernstSlope(tempC) {
+        // Nernst equation: E = E0 - (RT/nF) * pH
+        // At 25°C: 2.303 * R * T / F = 0.05916 V/pH
+        // Temperature coefficient: slope = 0.05916 * (273.15 + T) / 298.15
+        const tempK = 273.15 + tempC;
+        return -0.05916 * (tempK / 298.15);
+    }
+    
+    function calculateCalibration(sensor) {
+        const points = calState[sensor].points;
+        if (points.length < 1) return null;
+        
+        // Get temperature from input
+        const tempInput = document.getElementById(`${sensor}BufferTemp`);
+        const tempC = parseFloat(tempInput?.value) || 25;
+        
+        if (points.length === 1) {
+            // 1-point: use temperature-compensated theoretical slope
+            const p = points[0];
+            let slope, offset;
+            
+            if (sensor === 'ph') {
+                // Temperature-compensated Nernst slope
+                slope = getNernstSlope(tempC);
+                offset = p.value - (slope * p.voltage);
+                console.log(`pH 1-point cal @ ${tempC}°C: Nernst slope = ${slope.toFixed(4)} V/pH`);
+            } else if (sensor === 'do') {
+                // Temperature-compensated DO saturation
+                const doSat = getDOSaturation(tempC);
+                slope = doSat / p.voltage;
+                offset = 0;
+                console.log(`DO 1-point cal @ ${tempC}°C: Saturation = ${doSat.toFixed(1)} mg/L`);
+            } else { // tds
+                slope = p.value / p.voltage;
+                offset = 0;
+            }
+            return { slope, offset, tempC };
+        }
+        
+        // 2+ points: linear regression
+        const n = points.length;
+        let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+        
+        for (const p of points) {
+            sumX += p.voltage;
+            sumY += p.value;
+            sumXY += p.voltage * p.value;
+            sumXX += p.voltage * p.voltage;
+        }
+        
+        const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+        const offset = (sumY - slope * sumX) / n;
+        
+        return { slope, offset, tempC };
+    }
+    
+    // Update UI after capturing a point
+    function updatePointUI(sensor, pointNum) {
+        const point = calState[sensor].points.find(p => p.pointNum === pointNum);
+        if (!point) return;
+        
+        const pointEl = document.getElementById(`${sensor}Point${pointNum}`);
+        const voltageEl = document.getElementById(`${sensor}Point${pointNum}Voltage`);
+        const statusEl = document.getElementById(`${sensor}Point${pointNum}Status`);
+        
+        if (pointEl) pointEl.classList.add('captured');
+        if (voltageEl) voltageEl.textContent = point.voltage.toFixed(4);
+        if (statusEl) statusEl.textContent = 'Captured';
+        
+        // Check if we can calculate calibration
+        checkCalibrationReady(sensor);
+    }
+    
+    // Check if enough points to enable Apply button
+    function checkCalibrationReady(sensor) {
+        const points = calState[sensor].points;
+        const modeSelect = document.getElementById(`${sensor}PointMode`);
+        const requiredPoints = parseInt(modeSelect?.value || '2');
+        
+        const applyBtn = document.getElementById(`${sensor}ApplyBtn`);
+        const resultCard = document.getElementById(`${sensor}ResultCard`);
+        
+        if (points.length >= requiredPoints || (sensor !== 'ph' && points.length >= 1)) {
+            // Calculate and show result
+            const cal = calculateCalibration(sensor);
+            if (cal) {
+                document.getElementById(`${sensor}NewSlope`).textContent = cal.slope.toFixed(4);
+                document.getElementById(`${sensor}NewOffset`).textContent = cal.offset.toFixed(4);
+                if (resultCard) resultCard.style.display = 'block';
+                if (applyBtn) applyBtn.disabled = false;
+            }
         }
     }
     
     // Save calibration to API
-    async function saveCalibration(sensor, slope, offset) {
+    async function saveCalibration(sensor) {
+        const cal = calculateCalibration(sensor);
+        if (!cal) return;
+        
         try {
-            const res = await fetch(`${RELAY_API_URL}/calibration`, {
+            const res = await fetch(`${API_URL}/calibration`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sensor, slope, offset })
+                body: JSON.stringify({ sensor, slope: cal.slope, offset: cal.offset })
             });
+            
             if (res.ok) {
-                alert(`${sensor.toUpperCase()} calibration saved! Slope: ${slope.toFixed(4)}, Offset: ${offset.toFixed(4)}`);
-                loadCalibration();
+                // Update current values display
+                document.getElementById(`${sensor}CurrentSlope`).textContent = cal.slope.toFixed(4);
+                document.getElementById(`${sensor}CurrentOffset`).textContent = cal.offset.toFixed(4);
+                
+                const badge = document.getElementById(`${sensor}CalStatus`);
+                if (badge) {
+                    badge.textContent = 'Calibrated';
+                    badge.classList.add('calibrated');
+                }
+                
+                // Show success modal
+                const modal = document.getElementById('calSuccessModal');
+                const msg = document.getElementById('calSuccessMsg');
+                if (msg) msg.textContent = `${sensor.toUpperCase()} calibration saved! Slope: ${cal.slope.toFixed(4)}, Offset: ${cal.offset.toFixed(4)}`;
+                if (modal) modal.style.display = 'flex';
+                
+                // Clear state
+                clearCalibration(sensor);
             }
         } catch (e) {
-            console.log('Failed to save calibration:', e);
-            alert('Failed to save calibration');
+            console.error('Failed to save calibration:', e);
+            alert('Failed to save calibration. Check console.');
         }
     }
     
-    // Hook into existing calibrate buttons
-    function setupCalibrationButtons() {
-        // pH calibrate button
-        const calibrateBtn = document.getElementById('calibrateBtn');
-        if (calibrateBtn) {
-            calibrateBtn.addEventListener('click', () => {
-                const bufferInput = document.querySelector('#inputsContainer .inputBuffer');
-                const voltageInput = document.querySelector('#inputsContainer .inputVoltage');
+    // Clear calibration state
+    function clearCalibration(sensor) {
+        calState[sensor].points = [];
+        
+        // Reset UI
+        for (let i = 1; i <= 3; i++) {
+            const pointEl = document.getElementById(`${sensor}Point${i}`);
+            const voltageEl = document.getElementById(`${sensor}Point${i}Voltage`);
+            const statusEl = document.getElementById(`${sensor}Point${i}Status`);
+            
+            if (pointEl) pointEl.classList.remove('captured');
+            if (voltageEl) voltageEl.textContent = '--';
+            if (statusEl) statusEl.textContent = 'Waiting';
+        }
+        
+        const resultCard = document.getElementById(`${sensor}ResultCard`);
+        const applyBtn = document.getElementById(`${sensor}ApplyBtn`);
+        
+        if (resultCard) resultCard.style.display = 'none';
+        if (applyBtn) applyBtn.disabled = true;
+    }
+    
+    // Setup event listeners
+    function setupEventListeners() {
+        // Tab switching
+        document.querySelectorAll('.calibrate-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const sensor = btn.dataset.sensor;
                 
-                if (!bufferInput?.value || !voltageInput?.value) {
-                    alert('Please enter buffer pH and voltage values');
-                    return;
-                }
+                // Update active tab
+                document.querySelectorAll('.calibrate-tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
                 
-                const buffer = parseFloat(bufferInput.value);
-                const voltage = parseFloat(voltageInput.value) / 1000; // Convert mV to V
-                
-                // Simple 1-point calibration using Nernst equation
-                const slope = -0.059; // V/pH at 25°C
-                const offset = buffer - (slope * voltage);
-                
-                // Show in output fields
-                const outSlope = document.getElementById('outSlope');
-                const outOffset = document.getElementById('outOffset');
-                if (outSlope) outSlope.textContent = slope.toFixed(4);
-                if (outOffset) outOffset.textContent = offset.toFixed(4);
-                
-                // Show calibration values section
-                const valuesSection = document.getElementById('calibrationValuesSection');
-                if (valuesSection) valuesSection.style.display = 'block';
+                // Show correct panel
+                document.querySelectorAll('.simple-cal-panel').forEach(p => p.style.display = 'none');
+                const panel = document.querySelector(`.simple-cal-panel[data-sensor-type="${sensor}"]`);
+                if (panel) panel.style.display = 'flex';
+            });
+        });
+        
+        // pH point mode change
+        const phModeSelect = document.getElementById('phPointMode');
+        if (phModeSelect) {
+            phModeSelect.addEventListener('change', () => {
+                const mode = parseInt(phModeSelect.value);
+                document.getElementById('phPoint3').style.display = mode >= 3 ? 'block' : 'none';
+                clearCalibration('ph');
             });
         }
         
-        // pH apply button
-        const applyBtn = document.getElementById('applyCalValues');
-        if (applyBtn) {
-            applyBtn.addEventListener('click', () => {
-                const slopeEl = document.getElementById('outSlope');
-                const offsetEl = document.getElementById('outOffset');
-                if (slopeEl && offsetEl) {
-                    const slope = parseFloat(slopeEl.textContent);
-                    const offset = parseFloat(offsetEl.textContent);
-                    if (!isNaN(slope) && !isNaN(offset)) {
-                        saveCalibration('ph', slope, offset);
+        // DO point mode change
+        const doModeSelect = document.getElementById('doPointMode');
+        if (doModeSelect) {
+            doModeSelect.addEventListener('change', () => {
+                const mode = parseInt(doModeSelect.value);
+                document.getElementById('doPoint2').style.display = mode >= 2 ? 'block' : 'none';
+                clearCalibration('do');
+            });
+        }
+        
+        // TDS point mode change
+        const tdsModeSelect = document.getElementById('tdsPointMode');
+        if (tdsModeSelect) {
+            tdsModeSelect.addEventListener('change', () => {
+                const mode = parseInt(tdsModeSelect.value);
+                document.getElementById('tdsPoint2').style.display = mode >= 2 ? 'block' : 'none';
+                clearCalibration('tds');
+            });
+        }
+        
+        // pH capture buttons
+        for (let i = 1; i <= 3; i++) {
+            const btn = document.getElementById(`phCapture${i}`);
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    if (calState.ph.voltage === null) {
+                        alert('No voltage reading available. Is the sensor connected?');
+                        return;
                     }
-                }
-            });
+                    
+                    // Remove existing point if recapturing
+                    calState.ph.points = calState.ph.points.filter(p => p.pointNum !== i);
+                    
+                    calState.ph.points.push({
+                        pointNum: i,
+                        value: phBuffers[i - 1],
+                        voltage: calState.ph.voltage
+                    });
+                    
+                    updatePointUI('ph', i);
+                });
+            }
         }
         
-        // DO calibrate button
-        const calibrateBtnDO = document.getElementById('calibrateBtnDO');
-        if (calibrateBtnDO) {
-            calibrateBtnDO.addEventListener('click', () => {
-                const voltageInput = document.querySelector('#inputsContainerDO .inputVoltage');
-                
-                if (!voltageInput?.value) {
-                    alert('Please enter voltage value');
-                    return;
-                }
-                
-                const voltage = parseFloat(voltageInput.value) / 1000;
-                const doSat = 8.2; // 100% saturation at 25°C
-                
-                const slope = doSat / voltage;
-                const offset = 0;
-                
-                const outSlope = document.getElementById('outSlopeDO');
-                const outOffset = document.getElementById('outOffsetDO');
-                if (outSlope) outSlope.textContent = slope.toFixed(4);
-                if (outOffset) outOffset.textContent = offset.toFixed(4);
-                
-                const valuesSection = document.getElementById('calibrationValuesSectionDO');
-                if (valuesSection) valuesSection.style.display = 'block';
-            });
-        }
-        
-        // DO apply button
-        const applyBtnDO = document.getElementById('applyCalValuesDO');
-        if (applyBtnDO) {
-            applyBtnDO.addEventListener('click', () => {
-                const slopeEl = document.getElementById('outSlopeDO');
-                const offsetEl = document.getElementById('outOffsetDO');
-                if (slopeEl && offsetEl) {
-                    const slope = parseFloat(slopeEl.textContent);
-                    const offset = parseFloat(offsetEl.textContent);
-                    if (!isNaN(slope) && !isNaN(offset)) {
-                        saveCalibration('do', slope, offset);
+        // DO capture buttons
+        for (let i = 1; i <= 2; i++) {
+            const btn = document.getElementById(`doCapture${i}`);
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    if (calState.do.voltage === null) {
+                        alert('No voltage reading available. Is the sensor connected?');
+                        return;
                     }
-                }
-            });
+                    
+                    calState.do.points = calState.do.points.filter(p => p.pointNum !== i);
+                    
+                    // DO values: Point 1 = 100% saturation (8.2 mg/L at 25°C), Point 2 = 0%
+                    const doValue = i === 1 ? 8.2 : 0;
+                    
+                    calState.do.points.push({
+                        pointNum: i,
+                        value: doValue,
+                        voltage: calState.do.voltage
+                    });
+                    
+                    updatePointUI('do', i);
+                });
+            }
         }
         
-        // TDS calibrate button
-        const calibrateBtnTDS = document.getElementById('calibrateBtnTDS');
-        if (calibrateBtnTDS) {
-            calibrateBtnTDS.addEventListener('click', () => {
-                const bufferInput = document.querySelector('#inputsContainerTDS .inputBuffer');
-                const voltageInput = document.querySelector('#inputsContainerTDS .inputVoltage');
-                
-                if (!bufferInput?.value || !voltageInput?.value) {
-                    alert('Please enter TDS standard and voltage values');
-                    return;
-                }
-                
-                const standard = parseFloat(bufferInput.value);
-                const voltage = parseFloat(voltageInput.value) / 1000;
-                
-                const slope = standard / voltage;
-                const offset = 0;
-                
-                const outSlope = document.getElementById('outSlopeTDS');
-                const outOffset = document.getElementById('outOffsetTDS');
-                if (outSlope) outSlope.textContent = slope.toFixed(4);
-                if (outOffset) outOffset.textContent = offset.toFixed(4);
-                
-                const valuesSection = document.getElementById('calibrationValuesSectionTDS');
-                if (valuesSection) valuesSection.style.display = 'block';
-            });
-        }
-        
-        // TDS apply button
-        const applyBtnTDS = document.getElementById('applyCalValuesTDS');
-        if (applyBtnTDS) {
-            applyBtnTDS.addEventListener('click', () => {
-                const slopeEl = document.getElementById('outSlopeTDS');
-                const offsetEl = document.getElementById('outOffsetTDS');
-                if (slopeEl && offsetEl) {
-                    const slope = parseFloat(slopeEl.textContent);
-                    const offset = parseFloat(offsetEl.textContent);
-                    if (!isNaN(slope) && !isNaN(offset)) {
-                        saveCalibration('tds', slope, offset);
+        // TDS capture buttons
+        for (let i = 1; i <= 2; i++) {
+            const btn = document.getElementById(`tdsCapture${i}`);
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    if (calState.tds.voltage === null) {
+                        alert('No voltage reading available. Is the sensor connected?');
+                        return;
                     }
-                }
-            });
+                    
+                    const standardInput = document.getElementById(`tdsStandard${i}`);
+                    const standardValue = parseFloat(standardInput?.value);
+                    
+                    if (!standardValue || standardValue <= 0) {
+                        alert('Please enter a valid TDS standard value (ppm)');
+                        return;
+                    }
+                    
+                    calState.tds.points = calState.tds.points.filter(p => p.pointNum !== i);
+                    
+                    calState.tds.points.push({
+                        pointNum: i,
+                        value: standardValue,
+                        voltage: calState.tds.voltage
+                    });
+                    
+                    updatePointUI('tds', i);
+                });
+            }
+        }
+        
+        // Apply buttons
+        for (const sensor of ['ph', 'do', 'tds']) {
+            const applyBtn = document.getElementById(`${sensor}ApplyBtn`);
+            if (applyBtn) {
+                applyBtn.addEventListener('click', () => saveCalibration(sensor));
+            }
+            
+            const clearBtn = document.getElementById(`${sensor}ClearBtn`);
+            if (clearBtn) {
+                clearBtn.addEventListener('click', () => clearCalibration(sensor));
+            }
         }
     }
     
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
+        setupEventListeners();
         loadCalibration();
         fetchVoltage();
+        
+        // Update voltage every 2 seconds
         setInterval(fetchVoltage, 2000);
-        setupCalibrationButtons();
     });
 })();
