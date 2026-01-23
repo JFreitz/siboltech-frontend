@@ -944,11 +944,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			sidebarHistoryItems.forEach(item => {
 				item.addEventListener('click', (e) => {
 					e.preventDefault();
-					const metric = item.getAttribute('data-metric'); // 'Plant' or 'Actuator'
+					const metric = item.getAttribute('data-metric'); // 'Plantbtn' or 'Actuatorbtn'
 					// Do not navigate to other tabs or dashboard when submenu items are clicked.
 					// Update history board view in-place instead.
 					if (metric && metric.toLowerCase().includes('actuator')) {
-						// When Actuator submenu is clicked, open History and show the sensor/history table.
+						// When Actuator submenu is clicked, open History and show the actuator table.
 						const historyAnchor = document.querySelector('[data-tab="history"]');
 						if (historyAnchor) {
 							document.querySelectorAll('[data-tab]').forEach(x => x.classList.remove('active'));
@@ -957,12 +957,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
 							const histSec = document.getElementById('history');
 							if (histSec) histSec.classList.add('active');
 						}
-						// Show sensor view (the main history table with sensor+plant columns)
+						// Show actuator view (the actuator events table)
 						historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
-							if (w.getAttribute('data-history-view') === 'sensor') w.style.display = '';
+							if (w.getAttribute('data-history-view') === 'actuator') w.style.display = '';
 							else w.style.display = 'none';
 						});
-					} else if (metric && metric.toLowerCase() === 'plant') {
+						// Also show in history-board1 if present
+						const historyBoard1 = document.querySelector('.history-board1');
+						if (historyBoard1) {
+							historyBoard1.querySelectorAll('.history-table-wrap').forEach(w => {
+								if (w.getAttribute('data-history-view') === 'actuator') w.style.display = '';
+								else w.style.display = 'none';
+							});
+						}
+					} else if (metric && metric.toLowerCase().includes('plant')) {
 						// Ensure History tab is active
 						const historyAnchor = document.querySelector('[data-tab="history"]');
 						if (historyAnchor) {
@@ -973,10 +981,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
 							if (histSec) histSec.classList.add('active');
 						}
 
-						// Always show both sensor and plant table views together
+						// Show sensor and plant table views (not actuator)
 						historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
-							w.style.display = '';
+							const view = w.getAttribute('data-history-view');
+							if (view === 'sensor' || view === 'plant') w.style.display = '';
+							else w.style.display = 'none';
 						});
+						// Also update history-board1 if present
+						const historyBoard1 = document.querySelector('.history-board1');
+						if (historyBoard1) {
+							historyBoard1.querySelectorAll('.history-table-wrap').forEach(w => {
+								const view = w.getAttribute('data-history-view');
+								if (view === 'sensor' || view === 'plant') w.style.display = '';
+								else w.style.display = 'none';
+							});
+						}
 					} else {
 						// Other metrics: show sensor view by default
 						historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
