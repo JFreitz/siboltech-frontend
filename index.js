@@ -1540,8 +1540,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		const updateOverrideState = () => {
 			const label = overrideToggle.closest('.toggle-switch');
 			const textEl = label ? label.querySelector('.toggle-text') : null;
+			const actuatorCard = overrideToggle.closest('.actuator-card');
 			actuatorOverride = overrideToggle.checked;
 			if(textEl) textEl.textContent = actuatorOverride ? 'ON' : 'OFF';
+			// Add/remove orange border class when override is active
+			if(actuatorCard) {
+				if(actuatorOverride) {
+					actuatorCard.classList.add('override-active');
+				} else {
+					actuatorCard.classList.remove('override-active');
+				}
+			}
 		};
 		overrideToggle.addEventListener('change', updateOverrideState);
 		updateOverrideState();

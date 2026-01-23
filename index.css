@@ -478,6 +478,35 @@
 	text-align: center;
 }
 
+/* Override Mode Active - Orange border on actuator card */
+.actuator-card.override-active {
+	border: 3px solid #ff8c42;
+	box-shadow: 0 4px 20px rgba(255, 140, 66, 0.3);
+	transition: border 0.3s ease, box-shadow 0.3s ease;
+}
+
+.actuator-card.override-active .actuator-header {
+	background: linear-gradient(135deg, rgba(255, 140, 66, 0.15), rgba(255, 200, 150, 0.1));
+	border-radius: 10px 10px 0 0;
+	margin: -18px -18px 12px -18px;
+	padding: 18px;
+}
+
+.actuator-card.override-active .override-label {
+	color: #e65c00;
+	font-weight: 700;
+}
+
+.actuator-override input:checked + .toggle-slider {
+	background: linear-gradient(135deg, #ff8c42 0%, #e65c00 100%);
+	box-shadow: 0 2px 8px rgba(230, 92, 0, 0.4);
+}
+
+.actuator-override input:checked ~ .toggle-text {
+	color: #e65c00;
+	font-weight: 700;
+}
+
 /* Growth Comparison Card */
 .growth-comparison-card {
 	background: linear-gradient(135deg, #dff7df 0%, #d6f2d7 40%, #eaf9ee 100%);
