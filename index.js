@@ -82,30 +82,31 @@ async function fetchSensorData() {
         const res = await fetch(`${RELAY_API_URL}/latest`);
         const data = await res.json();
         
+        // API returns: { "ph": {"value": 6.5, "unit": "pH"}, "temperature_c": {...}, ... }
         // Update dashboard sensor values
-        if (data.ph !== undefined) {
+        if (data.ph && data.ph.value !== undefined) {
             document.querySelectorAll('#val-ph, [data-sensor="ph"] .value').forEach(el => {
-                if (el) el.textContent = data.ph.toFixed(2);
+                if (el) el.textContent = data.ph.value.toFixed(2);
             });
         }
-        if (data.do !== undefined) {
+        if (data.do_mg_l && data.do_mg_l.value !== undefined) {
             document.querySelectorAll('#val-do, [data-sensor="do"] .value').forEach(el => {
-                if (el) el.textContent = data.do.toFixed(2) + ' mg/L';
+                if (el) el.textContent = data.do_mg_l.value.toFixed(2) + ' mg/L';
             });
         }
-        if (data.temp !== undefined) {
+        if (data.temperature_c && data.temperature_c.value !== undefined) {
             document.querySelectorAll('#val-temp, [data-sensor="temp"] .value').forEach(el => {
-                if (el) el.textContent = data.temp.toFixed(1) + ' °C';
+                if (el) el.textContent = data.temperature_c.value.toFixed(1) + ' °C';
             });
         }
-        if (data.hum !== undefined) {
+        if (data.humidity && data.humidity.value !== undefined) {
             document.querySelectorAll('#val-hum, [data-sensor="hum"] .value').forEach(el => {
-                if (el) el.textContent = data.hum.toFixed(1) + ' %';
+                if (el) el.textContent = data.humidity.value.toFixed(1) + ' %';
             });
         }
-        if (data.tds !== undefined) {
+        if (data.tds_ppm && data.tds_ppm.value !== undefined) {
             document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => {
-                if (el) el.textContent = data.tds.toFixed(0) + ' ppm';
+                if (el) el.textContent = data.tds_ppm.value.toFixed(0) + ' ppm';
             });
         }
     } catch (e) {
