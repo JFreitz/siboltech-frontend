@@ -3761,231 +3761,336 @@ function updateMiniCharts(){
 }
 
 
-// ==================== CALIBRATION API INTEGRATION ====================
-(function initCalibrationAPI() {
-    // Load current calibration from API and display it
-    async function loadCalibration() {
-        try {
-            const res = await fetch(`${RELAY_API_URL}/calibration`);
-            const data = await res.json();
-            
-            // Update pH calibration display
-            if (data.ph) {
-                const slope = document.getElementById('calSlope');
-                const offset = document.getElementById('calOffsetVal');
-                if (slope) slope.textContent = data.ph.slope?.toFixed(4) || '--';
-                if (offset) offset.textContent = data.ph.offset?.toFixed(4) || '--';
-            }
-            
-            // Update DO calibration display
-            if (data.do) {
-                const slope = document.getElementById('calSlopeDO');
-                const offset = document.getElementById('calOffsetValDO');
-                if (slope) slope.textContent = data.do.slope?.toFixed(4) || '--';
-                if (offset) offset.textContent = data.do.offset?.toFixed(4) || '--';
-            }
-            
-            // Update TDS calibration display
-            if (data.tds) {
-                const slope = document.getElementById('calSlopeTDS');
-                const offset = document.getElementById('calOffsetValTDS');
-                if (slope) slope.textContent = data.tds.slope?.toFixed(4) || '--';
-                if (offset) offset.textContent = data.tds.offset?.toFixed(4) || '--';
-            }
-        } catch (e) {
-            console.log('Failed to load calibration:', e);
+
+// ==================== CALIBRATION SYSTEM ====================
+const CALIBRATION_API = 'https://likelihood-glucose-struck-representing.trycloudflare.com/api';
+
+// DO Saturation table (mg/L at 100% saturation by temperature)
+const DO_SATURATION = {
+    0: 14.62, 5: 12.77, 10: 11.29, 15: 10.08, 20: 9.09,
+    21: 8.91, 22: 8.74, 23: 8.58, 24: 8.42, 25: 8.26,
+    26: 8.11, 27: 7.97, 28: 7.83, 29: 7.69, 30: 7.56,
+    35: 6.95, 40: 6.41
+};
+
+function getDOSaturation(tempC) {
+    const temps = Object.keys(DO_SATURATION).map(Number).sort((a,b) => a-b);
+    if (tempC <= temps[0]) return DO_SATURATION[temps[0]];
+    if (tempC >= temps[temps.length-1]) return DO_SATURATION[temps[temps.length-1]];
+    for (let i = 0; i < temps.length - 1; i++) {
+        if (tempC >= temps[i] && tempC <= temps[i+1]) {
+            const t1 = temps[i], t2 = temps[i+1];
+            const ratio = (tempC - t1) / (t2 - t1);
+            return DO_SATURATION[t1] + ratio * (DO_SATURATION[t2] - DO_SATURATION[t1]);
         }
     }
+    return 8.26;
+}
+
+// Linear regression
+function linearRegression(points) {
+    const n = points.length;
+    if (n === 0) return { slope: 1, offset: 0 };
+    if (n === 1) return { slope: points[0].value / points[0].voltage, offset: 0 };
     
-    // Fetch live voltage readings for calibration
-    async function fetchVoltage() {
-        try {
-            const res = await fetch(`${RELAY_API_URL}/voltage`);
-            const data = await res.json();
-            
-            // Update voltage displays
-            if (data.ph?.voltage !== undefined) {
-                const el = document.getElementById('readingVoltage');
-                if (el) el.textContent = (data.ph.voltage * 1000).toFixed(1) + ' mV';
-                // Also fill voltage input if it exists and is empty
-                const inputs = document.querySelectorAll('#inputsContainer .inputVoltage');
-                inputs.forEach(inp => {
-                    if (inp && !inp.value) inp.value = (data.ph.voltage * 1000).toFixed(1);
-                });
-            }
-            if (data.do?.voltage !== undefined) {
-                const el = document.getElementById('readingVoltageDO');
-                if (el) el.textContent = (data.do.voltage * 1000).toFixed(1) + ' mV';
-            }
-            if (data.tds?.voltage !== undefined) {
-                const el = document.getElementById('readingVoltageTDS');
-                if (el) el.textContent = (data.tds.voltage * 1000).toFixed(1) + ' mV';
-            }
-        } catch (e) {
-            console.log('Failed to fetch voltage:', e);
-        }
-    }
-    
-    // Save calibration to API
-    async function saveCalibration(sensor, slope, offset) {
-        try {
-            const res = await fetch(`${RELAY_API_URL}/calibration`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sensor, slope, offset })
-            });
-            if (res.ok) {
-                alert(`${sensor.toUpperCase()} calibration saved! Slope: ${slope.toFixed(4)}, Offset: ${offset.toFixed(4)}`);
-                loadCalibration();
-            }
-        } catch (e) {
-            console.log('Failed to save calibration:', e);
-            alert('Failed to save calibration');
-        }
-    }
-    
-    // Hook into existing calibrate buttons
-    function setupCalibrationButtons() {
-        // pH calibrate button
-        const calibrateBtn = document.getElementById('calibrateBtn');
-        if (calibrateBtn) {
-            calibrateBtn.addEventListener('click', () => {
-                const bufferInput = document.querySelector('#inputsContainer .inputBuffer');
-                const voltageInput = document.querySelector('#inputsContainer .inputVoltage');
-                
-                if (!bufferInput?.value || !voltageInput?.value) {
-                    alert('Please enter buffer pH and voltage values');
-                    return;
-                }
-                
-                const buffer = parseFloat(bufferInput.value);
-                const voltage = parseFloat(voltageInput.value) / 1000; // Convert mV to V
-                
-                // Simple 1-point calibration using Nernst equation
-                const slope = -0.059; // V/pH at 25°C
-                const offset = buffer - (slope * voltage);
-                
-                // Show in output fields
-                const outSlope = document.getElementById('outSlope');
-                const outOffset = document.getElementById('outOffset');
-                if (outSlope) outSlope.textContent = slope.toFixed(4);
-                if (outOffset) outOffset.textContent = offset.toFixed(4);
-                
-                // Show calibration values section
-                const valuesSection = document.getElementById('calibrationValuesSection');
-                if (valuesSection) valuesSection.style.display = 'block';
-            });
-        }
-        
-        // pH apply button
-        const applyBtn = document.getElementById('applyCalValues');
-        if (applyBtn) {
-            applyBtn.addEventListener('click', () => {
-                const slopeEl = document.getElementById('outSlope');
-                const offsetEl = document.getElementById('outOffset');
-                if (slopeEl && offsetEl) {
-                    const slope = parseFloat(slopeEl.textContent);
-                    const offset = parseFloat(offsetEl.textContent);
-                    if (!isNaN(slope) && !isNaN(offset)) {
-                        saveCalibration('ph', slope, offset);
-                    }
-                }
-            });
-        }
-        
-        // DO calibrate button
-        const calibrateBtnDO = document.getElementById('calibrateBtnDO');
-        if (calibrateBtnDO) {
-            calibrateBtnDO.addEventListener('click', () => {
-                const voltageInput = document.querySelector('#inputsContainerDO .inputVoltage');
-                
-                if (!voltageInput?.value) {
-                    alert('Please enter voltage value');
-                    return;
-                }
-                
-                const voltage = parseFloat(voltageInput.value) / 1000;
-                const doSat = 8.2; // 100% saturation at 25°C
-                
-                const slope = doSat / voltage;
-                const offset = 0;
-                
-                const outSlope = document.getElementById('outSlopeDO');
-                const outOffset = document.getElementById('outOffsetDO');
-                if (outSlope) outSlope.textContent = slope.toFixed(4);
-                if (outOffset) outOffset.textContent = offset.toFixed(4);
-                
-                const valuesSection = document.getElementById('calibrationValuesSectionDO');
-                if (valuesSection) valuesSection.style.display = 'block';
-            });
-        }
-        
-        // DO apply button
-        const applyBtnDO = document.getElementById('applyCalValuesDO');
-        if (applyBtnDO) {
-            applyBtnDO.addEventListener('click', () => {
-                const slopeEl = document.getElementById('outSlopeDO');
-                const offsetEl = document.getElementById('outOffsetDO');
-                if (slopeEl && offsetEl) {
-                    const slope = parseFloat(slopeEl.textContent);
-                    const offset = parseFloat(offsetEl.textContent);
-                    if (!isNaN(slope) && !isNaN(offset)) {
-                        saveCalibration('do', slope, offset);
-                    }
-                }
-            });
-        }
-        
-        // TDS calibrate button
-        const calibrateBtnTDS = document.getElementById('calibrateBtnTDS');
-        if (calibrateBtnTDS) {
-            calibrateBtnTDS.addEventListener('click', () => {
-                const bufferInput = document.querySelector('#inputsContainerTDS .inputBuffer');
-                const voltageInput = document.querySelector('#inputsContainerTDS .inputVoltage');
-                
-                if (!bufferInput?.value || !voltageInput?.value) {
-                    alert('Please enter TDS standard and voltage values');
-                    return;
-                }
-                
-                const standard = parseFloat(bufferInput.value);
-                const voltage = parseFloat(voltageInput.value) / 1000;
-                
-                const slope = standard / voltage;
-                const offset = 0;
-                
-                const outSlope = document.getElementById('outSlopeTDS');
-                const outOffset = document.getElementById('outOffsetTDS');
-                if (outSlope) outSlope.textContent = slope.toFixed(4);
-                if (outOffset) outOffset.textContent = offset.toFixed(4);
-                
-                const valuesSection = document.getElementById('calibrationValuesSectionTDS');
-                if (valuesSection) valuesSection.style.display = 'block';
-            });
-        }
-        
-        // TDS apply button
-        const applyBtnTDS = document.getElementById('applyCalValuesTDS');
-        if (applyBtnTDS) {
-            applyBtnTDS.addEventListener('click', () => {
-                const slopeEl = document.getElementById('outSlopeTDS');
-                const offsetEl = document.getElementById('outOffsetTDS');
-                if (slopeEl && offsetEl) {
-                    const slope = parseFloat(slopeEl.textContent);
-                    const offset = parseFloat(offsetEl.textContent);
-                    if (!isNaN(slope) && !isNaN(offset)) {
-                        saveCalibration('tds', slope, offset);
-                    }
-                }
-            });
-        }
-    }
-    
-    // Initialize
-    document.addEventListener('DOMContentLoaded', () => {
-        loadCalibration();
-        fetchVoltage();
-        setInterval(fetchVoltage, 2000);
-        setupCalibrationButtons();
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    points.forEach(p => {
+        sumX += p.voltage;
+        sumY += p.value;
+        sumXY += p.voltage * p.value;
+        sumX2 += p.voltage * p.voltage;
     });
-})();
+    const denom = n * sumX2 - sumX * sumX;
+    if (Math.abs(denom) < 1e-10) return { slope: 1, offset: sumY / n - sumX / n };
+    const slope = (n * sumXY - sumX * sumY) / denom;
+    const offset = (sumY - slope * sumX) / n;
+    return { slope, offset };
+}
+
+// Calibration state
+const calData = {
+    ph: { points: [], voltage: null },
+    do: { points: [], voltage: null },
+    tds: { points: [], voltage: null }
+};
+
+// pH buffer values
+const PH_BUFFERS = { 1: 4.00, 2: 6.86, 3: 9.18 };
+
+// Fetch live voltages from API
+async function fetchCalVoltages() {
+    try {
+        const res = await fetch(`${CALIBRATION_API}/voltage`);
+        const data = await res.json();
+        
+        ['ph', 'do', 'tds'].forEach(sensor => {
+            const el = document.getElementById(`${sensor}LiveVoltage`);
+            if (el && data[sensor]?.voltage !== undefined) {
+                calData[sensor].voltage = data[sensor].voltage;
+                el.textContent = `${(data[sensor].voltage * 1000).toFixed(1)} mV`;
+            }
+        });
+    } catch (e) {
+        console.log('Voltage fetch error:', e);
+    }
+}
+
+// Load current calibration from API
+async function loadCalibration() {
+    try {
+        const res = await fetch(`${CALIBRATION_API}/calibration`);
+        const data = await res.json();
+        
+        ['ph', 'do', 'tds'].forEach(sensor => {
+            if (data[sensor]) {
+                const slopeEl = document.getElementById(`${sensor}CurrentSlope`);
+                const offsetEl = document.getElementById(`${sensor}CurrentOffset`);
+                const statusEl = document.getElementById(`${sensor}CalStatus`);
+                
+                if (slopeEl) slopeEl.textContent = data[sensor].slope?.toFixed(4) || '--';
+                if (offsetEl) offsetEl.textContent = data[sensor].offset?.toFixed(4) || '--';
+                if (statusEl) {
+                    statusEl.textContent = 'Calibrated';
+                    statusEl.classList.add('calibrated');
+                }
+            }
+        });
+    } catch (e) {
+        console.log('Failed to load calibration:', e);
+    }
+}
+
+// Save calibration to API
+async function saveCalibration(sensor, slope, offset) {
+    try {
+        const res = await fetch(`${CALIBRATION_API}/calibration`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sensor, slope, offset })
+        });
+        if (res.ok) {
+            const modal = document.getElementById('calSuccessModal');
+            const msg = document.getElementById('calSuccessMsg');
+            if (msg) msg.textContent = `${sensor.toUpperCase()} calibration saved! Slope: ${slope.toFixed(4)}, Offset: ${offset.toFixed(4)}`;
+            if (modal) modal.style.display = 'flex';
+            loadCalibration();
+        }
+    } catch (e) {
+        alert('Error saving calibration: ' + e.message);
+    }
+}
+
+// Capture pH point
+function capturePH(pointNum) {
+    const voltage = calData.ph.voltage;
+    if (!voltage) {
+        alert('No voltage reading available');
+        return;
+    }
+    
+    const value = PH_BUFFERS[pointNum];
+    const tempC = parseFloat(document.getElementById('phBufferTemp')?.value) || 25;
+    
+    // Temperature-compensated pH (Nernst adjustment)
+    const tempFactor = (273.15 + tempC) / (273.15 + 25);
+    
+    calData.ph.points[pointNum - 1] = { voltage, value, tempC };
+    
+    // Update UI
+    const voltageEl = document.getElementById(`phPoint${pointNum}Voltage`);
+    const statusEl = document.getElementById(`phPoint${pointNum}Status`);
+    if (voltageEl) voltageEl.textContent = `${(voltage * 1000).toFixed(1)} mV`;
+    if (statusEl) {
+        statusEl.textContent = 'Captured';
+        statusEl.classList.add('captured');
+    }
+    
+    calculatePHResult();
+}
+
+// Calculate pH calibration result
+function calculatePHResult() {
+    const validPoints = calData.ph.points.filter(p => p);
+    if (validPoints.length < 2) return;
+    
+    const { slope, offset } = linearRegression(validPoints);
+    
+    document.getElementById('phNewSlope').textContent = slope.toFixed(4);
+    document.getElementById('phNewOffset').textContent = offset.toFixed(4);
+    document.getElementById('phResultCard').style.display = 'block';
+    document.getElementById('phApplyBtn').disabled = false;
+}
+
+// Capture DO point
+function captureDO(pointNum) {
+    const voltage = calData.do.voltage;
+    if (!voltage) {
+        alert('No voltage reading available');
+        return;
+    }
+    
+    const tempC = parseFloat(document.getElementById('doBufferTemp')?.value) || 25;
+    const value = pointNum === 1 ? getDOSaturation(tempC) : 0; // Point 1 = 100%, Point 2 = 0%
+    
+    calData.do.points[pointNum - 1] = { voltage, value };
+    
+    const voltageEl = document.getElementById(`doPoint${pointNum}Voltage`);
+    const statusEl = document.getElementById(`doPoint${pointNum}Status`);
+    if (voltageEl) voltageEl.textContent = `${(voltage * 1000).toFixed(1)} mV`;
+    if (statusEl) {
+        statusEl.textContent = 'Captured';
+        statusEl.classList.add('captured');
+    }
+    
+    calculateDOResult();
+}
+
+// Calculate DO calibration result
+function calculateDOResult() {
+    const validPoints = calData.do.points.filter(p => p);
+    if (validPoints.length < 1) return;
+    
+    const { slope, offset } = linearRegression(validPoints);
+    
+    document.getElementById('doNewSlope').textContent = slope.toFixed(4);
+    document.getElementById('doNewOffset').textContent = offset.toFixed(4);
+    document.getElementById('doResultCard').style.display = 'block';
+    document.getElementById('doApplyBtn').disabled = false;
+}
+
+// Capture TDS point
+function captureTDS(pointNum) {
+    const voltage = calData.tds.voltage;
+    if (!voltage) {
+        alert('No voltage reading available');
+        return;
+    }
+    
+    const standardInput = document.getElementById(`tdsStandard${pointNum}`);
+    const value = parseFloat(standardInput?.value);
+    if (isNaN(value)) {
+        alert('Please enter the TDS standard value in ppm');
+        return;
+    }
+    
+    calData.tds.points[pointNum - 1] = { voltage, value };
+    
+    const voltageEl = document.getElementById(`tdsPoint${pointNum}Voltage`);
+    const statusEl = document.getElementById(`tdsPoint${pointNum}Status`);
+    if (voltageEl) voltageEl.textContent = `${(voltage * 1000).toFixed(1)} mV`;
+    if (statusEl) {
+        statusEl.textContent = 'Captured';
+        statusEl.classList.add('captured');
+    }
+    
+    calculateTDSResult();
+}
+
+// Calculate TDS calibration result
+function calculateTDSResult() {
+    const validPoints = calData.tds.points.filter(p => p);
+    if (validPoints.length < 1) return;
+    
+    const { slope, offset } = linearRegression(validPoints);
+    
+    document.getElementById('tdsNewSlope').textContent = slope.toFixed(4);
+    document.getElementById('tdsNewOffset').textContent = offset.toFixed(4);
+    document.getElementById('tdsResultCard').style.display = 'block';
+    document.getElementById('tdsApplyBtn').disabled = false;
+}
+
+// Clear calibration points
+function clearCal(sensor) {
+    calData[sensor].points = [];
+    
+    // Reset UI
+    [1, 2, 3].forEach(num => {
+        const voltageEl = document.getElementById(`${sensor}Point${num}Voltage`);
+        const statusEl = document.getElementById(`${sensor}Point${num}Status`);
+        if (voltageEl) voltageEl.textContent = '--';
+        if (statusEl) {
+            statusEl.textContent = 'Waiting';
+            statusEl.classList.remove('captured');
+        }
+    });
+    
+    document.getElementById(`${sensor}ResultCard`).style.display = 'none';
+    document.getElementById(`${sensor}ApplyBtn`).disabled = true;
+}
+
+// Apply calibration
+function applyCal(sensor) {
+    const slopeEl = document.getElementById(`${sensor}NewSlope`);
+    const offsetEl = document.getElementById(`${sensor}NewOffset`);
+    
+    const slope = parseFloat(slopeEl?.textContent);
+    const offset = parseFloat(offsetEl?.textContent);
+    
+    if (isNaN(slope) || isNaN(offset)) {
+        alert('No calibration calculated');
+        return;
+    }
+    
+    saveCalibration(sensor, slope, offset);
+}
+
+// Initialize calibration system
+function initCalibrationSystem() {
+    // Start voltage polling
+    fetchCalVoltages();
+    setInterval(fetchCalVoltages, 2000);
+    
+    // Load current calibration
+    loadCalibration();
+    
+    // pH capture buttons
+    document.getElementById('phCapture1')?.addEventListener('click', () => capturePH(1));
+    document.getElementById('phCapture2')?.addEventListener('click', () => capturePH(2));
+    document.getElementById('phCapture3')?.addEventListener('click', () => capturePH(3));
+    document.getElementById('phClearBtn')?.addEventListener('click', () => clearCal('ph'));
+    document.getElementById('phApplyBtn')?.addEventListener('click', () => applyCal('ph'));
+    
+    // pH point mode toggle
+    document.getElementById('phPointMode')?.addEventListener('change', (e) => {
+        const show3 = e.target.value === '3';
+        document.getElementById('phPoint3').style.display = show3 ? 'block' : 'none';
+    });
+    
+    // DO capture buttons
+    document.getElementById('doCapture1')?.addEventListener('click', () => captureDO(1));
+    document.getElementById('doCapture2')?.addEventListener('click', () => captureDO(2));
+    document.getElementById('doClearBtn')?.addEventListener('click', () => clearCal('do'));
+    document.getElementById('doApplyBtn')?.addEventListener('click', () => applyCal('do'));
+    
+    // DO point mode toggle
+    document.getElementById('doPointMode')?.addEventListener('change', (e) => {
+        const show2 = e.target.value === '2';
+        document.getElementById('doPoint2').style.display = show2 ? 'block' : 'none';
+    });
+    
+    // TDS capture buttons
+    document.getElementById('tdsCapture1')?.addEventListener('click', () => captureTDS(1));
+    document.getElementById('tdsCapture2')?.addEventListener('click', () => captureTDS(2));
+    document.getElementById('tdsClearBtn')?.addEventListener('click', () => clearCal('tds'));
+    document.getElementById('tdsApplyBtn')?.addEventListener('click', () => applyCal('tds'));
+    
+    // TDS point mode toggle
+    document.getElementById('tdsPointMode')?.addEventListener('change', (e) => {
+        const show2 = e.target.value === '2';
+        document.getElementById('tdsPoint2').style.display = show2 ? 'block' : 'none';
+    });
+    
+    // Sensor tab switching in calibration
+    document.querySelectorAll('.calibrate-tab-btn[data-sensor]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const sensor = btn.dataset.sensor;
+            document.querySelectorAll('.calibrate-tab-btn[data-sensor]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.simple-cal-panel').forEach(panel => {
+                panel.style.display = panel.dataset.sensorType === sensor ? 'block' : 'none';
+            });
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initCalibrationSystem);

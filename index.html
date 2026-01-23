@@ -637,255 +637,262 @@
 			</div>
 		</section>
 
-		
-
 		<section id="calibrate" class="tab-content calibrate-tab">
+			<h2>Sensor Calibration</h2>
+			
+			<!-- Sensor Selection Tabs -->
 			<div class="calibrate-header">
 				<ul class="calibrate-tabs">
 					<li class="calibrate-tab-btn active" data-sensor="ph">pH Level</li>
 					<li class="calibrate-tab-btn" data-sensor="do">Dissolved Oxygen</li>
-					<li class="calibrate-tab-btn" data-sensor="tds">Total Dissolved Solids</li>
+					<li class="calibrate-tab-btn" data-sensor="tds">TDS</li>
 				</ul>	
 			</div>
 
-			<div class="calibrate-grid" data-sensor-type="ph">
-				<div class="cal-card updated-calibration">
-					<div class="card-header">Updated Calibration <span class="cal-date" id="calDate"></span></div>
-					<div class="cal-values-column" id="calibrationValuesColumnPH">
-						<div class="cal-value"><div class="label">Buffer (pH)</div><div class="value" id="calBuffer">--</div></div>
-						<div class="cal-value"><div class="label">Voltage (mV)</div><div class="value" id="calVoltage">--</div></div>
-						<div class="cal-value"><div class="label">Temperature (°C)</div><div class="value" id="calTemp">--</div></div>
-						<div class="cal-value"><div class="label">Slope</div><div class="value" id="calSlope">--</div></div>
-						<div class="cal-value"><div class="label">Offset</div><div class="value" id="calOffsetVal">--</div></div>
+			<!-- ========== pH CALIBRATION ========== -->
+			<div class="simple-cal-panel" data-sensor-type="ph">
+				<div class="cal-status-card">
+					<div class="cal-status-header">
+						<span class="cal-status-title">Current Calibration</span>
+						<span class="cal-status-badge" id="phCalStatus">Not Calibrated</span>
+					</div>
+					<div class="cal-status-values">
+						<div class="cal-stat"><span class="cal-stat-label">Slope</span><span class="cal-stat-value" id="phCurrentSlope">--</span></div>
+						<div class="cal-stat"><span class="cal-stat-label">Offset</span><span class="cal-stat-value" id="phCurrentOffset">--</span></div>
 					</div>
 				</div>
 
-				<div class="cal-card sensor-readings">
-					<div class="card-header">Sensor Readings</div>
-					<div class="readings-grid">
-						<div class="reading"><div class="label">Voltage</div><div class="value" id="readingVoltage">--</div></div>					</div>
+				<div class="cal-live-card">
+					<div class="cal-live-header">Live Voltage Reading</div>
+					<div class="cal-live-value" id="phLiveVoltage">-- V</div>
+					<div class="cal-live-hint">Updates every 2 seconds</div>
 				</div>
-			</div>
 
-			<div class="calibrate-grid" data-sensor-type="do" style="display: none;">
-				<div class="cal-card updated-calibration">
-					<div class="card-header">Updated Calibration <span class="cal-date" id="calDateDO"></span></div>
-					<div class="cal-values-column" id="calibrationValuesRowDO">
-						<div class="cal-value"><div class="label">DO Saturation (%)</div><div class="value" id="calBufferDO">--</div></div>
-						<div class="cal-value"><div class="label">Voltage (mV)</div><div class="value" id="calVoltageDO">--</div></div>
-						<div class="cal-value"><div class="label">Temperature (°C)</div><div class="value" id="calTempDO">--</div></div>
-						<div class="cal-value"><div class="label">Slope</div><div class="value" id="calSlopeDO">--</div></div>
-						<div class="cal-value"><div class="label">Offset</div><div class="value" id="calOffsetValDO">--</div></div>
+				<div class="cal-points-card">
+					<div class="cal-points-header">
+						<span>Calibration Points</span>
+						<select id="phPointMode" class="cal-point-select">
+							<option value="2">2-Point (Recommended)</option>
+							<option value="3">3-Point (Most Accurate)</option>
+						</select>
 					</div>
-				</div>
 
-				<div class="cal-card sensor-readings">
-					<div class="card-header">Sensor Readings</div>
-					<div class="readings-grid">
-						<div class="reading"><div class="label">Voltage</div><div class="value" id="readingVoltageDO">--</div></div>
+					<div class="cal-temp-row">
+						<label>Water Temperature:</label>
+						<input type="number" id="phBufferTemp" value="25" step="0.1" class="cal-temp-input"> °C
 					</div>
-				</div>
-			</div>
 
-			<div class="calibrate-grid" data-sensor-type="tds" style="display: none;">
-				<div class="cal-card updated-calibration">
-					<div class="card-header">Updated Calibration <span class="cal-date" id="calDateTDS"></span></div>
-					<div class="cal-values-column">
-						<div class="cal-value"><div class="label">Calibration Standard</div><div class="value" id="calBufferTDS">--</div></div>
-						<div class="cal-value"><div class="label">Voltage (mV)</div><div class="value" id="calVoltageTDS">--</div></div>
-						<div class="cal-value"><div class="label">Temperature (°C)</div><div class="value" id="calTempTDS">--</div></div>
-						<div class="cal-value"><div class="label">Slope</div><div class="value" id="calSlopeTDS">--</div></div>
-						<div class="cal-value"><div class="label">Offset</div><div class="value" id="calOffsetValTDS">--</div></div>
-					</div>
-				</div>
-
-				<div class="cal-card sensor-readings">
-					<div class="card-header">Sensor Readings</div>
-					<div class="readings-grid">
-						<div class="reading"><div class="label">Voltage</div><div class="value" id="readingVoltageTDS">--</div></div>
-					</div>
-				</div>
-			</div>
-
-			<div class="calibration-section" data-sensor-type="ph">
-				<div class="calibration-toggle-header">
-					<div class="calibration-toggle-label">Calibration Mode:</div>
-					<label class="toggle-switch">
-						<input type="checkbox" id="calibrationModeToggle">
-						<span class="toggle-slider"></span>
-						<span class="toggle-text">OFF</span>
-					</label>
-				</div>
-				<div class="calibration-mode-inline" id="calibrationModeSection" style="display: none;">
-					<div class="calibration-mode-label">Point Selection:</div>
-					<div class="mode-buttons">
-						<button class="mode-btn active" data-mode="1">1-point</button>
-						<button class="mode-btn" data-mode="2">2-point</button>
-						<button class="mode-btn" data-mode="3">3-point</button>
-					</div>
-				</div>
-
-				<div class="calibration-cards-row">
-					<div class="card input-panel" id="inputPanelSection" style="display: none;">
-						<div class="status-row">
-							<div class="status-label">Status:</div>
-							<div class="status-indicator unstable"><span class="dot"></span><span>Unstable</span></div>
+					<!-- Point 1: pH 4.00 -->
+					<div class="cal-point" id="phPoint1">
+						<div class="cal-point-header">
+							<span class="cal-point-num">1</span>
+							<span class="cal-point-label">pH 4.00 Buffer</span>
+							<span class="cal-point-status" id="phPoint1Status">Waiting</span>
 						</div>
-						<div id="inputsContainer">
-							<div class="inputs-grid" data-point="1">
-								<div class="point-label">Point 1:</div>
-								<div class="input-group">
-									<div class="label">Buffer Solution Value (pH):</div>
-									<input type="number" class="inputBuffer" value="">
-								</div>
-								<div class="input-group">
-									<div class="label">Measured Voltage (mV):</div>
-									<input type="number" class="inputVoltage" value="">
-								</div>	
-								<div class="input-group">
-									<div class="label">Temperature (°C):</div>
-									<input type="number" class="inputTemp" value="">
-								</div>
-								<button class="btn btn-apply" id="applyInputs">Apply</button>
-							</div>
-						</div>
-						
-						<div class="panel-actions">
-							<button class="btn-primary" id="calibrateBtn">Calibrate</button>
+						<div class="cal-point-body">
+							<div class="cal-point-voltage">Captured: <span id="phPoint1Voltage">--</span> V</div>
+							<button class="cal-capture-btn" id="phCapture1">Capture pH 4.00</button>
 						</div>
 					</div>
 
-					<div class="cal-card calibration-values" id="calibrationValuesSection" style="display: none;">
-						<div class="card-header">Calibration Values:</div>
-						<div class="values-grid">
-							<div class="value-card"><div class="label">Slope</div><div class="value" id="outSlope">-</div></div>
-							<div class="value-card"><div class="label">Offset</div><div class="value" id="outOffset">-</div></div>
+					<!-- Point 2: pH 6.86 -->
+					<div class="cal-point" id="phPoint2">
+						<div class="cal-point-header">
+							<span class="cal-point-num">2</span>
+							<span class="cal-point-label">pH 6.86 Buffer</span>
+							<span class="cal-point-status" id="phPoint2Status">Waiting</span>
 						</div>
-						<div class="values-actions">
-							<button class="btn" id="clearCal">Clear</button>
-							<button class="btn-primary" id="applyCalValues">Update</button>
+						<div class="cal-point-body">
+							<div class="cal-point-voltage">Captured: <span id="phPoint2Voltage">--</span> V</div>
+							<button class="cal-capture-btn" id="phCapture2">Capture pH 6.86</button>
 						</div>
 					</div>
+
+					<!-- Point 3: pH 9.18 (optional) -->
+					<div class="cal-point" id="phPoint3" style="display:none;">
+						<div class="cal-point-header">
+							<span class="cal-point-num">3</span>
+							<span class="cal-point-label">pH 9.18 Buffer</span>
+							<span class="cal-point-status" id="phPoint3Status">Waiting</span>
+						</div>
+						<div class="cal-point-body">
+							<div class="cal-point-voltage">Captured: <span id="phPoint3Voltage">--</span> V</div>
+							<button class="cal-capture-btn" id="phCapture3">Capture pH 9.18</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="cal-result-card" id="phResultCard" style="display:none;">
+					<div class="cal-result-header">Calibration Result</div>
+					<div class="cal-result-values">
+						<div class="cal-result-item"><span>Slope:</span><span id="phNewSlope">--</span></div>
+						<div class="cal-result-item"><span>Offset:</span><span id="phNewOffset">--</span></div>
+					</div>
+				</div>
+
+				<div class="cal-actions">
+					<button class="cal-btn cal-btn-secondary" id="phClearBtn">Clear</button>
+					<button class="cal-btn cal-btn-primary" id="phApplyBtn" disabled>Apply Calibration</button>
 				</div>
 			</div>
 
-			<div class="calibration-section" data-sensor-type="do" style="display: none;">
-				<div class="calibration-toggle-header">
-					<div class="calibration-toggle-label">Calibration Mode:</div>
-					<label class="toggle-switch">
-						<input type="checkbox" id="calibrationModeToggleDO">
-						<span class="toggle-slider"></span>
-						<span class="toggle-text">OFF</span>
-					</label>
-				</div>
-				<div class="calibration-mode-inline" id="calibrationModeSectionDO" style="display: none;">
-					<div class="calibration-mode-label">Point Selection:</div>
-					<div class="mode-buttons">
-						<button class="mode-btn active" data-mode="1">1-point</button>
-						<button class="mode-btn" data-mode="2">2-point</button>
+			<!-- ========== DO CALIBRATION ========== -->
+			<div class="simple-cal-panel" data-sensor-type="do" style="display:none;">
+				<div class="cal-status-card">
+					<div class="cal-status-header">
+						<span class="cal-status-title">Current Calibration</span>
+						<span class="cal-status-badge" id="doCalStatus">Not Calibrated</span>
+					</div>
+					<div class="cal-status-values">
+						<div class="cal-stat"><span class="cal-stat-label">Slope</span><span class="cal-stat-value" id="doCurrentSlope">--</span></div>
+						<div class="cal-stat"><span class="cal-stat-label">Offset</span><span class="cal-stat-value" id="doCurrentOffset">--</span></div>
 					</div>
 				</div>
 
-				<div class="calibration-cards-row">
-					<div class="card input-panel" id="inputPanelSectionDO" style="display: none;">
-						<div class="status-row">
-							<div class="status-label">Status:</div>
-							<div class="status-indicator unstable"><span class="dot"></span><span>Unstable</span></div>
+				<div class="cal-live-card">
+					<div class="cal-live-header">Live Voltage Reading</div>
+					<div class="cal-live-value" id="doLiveVoltage">-- V</div>
+					<div class="cal-live-hint">Updates every 2 seconds</div>
+				</div>
+
+				<div class="cal-points-card">
+					<div class="cal-points-header">
+						<span>Calibration Points</span>
+						<select id="doPointMode" class="cal-point-select">
+							<option value="1">1-Point (Air Saturation)</option>
+							<option value="2">2-Point (Air + Zero)</option>
+						</select>
+					</div>
+
+					<div class="cal-temp-row">
+						<label>Water Temperature:</label>
+						<input type="number" id="doBufferTemp" value="25" step="0.1" class="cal-temp-input"> °C
+					</div>
+
+					<!-- Point 1: 100% Saturation -->
+					<div class="cal-point" id="doPoint1">
+						<div class="cal-point-header">
+							<span class="cal-point-num">1</span>
+							<span class="cal-point-label">Air-Saturated Water (100%)</span>
+							<span class="cal-point-status" id="doPoint1Status">Waiting</span>
 						</div>
-						<div id="inputsContainerDO">
-							<div class="inputs-grid" data-point="1">
-								<div class="point-label">Point 1:</div>
-								<div class="input-group" style="background-color: transparent;  border: none; padding: 0; margin:0; border-radius: 0px;">
-									<div class="label" style="margin-top: 12px;">DO Saturation (%):</div>
-									<div class="inputdosaturation" aria-label="DO saturation">100</div>
-								</div>
-								<div class="input-group">
-									<div class="label">Measured Voltage (mV):</div>
-									<input type="number" class="inputVoltage" value="">
-								</div>
-								<div class="input-group">
-									<div class="label">Temperature (°C):</div>
-									<input type="number" class="inputTemp" value="">
-								</div>
-								<button class="btn btn-apply" id="applyInputsDO">Apply</button>
-							</div>
-						</div>
-						
-						<div class="panel-actions">
-							<button class="btn-primary" id="calibrateBtnDO">Calibrate</button>
+						<div class="cal-point-body">
+							<div class="cal-point-voltage">Captured: <span id="doPoint1Voltage">--</span> V</div>
+							<button class="cal-capture-btn" id="doCapture1">Capture 100%</button>
 						</div>
 					</div>
 
-					<div class="cal-card calibration-values" id="calibrationValuesSectionDO" style="display: none;">
-						<div class="card-header">Calibration Values:</div>
-						<div class="values-grid">
-							<div class="value-card"><div class="label">Slope</div><div class="value" id="outSlopeDO">-</div></div>
-							<div class="value-card"><div class="label">Offset</div><div class="value" id="outOffsetDO">-</div></div>
+					<!-- Point 2: 0% (optional) -->
+					<div class="cal-point" id="doPoint2" style="display:none;">
+						<div class="cal-point-header">
+							<span class="cal-point-num">2</span>
+							<span class="cal-point-label">Zero Oxygen Solution (0%)</span>
+							<span class="cal-point-status" id="doPoint2Status">Waiting</span>
 						</div>
-						<div class="values-actions">
-							<button class="btn" id="clearCalDO">Clear</button>
-							<button class="btn-primary" id="applyCalValuesDO">Update</button>
+						<div class="cal-point-body">
+							<div class="cal-point-voltage">Captured: <span id="doPoint2Voltage">--</span> V</div>
+							<button class="cal-capture-btn" id="doCapture2">Capture 0%</button>
 						</div>
 					</div>
+				</div>
+
+				<div class="cal-result-card" id="doResultCard" style="display:none;">
+					<div class="cal-result-header">Calibration Result</div>
+					<div class="cal-result-values">
+						<div class="cal-result-item"><span>Slope:</span><span id="doNewSlope">--</span></div>
+						<div class="cal-result-item"><span>Offset:</span><span id="doNewOffset">--</span></div>
+					</div>
+				</div>
+
+				<div class="cal-actions">
+					<button class="cal-btn cal-btn-secondary" id="doClearBtn">Clear</button>
+					<button class="cal-btn cal-btn-primary" id="doApplyBtn" disabled>Apply Calibration</button>
 				</div>
 			</div>
 
-			<div class="calibration-section" data-sensor-type="tds" style="display: none;">
-				<div class="calibration-toggle-header">
-					<div class="calibration-toggle-label">Calibration Mode:</div>
-					<label class="toggle-switch">
-						<input type="checkbox" id="calibrationModeToggleTDS">
-						<span class="toggle-slider"></span>
-						<span class="toggle-text">OFF</span>
-					</label>
-				</div>
-				<div class="calibration-mode-inline" id="calibrationModeSectionTDS" style="display: none;">
-					<div class="calibration-mode-label">Point Selection:</div>
-					<div class="mode-buttons">
-						<button class="mode-btn active" data-mode="1">1-point</button>
+			<!-- ========== TDS CALIBRATION ========== -->
+			<div class="simple-cal-panel" data-sensor-type="tds" style="display:none;">
+				<div class="cal-status-card">
+					<div class="cal-status-header">
+						<span class="cal-status-title">Current Calibration</span>
+						<span class="cal-status-badge" id="tdsCalStatus">Not Calibrated</span>
+					</div>
+					<div class="cal-status-values">
+						<div class="cal-stat"><span class="cal-stat-label">Slope</span><span class="cal-stat-value" id="tdsCurrentSlope">--</span></div>
+						<div class="cal-stat"><span class="cal-stat-label">Offset</span><span class="cal-stat-value" id="tdsCurrentOffset">--</span></div>
 					</div>
 				</div>
 
-				<div class="calibration-cards-row">
-					<div class="card input-panel" id="inputPanelSectionTDS" style="display: none;">
-						<div class="status-row">
-							<div class="status-label">Status:</div>
-							<div class="status-indicator unstable"><span class="dot"></span><span>Unstable</span></div>
+				<div class="cal-live-card">
+					<div class="cal-live-header">Live Voltage Reading</div>
+					<div class="cal-live-value" id="tdsLiveVoltage">-- V</div>
+					<div class="cal-live-hint">Updates every 2 seconds</div>
+				</div>
+
+				<div class="cal-points-card">
+					<div class="cal-points-header">
+						<span>Calibration Points</span>
+						<select id="tdsPointMode" class="cal-point-select">
+							<option value="1">1-Point</option>
+							<option value="2">2-Point</option>
+						</select>
+					</div>
+
+					<div class="cal-temp-row">
+						<label>Water Temperature:</label>
+						<input type="number" id="tdsBufferTemp" value="25" step="0.1" class="cal-temp-input"> °C
+					</div>
+
+					<!-- Point 1 -->
+					<div class="cal-point" id="tdsPoint1">
+						<div class="cal-point-header">
+							<span class="cal-point-num">1</span>
+							<span class="cal-point-label">Standard Solution</span>
+							<span class="cal-point-status" id="tdsPoint1Status">Waiting</span>
 						</div>
-						<div id="inputsContainerTDS">
-							<div class="inputs-grid" data-point="1">
-								<div class="point-label">Point 1:</div>
-								<div class="input-group">
-									<div class="label">Calibration Standard (ppm):</div>
-									<input type="number" class="inputBuffer" value="">
-								</div>
-								<div class="input-group">
-									<div class="label">Measured Voltage (mV):</div>
-									<input type="number" class="inputVoltage" value="">
-								</div>
-								<div class="input-group">
-									<div class="label">Temperature (°C):</div>
-									<input type="number" class="inputTemp" value="">
-								</div>
-							</div>
-						</div>
-						
-						<div class="panel-actions">
-							<button class="btn-primary" id="calibrateBtnTDS">Calibrate</button>
+						<div class="cal-point-body">
+							<input type="number" id="tdsStandard1" placeholder="Enter ppm (e.g. 1000)" class="cal-standard-input">
+							<div class="cal-point-voltage">Captured: <span id="tdsPoint1Voltage">--</span> V</div>
+							<button class="cal-capture-btn" id="tdsCapture1">Capture</button>
 						</div>
 					</div>
 
-					<div class="cal-card calibration-values" id="calibrationValuesSectionTDS" style="display: none;">
-						<div class="card-header">Calibration Values:</div>
-						<div class="values-grid">
-							<div class="value-card"><div class="label">Slope</div><div class="value" id="outSlopeTDS">-</div></div>
-							<div class="value-card"><div class="label">Offset</div><div class="value" id="outOffsetTDS">-</div></div>
+					<!-- Point 2 (optional) -->
+					<div class="cal-point" id="tdsPoint2" style="display:none;">
+						<div class="cal-point-header">
+							<span class="cal-point-num">2</span>
+							<span class="cal-point-label">Second Standard</span>
+							<span class="cal-point-status" id="tdsPoint2Status">Waiting</span>
 						</div>
-						<div class="values-actions">
-							<button class="btn" id="clearCalTDS">Clear</button>
-							<button class="btn-primary" id="applyCalValuesTDS">Update</button>
+						<div class="cal-point-body">
+							<input type="number" id="tdsStandard2" placeholder="Enter ppm (e.g. 500)" class="cal-standard-input">
+							<div class="cal-point-voltage">Captured: <span id="tdsPoint2Voltage">--</span> V</div>
+							<button class="cal-capture-btn" id="tdsCapture2">Capture</button>
 						</div>
 					</div>
+				</div>
+
+				<div class="cal-result-card" id="tdsResultCard" style="display:none;">
+					<div class="cal-result-header">Calibration Result</div>
+					<div class="cal-result-values">
+						<div class="cal-result-item"><span>Slope:</span><span id="tdsNewSlope">--</span></div>
+						<div class="cal-result-item"><span>Offset:</span><span id="tdsNewOffset">--</span></div>
+					</div>
+				</div>
+
+				<div class="cal-actions">
+					<button class="cal-btn cal-btn-secondary" id="tdsClearBtn">Clear</button>
+					<button class="cal-btn cal-btn-primary" id="tdsApplyBtn" disabled>Apply Calibration</button>
+				</div>
+			</div>
+
+			<!-- Success Modal -->
+			<div class="cal-modal" id="calSuccessModal" style="display:none;">
+				<div class="cal-modal-content">
+					<div class="cal-modal-icon">&#10004;</div>
+					<div class="cal-modal-title">Calibration Saved!</div>
+					<div class="cal-modal-msg" id="calSuccessMsg">pH calibration applied successfully.</div>
+					<button class="cal-modal-close" onclick="document.getElementById('calSuccessModal').style.display='none'">OK</button>
 				</div>
 			</div>
 		</section>
