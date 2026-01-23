@@ -3952,30 +3952,64 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Calculate slope and offset from captured points
+    // Get DO saturation value at given temperature (mg/L)
+    function getDOSaturation(tempC) {
+        // Benson & Krause equation approximation for freshwater at sea level
+        // https://www.waterontheweb.org/under/waterquality/oxygen.html
+        const temps = [0, 5, 10, 15, 20, 25, 30, 35, 40];
+        const sats = [14.6, 12.8, 11.3, 10.1, 9.1, 8.2, 7.5, 6.9, 6.4];
+        
+        // Linear interpolation
+        if (tempC <= 0) return sats[0];
+        if (tempC >= 40) return sats[sats.length - 1];
+        
+        for (let i = 0; i < temps.length - 1; i++) {
+            if (tempC >= temps[i] && tempC < temps[i + 1]) {
+                const ratio = (tempC - temps[i]) / (temps[i + 1] - temps[i]);
+                return sats[i] + ratio * (sats[i + 1] - sats[i]);
+            }
+        }
+        return 8.2; // Default 25°C
+    }
+    
+    // Get Nernst slope at given temperature (V/pH)
+    function getNernstSlope(tempC) {
+        // Nernst equation: E = E0 - (RT/nF) * pH
+        // At 25°C: 2.303 * R * T / F = 0.05916 V/pH
+        // Temperature coefficient: slope = 0.05916 * (273.15 + T) / 298.15
+        const tempK = 273.15 + tempC;
+        return -0.05916 * (tempK / 298.15);
+    }
+    
     function calculateCalibration(sensor) {
         const points = calState[sensor].points;
         if (points.length < 1) return null;
         
+        // Get temperature from input
+        const tempInput = document.getElementById(`${sensor}BufferTemp`);
+        const tempC = parseFloat(tempInput?.value) || 25;
+        
         if (points.length === 1) {
-            // 1-point: assume slope, calculate offset
-            // For pH: slope ≈ -0.0592V/pH at 25°C (Nernst)
-            // For DO: assume linear from 0
-            // For TDS: assume linear from 0
+            // 1-point: use temperature-compensated theoretical slope
             const p = points[0];
             let slope, offset;
             
             if (sensor === 'ph') {
-                slope = -0.059; // Nernst constant
+                // Temperature-compensated Nernst slope
+                slope = getNernstSlope(tempC);
                 offset = p.value - (slope * p.voltage);
+                console.log(`pH 1-point cal @ ${tempC}°C: Nernst slope = ${slope.toFixed(4)} V/pH`);
             } else if (sensor === 'do') {
-                // At 100% saturation, typical DO is ~8.2 mg/L at 25°C
-                slope = 8.2 / p.voltage;
+                // Temperature-compensated DO saturation
+                const doSat = getDOSaturation(tempC);
+                slope = doSat / p.voltage;
                 offset = 0;
+                console.log(`DO 1-point cal @ ${tempC}°C: Saturation = ${doSat.toFixed(1)} mg/L`);
             } else { // tds
                 slope = p.value / p.voltage;
                 offset = 0;
             }
-            return { slope, offset };
+            return { slope, offset, tempC };
         }
         
         // 2+ points: linear regression
@@ -3992,7 +4026,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
         const offset = (sumY - slope * sumX) / n;
         
-        return { slope, offset };
+        // Get temperature for reference
+        const tempInput = document.getElementById(`${sensor}BufferTemp`);
+        const tempC = parseFloat(tempInput?.value) || 25;
+        
+        return { slope, offset, tempC };
     }
     
     // Update UI after capturing a point
