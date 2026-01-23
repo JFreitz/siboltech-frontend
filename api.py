@@ -475,6 +475,8 @@ def get_history():
 # ==================== RELAY CONTROL ====================
 # In-memory relay states (persisted in DB for reliability)
 RELAY_STATES = {i: False for i in range(1, 10)}  # 9 relays
+CALIBRATION_MODE_ENABLED = False  # When True, disables all actuator triggers
+
 RELAY_LABELS = {
     1: "Misting Pump",
     2: "Air Pump",
@@ -522,6 +524,34 @@ def relay_status():
             {"id": i, "label": RELAY_LABELS.get(i, f"Relay {i}"), "state": RELAY_STATES[i]}
             for i in range(1, 10)  # 9 relays
         ]
+    })
+
+
+# ==================== CALIBRATION MODE ====================
+@app.route("/api/calibration-mode", methods=["GET"])
+def get_calibration_mode():
+    """Get current calibration mode status."""
+    return jsonify({
+        "success": True,
+        "enabled": CALIBRATION_MODE_ENABLED
+    })
+
+
+@app.route("/api/calibration-mode", methods=["POST"])
+def set_calibration_mode():
+    """Enable/disable calibration mode (disables actuators during calibration)."""
+    global CALIBRATION_MODE_ENABLED
+    data = request.get_json() or {}
+    enabled = data.get("enabled", False)
+    
+    CALIBRATION_MODE_ENABLED = bool(enabled)
+    
+    print(f"[CALIBRATION MODE] {'ENABLED' if CALIBRATION_MODE_ENABLED else 'DISABLED'} - Actuators {'suspended' if CALIBRATION_MODE_ENABLED else 'active'}")
+    
+    return jsonify({
+        "success": True,
+        "enabled": CALIBRATION_MODE_ENABLED,
+        "message": "Actuators disabled for calibration" if CALIBRATION_MODE_ENABLED else "Actuators re-enabled"
     })
 
 
@@ -617,6 +647,86 @@ def _save_relay_state(relay_id, state):
             session.commit()
     except Exception:
         pass
+
+
+# ==================== Calibration Endpoints ====================
+CALIBRATION_FILE = os.path.join(os.path.dirname(__file__), "calibration.json")
+
+def _load_calibration():
+    """Load calibration values from file."""
+    try:
+        with open(CALIBRATION_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return {"ph": {"slope": 1.0, "offset": 0.0}, "tds": {"slope": 1.0, "offset": 0.0}, "do": {"slope": 1.0, "offset": 0.0}}
+
+def _save_calibration(data):
+    """Save calibration values to file."""
+    with open(CALIBRATION_FILE, 'w') as f:
+        json.dump(data, f, indent=2)
+
+@app.route("/api/calibration", methods=["GET"])
+def get_calibration():
+    """Get current calibration values for all sensors."""
+    cal = _load_calibration()
+    return jsonify(cal)
+
+@app.route("/api/calibration", methods=["POST"])
+def set_calibration():
+    """Update calibration values for a sensor.
+    
+    Expects JSON: {"sensor": "ph|tds|do", "slope": float, "offset": float}
+    """
+    data = request.get_json()
+    sensor = data.get("sensor", "").lower()
+    slope = data.get("slope")
+    offset = data.get("offset")
+    
+    if sensor not in ["ph", "tds", "do"]:
+        return jsonify({"error": "Invalid sensor. Use: ph, tds, do"}), 400
+    
+    if slope is None or offset is None:
+        return jsonify({"error": "Missing slope or offset"}), 400
+    
+    cal = _load_calibration()
+    cal[sensor] = {"slope": float(slope), "offset": float(offset)}
+    _save_calibration(cal)
+    
+    # Log calibration change
+    try:
+        with Session() as session:
+            session.add(SensorReading(
+                timestamp=_utcnow(),
+                sensor=f"{sensor}_calibration",
+                value=slope,
+                unit="calibration",
+                meta={"slope": slope, "offset": offset}
+            ))
+            session.commit()
+    except:
+        pass
+    
+    return jsonify({"success": True, "sensor": sensor, "slope": slope, "offset": offset})
+
+@app.route("/api/voltage", methods=["GET"])
+def get_voltage():
+    """Get latest raw voltage readings for calibration.
+    
+    Returns the most recent voltage values for pH, TDS, and DO sensors.
+    """
+    with Session() as session:
+        result = {}
+        for sensor in ["ph_voltage_v", "tds_voltage_v", "do_voltage_v"]:
+            row = session.execute(
+                text("SELECT value, timestamp FROM sensor_readings WHERE sensor = :s ORDER BY timestamp DESC LIMIT 1"),
+                {"s": sensor}
+            ).first()
+            if row:
+                result[sensor.replace("_voltage_v", "")] = {
+                    "voltage": row[0],
+                    "timestamp": _format_ts_for_display(row[1])
+                }
+        return jsonify(result)
 
 
 if __name__ == "__main__":
