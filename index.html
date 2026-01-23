@@ -640,6 +640,18 @@
 		<section id="calibrate" class="tab-content calibrate-tab">
 			<h2>Sensor Calibration</h2>
 			
+			<!-- Calibration Mode Toggle -->
+			<div class="cal-mode-toggle">
+				<div class="cal-mode-info">
+					<span class="cal-mode-label">Calibration Mode</span>
+					<span class="cal-mode-desc">Disables all actuators during calibration</span>
+				</div>
+				<button class="cal-mode-btn" id="calModeBtn">
+					<span class="cal-mode-status" id="calModeStatus">OFF</span>
+					<span class="cal-mode-icon" id="calModeIcon">⚡</span>
+				</button>
+			</div>
+			
 			<!-- Sensor Selection Tabs -->
 			<div class="calibrate-header">
 				<ul class="calibrate-tabs">

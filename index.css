@@ -1,3 +1,83 @@
+/* Calibration Mode Toggle */
+.cal-mode-toggle {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	background: linear-gradient(145deg, #fff8e6, #fff3d0);
+	border: 2px solid #e6c84a;
+	border-radius: 14px;
+	padding: 16px 20px;
+	margin-bottom: 24px;
+	box-shadow: 0 3px 12px rgba(230, 200, 74, 0.2);
+}
+
+.cal-mode-info {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.cal-mode-label {
+	font-size: 16px;
+	font-weight: 700;
+	color: #7a6a1a;
+}
+
+.cal-mode-desc {
+	font-size: 12px;
+	color: #9a8a3a;
+}
+
+.cal-mode-btn {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	background: linear-gradient(180deg, #e0e0e0, #c8c8c8);
+	border: 2px solid #a0a0a0;
+	border-radius: 30px;
+	padding: 10px 20px;
+	font-weight: 700;
+	font-size: 14px;
+	cursor: pointer;
+	transition: all 0.3s ease;
+	min-width: 110px;
+	justify-content: center;
+}
+
+.cal-mode-btn:hover {
+	transform: scale(1.02);
+}
+
+.cal-mode-btn.active {
+	background: linear-gradient(180deg, #ff8c42, #e65c00);
+	border-color: #cc5200;
+	color: #fff;
+	box-shadow: 0 4px 16px rgba(230, 92, 0, 0.4);
+}
+
+.cal-mode-status {
+	font-size: 14px;
+	font-weight: 800;
+	letter-spacing: 0.5px;
+}
+
+.cal-mode-btn.active .cal-mode-status {
+	color: #fff;
+}
+
+.cal-mode-icon {
+	font-size: 18px;
+}
+
+.cal-mode-btn.active .cal-mode-icon {
+	animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.5; }
+}
+
 /* Calibrate UI */
 .calibrate-tab { padding: 16px; }
 .calibrate-header { margin-bottom: 28px; padding-left: 4px; }

@@ -1,6 +1,81 @@
 // === SIBOLTECH API Configuration ===
 const RELAY_API_URL = 'https://likelihood-glucose-struck-representing.trycloudflare.com/api';
 
+// === CALIBRATION MODE (Disables Actuators) ===
+let calibrationModeActive = false;
+
+async function toggleCalibrationMode() {
+    const btn = document.getElementById('calModeBtn');
+    const statusEl = document.getElementById('calModeStatus');
+    const iconEl = document.getElementById('calModeIcon');
+    
+    if (!btn) return;
+    
+    const newMode = !calibrationModeActive;
+    
+    try {
+        const res = await fetch(`${RELAY_API_URL}/calibration-mode`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: newMode })
+        });
+        
+        if (res.ok) {
+            calibrationModeActive = newMode;
+            updateCalibrationModeUI();
+            console.log('Calibration mode:', calibrationModeActive ? 'ENABLED' : 'DISABLED');
+        } else {
+            console.error('Failed to set calibration mode');
+        }
+    } catch (e) {
+        console.error('Error toggling calibration mode:', e);
+        // Still update UI locally if API fails
+        calibrationModeActive = newMode;
+        updateCalibrationModeUI();
+    }
+}
+
+function updateCalibrationModeUI() {
+    const btn = document.getElementById('calModeBtn');
+    const statusEl = document.getElementById('calModeStatus');
+    const iconEl = document.getElementById('calModeIcon');
+    
+    if (!btn || !statusEl || !iconEl) return;
+    
+    if (calibrationModeActive) {
+        btn.classList.add('active');
+        statusEl.textContent = 'ON';
+        iconEl.textContent = '🔧';
+    } else {
+        btn.classList.remove('active');
+        statusEl.textContent = 'OFF';
+        iconEl.textContent = '⚡';
+    }
+}
+
+async function fetchCalibrationMode() {
+    try {
+        const res = await fetch(`${RELAY_API_URL}/calibration-mode`);
+        if (res.ok) {
+            const data = await res.json();
+            calibrationModeActive = data.enabled || false;
+            updateCalibrationModeUI();
+        }
+    } catch (e) {
+        console.log('Could not fetch calibration mode:', e);
+    }
+}
+
+// Initialize calibration mode button
+document.addEventListener('DOMContentLoaded', () => {
+    const calModeBtn = document.getElementById('calModeBtn');
+    if (calModeBtn) {
+        calModeBtn.addEventListener('click', toggleCalibrationMode);
+    }
+    // Fetch initial state
+    fetchCalibrationMode();
+});
+
 // Fetch real sensor data from API
 async function fetchSensorData() {
     try {
