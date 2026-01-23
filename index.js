@@ -1469,23 +1469,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	let actuatorOverride = false;
 
 	function updateSensorsAndActuators(){
-		// sample values - replace with real sensor API later
-		// widen ranges so warnings/critical states appear more often during demo
-		const phValue = (6 + Math.random()*2).toFixed(2);      // 6.00 - 7.99
-		const doValue = (6 + Math.random()*4).toFixed(1);       // 6.0 - 9.9
-		const tempValue = (22 + Math.random()*8).toFixed(1);    // 22.0 - 29.9
-		const humValue = Math.floor(45 + Math.random()*45);     // 45 - 89
-		const tdsValue = (0.3 + Math.random()*2.2).toFixed(2);  // 0.30 - 2.50
+		// Sensor values are now fetched from API via fetchSensorData()
+		// This function only handles actuator auto-control when override is OFF
 		
-		// push live readings to all mirrored UI blocks (dashboard, training, sensors tab)
-		const setValueAll = (key, val) => {
-			document.querySelectorAll(`[id="val-${key}"]`).forEach(el => { el.textContent = val; });
-		};
-		setValueAll('ph', phValue);
-		setValueAll('do', doValue);
-		setValueAll('temp', tempValue);
-		setValueAll('hum', humValue);
-		setValueAll('tds', tdsValue);
+		// Get current sensor values from DOM for alert updates
+		const phValue = document.getElementById('val-ph')?.textContent || '0';
+		const doValue = document.getElementById('val-do')?.textContent?.replace(' mg/L', '') || '0';
+		const tempValue = document.getElementById('val-temp')?.textContent?.replace(' °C', '') || '0';
+		const humValue = document.getElementById('val-hum')?.textContent?.replace(' %', '') || '0';
+		const tdsValue = document.getElementById('val-tds')?.textContent?.replace(' ppm', '') || '0';
 
 		// Record values for sensor graphs time series
 		recordSensorValue('ph', parseFloat(phValue));
@@ -1501,16 +1493,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		updateSensorAlert('hum', humValue);
 		updateSensorAlert('tds', tdsValue);
 
-		// actuators - only auto-adjust when override is OFF
-		if(!actuatorOverride){
-			setActuatorState('act-water', Math.random()>0.2 ? 'ON':'OFF');
-			setActuatorState('act-air', Math.random()>0.5 ? 'ON':'OFF');
-			// Track both exhaust fans separately (in/out)
-			setActuatorState('act-fan-in', Math.random()>0.4 ? 'ON':'OFF');
-			setActuatorState('act-fan-out', Math.random()>0.4 ? 'ON':'OFF');
-			setActuatorState('act-lights-aerponics', Math.random()>0.3 ? 'ON':'OFF');
-			setActuatorState('act-lights-dwc', Math.random()>0.3 ? 'ON':'OFF');
-		}
+		// actuators - auto control is handled by backend based on sensor readings
+		// This only updates UI state, actual control comes from API
 	}
 
 	// helper: set actuator state text + checkbox
