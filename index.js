@@ -83,34 +83,36 @@ async function fetchSensorData() {
         const data = await res.json();
         
         // API returns: { "ph": {"value": 6.5, "unit": "pH"}, "temperature_c": {...}, ... }
-        // Update dashboard sensor values
-        if (data.ph && data.ph.value !== undefined) {
-            document.querySelectorAll('#val-ph, [data-sensor="ph"] .value').forEach(el => {
-                if (el) el.textContent = data.ph.value.toFixed(2);
-            });
-        }
-        if (data.do_mg_l && data.do_mg_l.value !== undefined) {
-            document.querySelectorAll('#val-do, [data-sensor="do"] .value').forEach(el => {
-                if (el) el.textContent = data.do_mg_l.value.toFixed(2) + ' mg/L';
-            });
-        }
-        if (data.temperature_c && data.temperature_c.value !== undefined) {
-            document.querySelectorAll('#val-temp, [data-sensor="temp"] .value').forEach(el => {
-                if (el) el.textContent = data.temperature_c.value.toFixed(1) + ' °C';
-            });
-        }
-        if (data.humidity && data.humidity.value !== undefined) {
-            document.querySelectorAll('#val-hum, [data-sensor="hum"] .value').forEach(el => {
-                if (el) el.textContent = data.humidity.value.toFixed(1) + ' %';
-            });
-        }
-        if (data.tds_ppm && data.tds_ppm.value !== undefined) {
-            document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => {
-                if (el) el.textContent = data.tds_ppm.value.toFixed(0) + ' ppm';
-            });
-        }
+        // Update dashboard sensor values (default to 0 if no data)
+        const phVal = (data.ph && data.ph.value !== undefined) ? data.ph.value.toFixed(2) : '0.00';
+        const doVal = (data.do_mg_l && data.do_mg_l.value !== undefined) ? data.do_mg_l.value.toFixed(2) + ' mg/L' : '0.00 mg/L';
+        const tempVal = (data.temperature_c && data.temperature_c.value !== undefined) ? data.temperature_c.value.toFixed(1) + ' °C' : '0.0 °C';
+        const humVal = (data.humidity && data.humidity.value !== undefined) ? data.humidity.value.toFixed(1) + ' %' : '0.0 %';
+        const tdsVal = (data.tds_ppm && data.tds_ppm.value !== undefined) ? data.tds_ppm.value.toFixed(0) + ' ppm' : '0 ppm';
+
+        document.querySelectorAll('#val-ph, [data-sensor="ph"] .value').forEach(el => {
+            if (el) el.textContent = phVal;
+        });
+        document.querySelectorAll('#val-do, [data-sensor="do"] .value').forEach(el => {
+            if (el) el.textContent = doVal;
+        });
+        document.querySelectorAll('#val-temp, [data-sensor="temp"] .value').forEach(el => {
+            if (el) el.textContent = tempVal;
+        });
+        document.querySelectorAll('#val-hum, [data-sensor="hum"] .value').forEach(el => {
+            if (el) el.textContent = humVal;
+        });
+        document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => {
+            if (el) el.textContent = tdsVal;
+        });
     } catch (e) {
         console.log('API fetch error:', e);
+        // On error, show zeros
+        document.querySelectorAll('#val-ph, [data-sensor="ph"] .value').forEach(el => { if (el) el.textContent = '0.00'; });
+        document.querySelectorAll('#val-do, [data-sensor="do"] .value').forEach(el => { if (el) el.textContent = '0.00 mg/L'; });
+        document.querySelectorAll('#val-temp, [data-sensor="temp"] .value').forEach(el => { if (el) el.textContent = '0.0 °C'; });
+        document.querySelectorAll('#val-hum, [data-sensor="hum"] .value').forEach(el => { if (el) el.textContent = '0.0 %'; });
+        document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => { if (el) el.textContent = '0 ppm'; });
     }
 }
 
