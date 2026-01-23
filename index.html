@@ -783,7 +783,7 @@
 			<div class="simple-cal-panel" data-sensor-type="ph">
 				<div class="cal-status-card">
 					<div class="cal-status-header">
-						<span class="cal-status-title">📊 Current Calibration</span>
+						<span class="cal-status-title">Current Calibration</span>
 						<span class="cal-status-badge" id="phCalStatus">Not Calibrated</span>
 					</div>
 					<div class="cal-status-values">
@@ -793,7 +793,7 @@
 				</div>
 
 				<div class="cal-live-card">
-					<div class="cal-live-header">🔴 Live Voltage Reading</div>
+					<div class="cal-live-header">Live Voltage Reading</div>
 					<div class="cal-live-value" id="phLiveVoltage">-- V</div>
 					<div class="cal-live-hint">Updates every 2 seconds</div>
 				</div>
@@ -808,7 +808,7 @@
 					</div>
 
 					<div class="cal-temp-row">
-						<label>🌡️ Water Temperature:</label>
+						<label>Water Temperature:</label>
 						<input type="number" id="phBufferTemp" value="25" step="0.1" class="cal-temp-input"> °C
 					</div>
 
@@ -817,7 +817,7 @@
 						<div class="cal-point-header">
 							<span class="cal-point-num">1</span>
 							<span class="cal-point-label">pH 4.00 Buffer</span>
-							<span class="cal-point-status" id="phPoint1Status">⏳ Waiting</span>
+							<span class="cal-point-status" id="phPoint1Status">Waiting</span>
 						</div>
 						<div class="cal-point-body">
 							<div class="cal-point-voltage">Captured: <span id="phPoint1Voltage">--</span> V</div>
@@ -830,7 +830,7 @@
 						<div class="cal-point-header">
 							<span class="cal-point-num">2</span>
 							<span class="cal-point-label">pH 6.86 Buffer</span>
-							<span class="cal-point-status" id="phPoint2Status">⏳ Waiting</span>
+							<span class="cal-point-status" id="phPoint2Status">Waiting</span>
 						</div>
 						<div class="cal-point-body">
 							<div class="cal-point-voltage">Captured: <span id="phPoint2Voltage">--</span> V</div>
@@ -843,7 +843,7 @@
 						<div class="cal-point-header">
 							<span class="cal-point-num">3</span>
 							<span class="cal-point-label">pH 9.18 Buffer</span>
-							<span class="cal-point-status" id="phPoint3Status">⏳ Waiting</span>
+							<span class="cal-point-status" id="phPoint3Status">Waiting</span>
 						</div>
 						<div class="cal-point-body">
 							<div class="cal-point-voltage">Captured: <span id="phPoint3Voltage">--</span> V</div>
@@ -853,7 +853,7 @@
 				</div>
 
 				<div class="cal-result-card" id="phResultCard" style="display:none;">
-					<div class="cal-result-header">✅ Calibration Result</div>
+					<div class="cal-result-header">Calibration Result</div>
 					<div class="cal-result-values">
 						<div class="cal-result-item"><span>Slope:</span><span id="phNewSlope">--</span></div>
 						<div class="cal-result-item"><span>Offset:</span><span id="phNewOffset">--</span></div>
@@ -870,7 +870,7 @@
 			<div class="simple-cal-panel" data-sensor-type="do" style="display:none;">
 				<div class="cal-status-card">
 					<div class="cal-status-header">
-						<span class="cal-status-title">📊 Current Calibration</span>
+						<span class="cal-status-title">Current Calibration</span>
 						<span class="cal-status-badge" id="doCalStatus">Not Calibrated</span>
 					</div>
 					<div class="cal-status-values">
@@ -880,7 +880,7 @@
 				</div>
 
 				<div class="cal-live-card">
-					<div class="cal-live-header">🔴 Live Voltage Reading</div>
+					<div class="cal-live-header">Live Voltage Reading</div>
 					<div class="cal-live-value" id="doLiveVoltage">-- V</div>
 					<div class="cal-live-hint">Updates every 2 seconds</div>
 				</div>
@@ -895,7 +895,7 @@
 					</div>
 
 					<div class="cal-temp-row">
-						<label>🌡️ Water Temperature:</label>
+						<label>Water Temperature:</label>
 						<input type="number" id="doBufferTemp" value="25" step="0.1" class="cal-temp-input"> °C
 					</div>
 
@@ -904,7 +904,7 @@
 						<div class="cal-point-header">
 							<span class="cal-point-num">1</span>
 							<span class="cal-point-label">Air-Saturated Water (100%)</span>
-							<span class="cal-point-status" id="doPoint1Status">⏳ Waiting</span>
+							<span class="cal-point-status" id="doPoint1Status">Waiting</span>
 						</div>
 						<div class="cal-point-body">
 							<div class="cal-point-voltage">Captured: <span id="doPoint1Voltage">--</span> V</div>
@@ -917,7 +917,7 @@
 						<div class="cal-point-header">
 							<span class="cal-point-num">2</span>
 							<span class="cal-point-label">Zero Oxygen Solution (0%)</span>
-							<span class="cal-point-status" id="doPoint2Status">⏳ Waiting</span>
+							<span class="cal-point-status" id="doPoint2Status">Waiting</span>
 						</div>
 						<div class="cal-point-body">
 							<div class="cal-point-voltage">Captured: <span id="doPoint2Voltage">--</span> V</div>
@@ -927,7 +927,7 @@
 				</div>
 
 				<div class="cal-result-card" id="doResultCard" style="display:none;">
-					<div class="cal-result-header">✅ Calibration Result</div>
+					<div class="cal-result-header">Calibration Result</div>
 					<div class="cal-result-values">
 						<div class="cal-result-item"><span>Slope:</span><span id="doNewSlope">--</span></div>
 						<div class="cal-result-item"><span>Offset:</span><span id="doNewOffset">--</span></div>
@@ -944,7 +944,7 @@
 			<div class="simple-cal-panel" data-sensor-type="tds" style="display:none;">
 				<div class="cal-status-card">
 					<div class="cal-status-header">
-						<span class="cal-status-title">📊 Current Calibration</span>
+						<span class="cal-status-title">Current Calibration</span>
 						<span class="cal-status-badge" id="tdsCalStatus">Not Calibrated</span>
 					</div>
 					<div class="cal-status-values">
@@ -954,7 +954,7 @@
 				</div>
 
 				<div class="cal-live-card">
-					<div class="cal-live-header">🔴 Live Voltage Reading</div>
+					<div class="cal-live-header">Live Voltage Reading</div>
 					<div class="cal-live-value" id="tdsLiveVoltage">-- V</div>
 					<div class="cal-live-hint">Updates every 2 seconds</div>
 				</div>
@@ -969,7 +969,7 @@
 					</div>
 
 					<div class="cal-temp-row">
-						<label>🌡️ Water Temperature:</label>
+						<label>Water Temperature:</label>
 						<input type="number" id="tdsBufferTemp" value="25" step="0.1" class="cal-temp-input"> °C
 					</div>
 
@@ -978,7 +978,7 @@
 						<div class="cal-point-header">
 							<span class="cal-point-num">1</span>
 							<span class="cal-point-label">Standard Solution</span>
-							<span class="cal-point-status" id="tdsPoint1Status">⏳ Waiting</span>
+							<span class="cal-point-status" id="tdsPoint1Status">Waiting</span>
 						</div>
 						<div class="cal-point-body">
 							<input type="number" id="tdsStandard1" placeholder="Enter ppm (e.g. 1000)" class="cal-standard-input">
@@ -992,7 +992,7 @@
 						<div class="cal-point-header">
 							<span class="cal-point-num">2</span>
 							<span class="cal-point-label">Second Standard</span>
-							<span class="cal-point-status" id="tdsPoint2Status">⏳ Waiting</span>
+							<span class="cal-point-status" id="tdsPoint2Status">Waiting</span>
 						</div>
 						<div class="cal-point-body">
 							<input type="number" id="tdsStandard2" placeholder="Enter ppm (e.g. 500)" class="cal-standard-input">
@@ -1003,7 +1003,7 @@
 				</div>
 
 				<div class="cal-result-card" id="tdsResultCard" style="display:none;">
-					<div class="cal-result-header">✅ Calibration Result</div>
+					<div class="cal-result-header">Calibration Result</div>
 					<div class="cal-result-values">
 						<div class="cal-result-item"><span>Slope:</span><span id="tdsNewSlope">--</span></div>
 						<div class="cal-result-item"><span>Offset:</span><span id="tdsNewOffset">--</span></div>

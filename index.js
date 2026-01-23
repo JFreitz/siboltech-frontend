@@ -4040,7 +4040,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (pointEl) pointEl.classList.add('captured');
         if (voltageEl) voltageEl.textContent = point.voltage.toFixed(4);
-        if (statusEl) statusEl.textContent = '✅ Captured';
+        if (statusEl) statusEl.textContent = 'Captured';
         
         // Check if we can calculate calibration
         checkCalibrationReady(sensor);
@@ -4117,7 +4117,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (pointEl) pointEl.classList.remove('captured');
             if (voltageEl) voltageEl.textContent = '--';
-            if (statusEl) statusEl.textContent = '⏳ Waiting';
+            if (statusEl) statusEl.textContent = 'Waiting';
         }
         
         const resultCard = document.getElementById(`${sensor}ResultCard`);
