@@ -1104,9 +1104,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				if (sensorHeader) {
 					sensorHeader.style.display = isTrad ? 'none' : '';
 				}
-				const sensorCols = thead.querySelectorAll('.history-head-cols th:nth-child(-n+6)');
-				sensorCols.forEach(col => {
-					col.style.display = isTrad ? 'none' : '';
+				// Hide only sensor columns (2-6: pH, DO, TDS, Temp, Humidity), keep timestamp
+				const allCols = thead.querySelectorAll('.history-head-cols th');
+				allCols.forEach((col, idx) => {
+					if (idx >= 1 && idx <= 5) {  // Columns 2-6 are sensor columns (1-5 in 0-based indexing)
+						col.style.display = isTrad ? 'none' : '';
+					}
 				});
 			}
 			
