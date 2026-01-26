@@ -2353,7 +2353,10 @@ setTimeout(() => {
 		}
 	}
 
-	function submitAeroponicsPlantList() {
+	async function submitAeroponicsPlantList() {
+		// Wait for API URL to be initialized
+		await waitForAPIUrl();
+		
 		const list = document.getElementById('aeroponicsPlantsList');
 		if (!list) return;
 		const card = list.querySelector('.sensor-input-card1');
@@ -2381,9 +2384,47 @@ setTimeout(() => {
 			return;
 		}
 
-		// Show success modal
-		showSuccessModal(data);
-		showToast('Data submitted successfully!', 'success');
+		// Determine farming system from active tab
+		const activeTab = document.querySelector('.training-tab-btn.active');
+		const tabSensor = activeTab?.getAttribute('data-sensor') || 'training-aero';
+		const farmingSystem = tabSensor === 'training-aero' ? 'aeroponics' : 
+		                     tabSensor === 'training-dwc' ? 'dwc' : 'traditional';
+
+		// Submit each plant's data to the API
+		try {
+			for (const plant of data) {
+				const payload = {
+					plant_id: plant.no,
+					farming_system: farmingSystem,
+					leaves: parseFloat(plant.leaves) || null,
+					branches: parseFloat(plant.branches) || null,
+					height: parseFloat(plant.height) || null,
+					weight: parseFloat(plant.width) || null,
+					length: parseFloat(plant.length) || null
+				};
+
+				const res = await fetch(`${RELAY_API_URL}/plant-reading`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(payload)
+				});
+
+				if (!res.ok) {
+					const errText = await res.text();
+					console.error(`Failed to submit plant ${plant.no}:`, res.status, errText);
+				}
+			}
+
+			// Show success modal
+			showSuccessModal(data);
+			showToast(`${data.length} plant${data.length > 1 ? 's' : ''} submitted to history!`, 'success');
+			
+			// Clear fields after successful submission
+			clearAllFields();
+		} catch (error) {
+			console.error('Error submitting plant readings:', error);
+			showToast('Failed to submit plant readings. Check console for details.', 'dangerous');
+		}
 	}
 
 	function clearAllFields() {
@@ -4423,101 +4464,10 @@ function updateMiniCharts(){
     });
 })();
 
-// === PLANT READINGS SUBMISSION (Prediction Tab Integration) ===
-document.addEventListener('DOMContentLoaded', () => {
-    const submitBtn = document.getElementById('submitAllPredBtn');
-    if (!submitBtn) return;
-    
-    submitBtn.addEventListener('click', async () => {
-        // Wait for API URL to be initialized
-        await waitForAPIUrl();
-        
-        // Determine active farming system
-        const aeroTab = document.getElementById('aeroponicsContainer');
-        const dwcTab = document.getElementById('dwcContainer');
-        const activeFarmingSystem = aeroTab?.classList.contains('active') ? 'aeroponics' : 'dwc';
-        
-        // Collect plant input values from all visible plant cards
-        const plants = [];
-        const cards = document.querySelectorAll('.plant-graph-card');
-        
-        for (let i = 0; i < cards.length; i++) {
-            const card = cards[i];
-            const plantNum = i + 1;
-            
-            // Get input values with class "prediction-input" from this card
-            const inputs = card.querySelectorAll('.prediction-input');
-            const plantData = {
-                plant_id: plantNum,
-                farming_system: activeFarmingSystem,
-                leaves: null,
-                branches: null,
-                height: null,
-                weight: null,
-                length: null
-            };
-            
-            for (const input of inputs) {
-                const metric = input.getAttribute('data-metric');
-                const value = parseFloat(input.value);
-                if (metric && !isNaN(value)) {
-                    if (metric === 'leaves') plantData.leaves = value;
-                    else if (metric === 'branches') plantData.branches = value;
-                    else if (metric === 'height') plantData.height = value;
-                    else if (metric === 'width' || metric === 'weight') plantData.weight = value;
-                    else if (metric === 'length') plantData.length = value;
-                }
-            }
-            
-            // Only add plant if at least one measurement is provided
-            if (plantData.leaves !== null || plantData.branches !== null || 
-                plantData.height !== null || plantData.weight !== null || plantData.length !== null) {
-                plants.push(plantData);
-            }
-        }
-        
-        if (plants.length === 0) {
-            alert('Please enter at least one plant measurement before submitting.');
-            return;
-        }
-        
-        try {
-            // Submit each plant reading
-            for (const plant of plants) {
-                console.log('Submitting plant reading to:', `${RELAY_API_URL}/plant-reading`, plant);
-                const res = await fetch(`${RELAY_API_URL}/plant-reading`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(plant)
-                });
-                
-                if (!res.ok) {
-                    const errText = await res.text();
-                    console.error(`Failed to submit plant ${plant.plant_id}:`, res.status, errText);
-                    throw new Error(`HTTP ${res.status}: ${errText}`);
-                }
-            }
-            
-            // Show success message
-            const successModal = document.getElementById('calSuccessModal');
-            if (successModal) {
-                const msgEl = document.getElementById('calSuccessMsg');
-                if (msgEl) msgEl.textContent = `Plant readings submitted successfully (${plants.length} plant${plants.length > 1 ? 's' : ''}).`;
-                successModal.style.display = 'flex';
-                setTimeout(() => { successModal.style.display = 'none'; }, 3000);
-            } else {
-                alert(`Plant readings submitted successfully (${plants.length} plant${plants.length > 1 ? 's' : ''}).`);
-            }
-            
-            // Clear input fields
-            document.querySelectorAll('.prediction-input').forEach(input => input.value = '');
-            
-        } catch (error) {
-            console.error('Error submitting plant readings:', error);
-            alert('Failed to submit plant readings. Check console for details.');
-        }
-    });
-});
+// === PREDICTION TAB NOTE ===
+// The Prediction tab is for viewing ML predictions based on training data.
+// Inputs in prediction tab are for generating predictions, NOT for saving training data.
+// Training data is submitted from the Training tab and saved to history.
 
 // === RELAY EVENT LOGGING (Actuator State Change Tracking) ===
 document.addEventListener('DOMContentLoaded', () => {
