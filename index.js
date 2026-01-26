@@ -1018,6 +1018,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			let interval = historyState.interval.toLowerCase();
 			if (interval === '15-min') interval = '15min';
 			
+			// Convert method code to farming system name
+			let farmingSystem;
+			if (method === 'aero') farmingSystem = 'aeroponics';
+			else if (method === 'dwc') farmingSystem = 'dwc';
+			else farmingSystem = 'traditional';
+			
 			try {
 				// For ALL systems, fetch plant readings (which includes sensor data joined in)
 				// The API intelligently fetches:
@@ -1027,8 +1033,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				const actuatorTableWrap = historyBoard.querySelector('[data-history-view="actuator"]');
 				
 				// Fetch plant/sensor readings (always use type=plant for the combined table)
+				// IMPORTANT: Pass farming_system to filter by farming system
 				if (plantTableWrap) {
-					const plantRes = await fetch(`${RELAY_API_URL}/history?type=plant&plant_id=${plant}&interval=${interval}`);
+					const plantRes = await fetch(`${RELAY_API_URL}/history?type=plant&plant_id=${plant}&interval=${interval}&farming_system=${farmingSystem}`);
 					if (plantRes.ok) {
 						const plantData = await plantRes.json();
 						populatePlantHistoryTable(plantTableWrap, plantData);
