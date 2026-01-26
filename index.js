@@ -1111,14 +1111,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			}
 			
 			const rows = readings.map(row => {
+				const timestamp = new Date(row.timestamp).toLocaleString();
+				const sensorDisplay = isTrad ? 'none' : '';
 				const cells = [
-					`<td style="display: ${isTrad ? 'none' : ''}">${new Date(row.timestamp).toLocaleString()}</td>`,
-					`<td style="display: ${isTrad ? 'none' : ''}">${(row.ph !== null && row.ph !== undefined) ? row.ph.toFixed(2) : '-'}</td>`,
-					`<td style="display: ${isTrad ? 'none' : ''}">${(row.do !== null && row.do !== undefined) ? row.do.toFixed(2) : '-'}</td>`,
-					`<td style="display: ${isTrad ? 'none' : ''}">${(row.tds !== null && row.tds !== undefined) ? row.tds.toFixed(0) : '-'}</td>`,
-					`<td style="display: ${isTrad ? 'none' : ''}">${(row.temperature !== null && row.temperature !== undefined) ? row.temperature.toFixed(1) : '-'}</td>`,
-					`<td style="display: ${isTrad ? 'none' : ''}">${(row.humidity !== null && row.humidity !== undefined) ? row.humidity.toFixed(1) : '-'}</td>`,
-					`<td>${new Date(row.timestamp).toLocaleString()}</td>`,
+					`<td>${timestamp}</td>`,
+					`<td style="display: ${sensorDisplay}">${(row.ph !== null && row.ph !== undefined) ? row.ph.toFixed(2) : '-'}</td>`,
+					`<td style="display: ${sensorDisplay}">${(row.do !== null && row.do !== undefined) ? row.do.toFixed(2) : '-'}</td>`,
+					`<td style="display: ${sensorDisplay}">${(row.tds !== null && row.tds !== undefined) ? row.tds.toFixed(0) : '-'}</td>`,
+					`<td style="display: ${sensorDisplay}">${(row.temperature !== null && row.temperature !== undefined) ? row.temperature.toFixed(1) : '-'}</td>`,
+					`<td style="display: ${sensorDisplay}">${(row.humidity !== null && row.humidity !== undefined) ? row.humidity.toFixed(1) : '-'}</td>`,
 					`<td>${(row.leaves !== null && row.leaves !== undefined) ? row.leaves.toFixed(1) : '-'}</td>`,
 					`<td>${(row.branches !== null && row.branches !== undefined) ? row.branches.toFixed(1) : '-'}</td>`,
 					`<td>${(row.weight !== null && row.weight !== undefined) ? row.weight.toFixed(1) : '-'}</td>`,
@@ -1139,7 +1140,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			const readings = data.readings || data || [];
 			
 			if (!readings || readings.length === 0) {
-				tbody.innerHTML = '<tr><td colspan="10" class="history-empty">No actuator events recorded.</td></tr>';
+				tbody.innerHTML = '<tr><td colspan="15" class="history-empty">No actuator events recorded.</td></tr>';
 				return;
 			}
 			
@@ -1173,6 +1174,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
 						<td>${relayStates[6]}</td>
 						<td>${relayStates[7]}</td>
 						<td>${relayStates[8]}</td>
+						<td>${row.ph !== null ? row.ph.toFixed(2) : '-'}</td>
+						<td>${row.do !== null ? row.do.toFixed(2) : '-'}</td>
+						<td>${row.tds !== null ? row.tds.toFixed(0) : '-'}</td>
+						<td>${row.temperature !== null ? row.temperature.toFixed(1) : '-'}</td>
+						<td>${row.humidity !== null ? row.humidity.toFixed(1) : '-'}</td>
 					</tr>
 				`;
 			}).join('');
