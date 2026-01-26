@@ -975,9 +975,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			});
 		});
 
-		// Initialize view visibility - both plant and actuator tables always visible
+		// Initialize view visibility - show plant table, hide actuator by default
 		historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
-			w.style.display = '';  // Show all views by default
+			if (w.getAttribute('data-history-view') === 'plant') {
+				w.style.display = '';  // Show plant table
+			} else {
+				w.style.display = 'none';  // Hide actuator table initially
+			}
 		});
 
 		historyBoard.querySelectorAll('.history-pill').forEach(pill => {
