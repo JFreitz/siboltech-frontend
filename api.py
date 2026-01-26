@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker
 
 import paho.mqtt.publish as mqtt_publish
 
-from db import Base, SensorReading
+from db import Base, SensorReading, PlantReading, ActuatorEvent
 
 
 app = Flask(__name__)
@@ -343,111 +343,158 @@ def get_latest():
 
 @app.route("/api/history")
 def get_history():
-    """Get sensor reading history for the History tab.
+    """Get history for Plant, Sensor, or Actuator tab.
     
     Query params:
-    - interval: 'daily' or '15min' (default: 'daily')
+    - type: 'plant|sensor|actuator' (default: 'sensor')
+    - farming_system: 'aeroponics|dwc|traditional' (for plant tab, optional)
+    - plant_id: 1-6 (for plant tab, optional)
+    - interval: 'daily' or '15min' (for sensor, default: 'daily')
     - days: number of days to look back (default: 7)
     - limit: max records to return (default: 100)
-    
-    Both intervals return AVERAGED data:
-    - daily: average per day
-    - 15min: average per 15-minute bucket
     """
+    history_type = request.args.get('type', 'sensor').lower()
+    plant_id = request.args.get('plant_id', type=int)
+    farming_system = request.args.get('farming_system')
     interval = request.args.get('interval', 'daily').lower()
     days = int(request.args.get('days', 7))
     limit = int(request.args.get('limit', 100))
     
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     
-    with Session() as session:
-        if interval == '15min':
-            # Get all readings in the time range for 15-min bucketing
-            rows = session.execute(
-                text(
-                    """
-                    SELECT timestamp, sensor, value, unit
-                    FROM sensor_readings
-                    WHERE sensor IN ('temperature_c', 'humidity', 'tds_ppm', 'ph', 'do_mg_l')
-                      AND timestamp >= :cutoff
-                    ORDER BY timestamp DESC
-                    """
-                ),
-                {"cutoff": cutoff},
-            ).fetchall()
-        else:
-            # Daily aggregation - get average per day per sensor
-            # Using SQLite-compatible date extraction
-            rows = session.execute(
-                text(
-                    """
-                    SELECT DATE(timestamp) as day, sensor, AVG(value) as avg_value, unit
-                    FROM sensor_readings
-                    WHERE sensor IN ('temperature_c', 'humidity', 'tds_ppm', 'ph', 'do_mg_l')
-                      AND timestamp >= :cutoff
-                    GROUP BY DATE(timestamp), sensor, unit
-                    ORDER BY day DESC
-                    LIMIT :limit
-                    """
-                ),
-                {"cutoff": cutoff, "limit": limit * 5},
-            ).fetchall()
-    
-    # Group readings by timestamp
-    if interval == '15min':
-        # Group readings into 15-minute buckets and calculate averages
-        buckets = {}  # key: bucket_start_time, value: {sensor: [values]}
+    if history_type == 'plant':
+        # Get plant readings
+        with Session() as session:
+            query = session.query(PlantReading).filter(PlantReading.timestamp >= cutoff)
+            if plant_id:
+                query = query.filter(PlantReading.plant_id == plant_id)
+            if farming_system:
+                query = query.filter(PlantReading.farming_system == farming_system)
+            
+            rows = query.order_by(PlantReading.timestamp.desc()).limit(limit).all()
         
-        for r in rows:
-            ts_raw = r[0]
-            sensor = r[1]
-            value = r[2]
-            
-            if value is None:
-                continue
-            
-            # Parse timestamp - SQLite returns strings, Postgres returns datetime
-            if isinstance(ts_raw, str):
-                try:
-                    ts = datetime.fromisoformat(ts_raw.replace('Z', '+00:00'))
-                except:
-                    continue
-            elif isinstance(ts_raw, datetime):
-                ts = ts_raw
-            else:
-                continue
-                
-            # Calculate 15-minute bucket start time
-            bucket_minute = (ts.minute // 15) * 15
-            bucket_ts = ts.replace(minute=bucket_minute, second=0, microsecond=0)
-            
-            bucket_key = bucket_ts.strftime('%Y-%m-%d %H:%M')
-            
-            if bucket_key not in buckets:
-                buckets[bucket_key] = {
-                    'timestamp': bucket_ts,
-                    'ph': [],
-                    'do_mg_l': [],
-                    'tds_ppm': [],
-                    'temperature_c': [],
-                    'humidity': []
-                }
-            
-            if sensor in buckets[bucket_key]:
-                buckets[bucket_key][sensor].append(value)
-        
-        # Calculate averages for each bucket
         data = []
-        for bucket_key in sorted(buckets.keys(), reverse=True)[:limit]:
-            bucket = buckets[bucket_key]
-            reading = {
-                'timestamp': _format_ts_for_display(bucket['timestamp']),
-                'ph': round(sum(bucket['ph']) / len(bucket['ph']), 2) if bucket['ph'] else None,
-                'do': round(sum(bucket['do_mg_l']) / len(bucket['do_mg_l']), 2) if bucket['do_mg_l'] else None,
-                'tds': round(sum(bucket['tds_ppm']) / len(bucket['tds_ppm']), 1) if bucket['tds_ppm'] else None,
-                'temp': round(sum(bucket['temperature_c']) / len(bucket['temperature_c']), 1) if bucket['temperature_c'] else None,
-                'humidity': round(sum(bucket['humidity']) / len(bucket['humidity']), 1) if bucket['humidity'] else None
-            }
+        for r in rows:
+            data.append({
+                'timestamp': _format_ts_for_display(r.timestamp),
+                'plant_id': r.plant_id,
+                'farming_system': r.farming_system,
+                'leaves': r.leaves,
+                'branches': r.branches,
+                'height': r.height,
+                'weight': r.weight,
+                'length': r.length
+            })
+        return jsonify({'success': True, 'type': 'plant', 'count': len(data), 'readings': data})
+    
+    elif history_type == 'actuator':
+        # Get actuator events
+        with Session() as session:
+            rows = session.query(ActuatorEvent).filter(ActuatorEvent.timestamp >= cutoff).order_by(ActuatorEvent.timestamp.desc()).limit(limit).all()
+        
+        data = []
+        for r in rows:
+            relay_label = RELAY_LABELS.get(r.relay_id, f'Relay {r.relay_id}')
+            data.append({
+                'timestamp': _format_ts_for_display(r.timestamp),
+                'relay_id': r.relay_id,
+                'relay_label': relay_label,
+                'state': 'ON' if r.state == 1 else 'OFF',
+                'state_code': r.state
+            })
+        return jsonify({'success': True, 'type': 'actuator', 'count': len(data), 'events': data})
+    
+    else:
+        # Default: Sensor readings (daily/15min)
+        with Session() as session:
+            if interval == '15min':
+                # Get all readings in the time range for 15-min bucketing
+                rows = session.execute(
+                    text(
+                        """
+                        SELECT timestamp, sensor, value, unit
+                        FROM sensor_readings
+                        WHERE sensor IN ('temperature_c', 'humidity', 'tds_ppm', 'ph', 'do_mg_l')
+                          AND timestamp >= :cutoff
+                        ORDER BY timestamp DESC
+                        """
+                    ),
+                    {"cutoff": cutoff},
+                ).fetchall()
+            else:
+                # Daily aggregation - get average per day per sensor
+                # Using SQLite-compatible date extraction
+                rows = session.execute(
+                    text(
+                        """
+                        SELECT DATE(timestamp) as day, sensor, AVG(value) as avg_value, unit
+                        FROM sensor_readings
+                        WHERE sensor IN ('temperature_c', 'humidity', 'tds_ppm', 'ph', 'do_mg_l')
+                          AND timestamp >= :cutoff
+                        GROUP BY DATE(timestamp), sensor, unit
+                        ORDER BY day DESC
+                        LIMIT :limit
+                        """
+                    ),
+                    {"cutoff": cutoff, "limit": limit * 5},
+                ).fetchall()
+        
+        # Group readings by timestamp
+        if interval == '15min':
+            # Group readings into 15-minute buckets and calculate averages
+            buckets = {}  # key: bucket_start_time, value: {sensor: [values]}
+            
+            for r in rows:
+                ts_raw = r[0]
+                sensor = r[1]
+                value = r[2]
+                
+                if value is None:
+                    continue
+                
+                # Parse timestamp - SQLite returns strings, Postgres returns datetime
+                if isinstance(ts_raw, str):
+                    try:
+                        ts = datetime.fromisoformat(ts_raw.replace('Z', '+00:00'))
+                    except:
+                        continue
+                elif isinstance(ts_raw, datetime):
+                    ts = ts_raw
+                else:
+                    continue
+                    
+                # Calculate 15-minute bucket start time
+                bucket_minute = (ts.minute // 15) * 15
+                bucket_ts = ts.replace(minute=bucket_minute, second=0, microsecond=0)
+                
+                bucket_key = bucket_ts.strftime('%Y-%m-%d %H:%M')
+                
+                if bucket_key not in buckets:
+                    buckets[bucket_key] = {
+                        'timestamp': bucket_ts,
+                        'ph': [],
+                        'do_mg_l': [],
+                        'tds_ppm': [],
+                        'temperature_c': [],
+                        'humidity': []
+                    }
+                
+                if sensor in buckets[bucket_key]:
+                    buckets[bucket_key][sensor].append(value)
+            
+            # Calculate averages for each bucket
+            data = []
+            for bucket_key in sorted(buckets.keys(), reverse=True)[:limit]:
+                bucket = buckets[bucket_key]
+                reading = {
+                    'timestamp': _format_ts_for_display(bucket['timestamp']),
+                    'ph': round(sum(bucket['ph']) / len(bucket['ph']), 2) if bucket['ph'] else None,
+                    'do': round(sum(bucket['do_mg_l']) / len(bucket['do_mg_l']), 2) if bucket['do_mg_l'] else None,
+                    'tds': round(sum(bucket['tds_ppm']) / len(bucket['tds_ppm']), 1) if bucket['tds_ppm'] else None,
+                    'temp': round(sum(bucket['temperature_c']) / len(bucket['temperature_c']), 1) if bucket['temperature_c'] else None,
+                    'humidity': round(sum(bucket['humidity']) / len(bucket['humidity']), 1) if bucket['humidity'] else None
+                }
+                data.append(reading)
             data.append(reading)
     else:
         # Daily averages
@@ -521,6 +568,78 @@ def _init_relay_states():
 
 # Initialize on startup
 _init_relay_states()
+
+# ==================== PLANT READINGS ====================
+@app.route("/api/plant-reading", methods=["POST"])
+def save_plant_reading():
+    """Save plant measurements from prediction tab.
+    
+    Expected payload:
+    {
+        "plant_id": 1,
+        "farming_system": "aeroponics|dwc|traditional",
+        "leaves": 5,
+        "branches": 3,
+        "height": 15.5,
+        "weight": 120.3,
+        "length": 20.0
+    }
+    """
+    payload = request.get_json(silent=True) or {}
+    plant_id = payload.get("plant_id")
+    farming_system = payload.get("farming_system", "aeroponics")
+    
+    if not plant_id:
+        return {"ok": False, "error": "plant_id required"}, 400
+    
+    try:
+        reading = PlantReading(
+            plant_id=int(plant_id),
+            farming_system=farming_system,
+            leaves=float(payload.get("leaves")) if payload.get("leaves") is not None else None,
+            branches=float(payload.get("branches")) if payload.get("branches") is not None else None,
+            height=float(payload.get("height")) if payload.get("height") is not None else None,
+            weight=float(payload.get("weight")) if payload.get("weight") is not None else None,
+            length=float(payload.get("length")) if payload.get("length") is not None else None,
+        )
+        with Session() as session:
+            session.add(reading)
+            session.commit()
+        return {"ok": True, "id": reading.id}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}, 400
+
+# ==================== ACTUATOR EVENTS ====================
+@app.route("/api/relay-event", methods=["POST"])
+def log_relay_event():
+    """Log relay state change event.
+    
+    Expected payload:
+    {
+        "relay_id": 1,
+        "state": 0 or 1,  # 0=OFF, 1=ON
+        "meta": {}  # optional
+    }
+    """
+    payload = request.get_json(silent=True) or {}
+    relay_id = payload.get("relay_id")
+    state = payload.get("state")
+    
+    if relay_id is None or state is None:
+        return {"ok": False, "error": "relay_id and state required"}, 400
+    
+    try:
+        event = ActuatorEvent(
+            relay_id=int(relay_id),
+            state=int(state),
+            meta=payload.get("meta")
+        )
+        with Session() as session:
+            session.add(event)
+            session.commit()
+        return {"ok": True, "id": event.id}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}, 400
 
 # Alias endpoint for relay status (for frontend compatibility)
 @app.route("/api/relays")
