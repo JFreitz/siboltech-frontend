@@ -938,6 +938,134 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 		updateHistoryEmpty();
 
+		// Fetch and populate history data
+		const fetchHistoryData = async () => {
+			const method = historyState.method; // 'aero', 'dwc', 'trad'
+			const plant = historyState.plant;
+			const interval = historyState.interval.toLowerCase(); // 'daily' or '15-min'
+			
+			try {
+				// Determine which table to populate based on selected method
+				let type = method === 'trad' ? 'plant' : 'sensor'; // Default to plant for trad, sensor for aero/dwc
+				
+				// For aero/dwc, also fetch plant data if available
+				const plantTableWrap = historyBoard.querySelector('[data-history-view="plant"]');
+				const actuatorTableWrap = historyBoard.querySelector('[data-history-view="actuator"]');
+				
+				// Fetch sensor/plant readings
+				if (plantTableWrap && plantTableWrap.style.display !== 'none') {
+					const plantRes = await fetch(`${RELAY_API_URL}/history?type=plant&plant_id=${plant}&interval=${interval}`);
+					if (plantRes.ok) {
+						const plantData = await plantRes.json();
+						populatePlantHistoryTable(plantTableWrap, plantData);
+					}
+				}
+				
+				// Fetch actuator events
+				if (actuatorTableWrap && actuatorTableWrap.style.display !== 'none') {
+					const actuatorRes = await fetch(`${RELAY_API_URL}/history?type=actuator&plant_id=${plant}&interval=${interval}`);
+					if (actuatorRes.ok) {
+						const actuatorData = await actuatorRes.json();
+						populateActuatorHistoryTable(actuatorTableWrap, actuatorData);
+					}
+				}
+			} catch (error) {
+				console.error('Error fetching history data:', error);
+			}
+		};
+		
+		const populatePlantHistoryTable = (tableWrap, data) => {
+			const tbody = tableWrap.querySelector('tbody');
+			if (!tbody) return;
+			
+			if (!data || data.length === 0) {
+				tbody.innerHTML = '<tr><td colspan="11" class="history-empty">No data available.</td></tr>';
+				return;
+			}
+			
+			const rows = data.map(row => `
+				<tr>
+					<td>${new Date(row.timestamp).toLocaleString()}</td>
+					<td>${row.ph !== null ? row.ph.toFixed(2) : '-'}</td>
+					<td>${row.do !== null ? row.do.toFixed(2) : '-'}</td>
+					<td>${row.tds !== null ? row.tds.toFixed(0) : '-'}</td>
+					<td>${row.temperature !== null ? row.temperature.toFixed(1) : '-'}</td>
+					<td>${row.humidity !== null ? row.humidity.toFixed(1) : '-'}</td>
+					<td>${row.leaves !== null ? row.leaves.toFixed(1) : '-'}</td>
+					<td>${row.branches !== null ? row.branches.toFixed(1) : '-'}</td>
+					<td>${row.weight !== null ? row.weight.toFixed(1) : '-'}</td>
+					<td>${row.length !== null ? row.length.toFixed(1) : '-'}</td>
+					<td>${row.height !== null ? row.height.toFixed(1) : '-'}</td>
+				</tr>
+			`).join('');
+			
+			tbody.innerHTML = rows;
+		};
+		
+		const populateActuatorHistoryTable = (tableWrap, data) => {
+			const tbody = tableWrap.querySelector('tbody');
+			if (!tbody) return;
+			
+			if (!data || data.length === 0) {
+				tbody.innerHTML = '<tr><td colspan="15" class="history-empty">No actuator events recorded.</td></tr>';
+				return;
+			}
+			
+			// Relay names mapping
+			const relayNames = {
+				1: 'Misting', 2: 'Air Pump', 3: 'Exhaust IN', 4: 'Exhaust OUT',
+				5: 'Lights Aero', 6: 'Lights DWC', 7: 'pH Up', 8: 'pH Down', 9: 'Leafy Green'
+			};
+			
+			const rows = data.map(row => {
+				// Parse relay events
+				const relayStates = Array(9).fill('-');
+				if (row.relay_events && Array.isArray(row.relay_events)) {
+					row.relay_events.forEach(evt => {
+						const idx = evt.relay_id - 1;
+						if (idx >= 0 && idx < 9) {
+							relayStates[idx] = evt.state === 1 ? 'ON' : 'OFF';
+						}
+					});
+				}
+				
+				return `
+					<tr>
+						<td>${new Date(row.timestamp).toLocaleString()}</td>
+						<td>${relayStates[0]}</td>
+						<td>${relayStates[1]}</td>
+						<td>${relayStates[2]}</td>
+						<td>${relayStates[3]}</td>
+						<td>${relayStates[4]}</td>
+						<td>${relayStates[5]}</td>
+						<td>${relayStates[6]}</td>
+						<td>${relayStates[7]}</td>
+						<td>${relayStates[8]}</td>
+						<td>${row.ph !== null ? row.ph.toFixed(2) : '-'}</td>
+						<td>${row.do !== null ? row.do.toFixed(2) : '-'}</td>
+						<td>${row.tds !== null ? row.tds.toFixed(0) : '-'}</td>
+						<td>${row.temperature !== null ? row.temperature.toFixed(1) : '-'}</td>
+						<td>${row.humidity !== null ? row.humidity.toFixed(1) : '-'}</td>
+					</tr>
+				`;
+			}).join('');
+			
+			tbody.innerHTML = rows;
+		};
+		
+		// Fetch history data when tab/plant/interval changes
+		historyBoard.addEventListener('click', () => {
+			setTimeout(() => fetchHistoryData(), 100);
+		});
+		
+		// Initial fetch when history tab opens
+		const historyTab = document.querySelector('[data-tab="history"]');
+		if (historyTab) {
+			historyTab.addEventListener('click', () => {
+				setTimeout(() => fetchHistoryData(), 100);
+			});
+		}
+
 		// Sidebar history menu (Plant / Actuator) click handlers
 		const sidebarHistoryItems = document.querySelectorAll('#historyMenu .history');
 		if(sidebarHistoryItems && sidebarHistoryItems.length) {
@@ -4238,3 +4366,152 @@ function updateMiniCharts(){
         setInterval(fetchVoltage, 2000);
     });
 })();
+
+// === PLANT READINGS SUBMISSION (Prediction Tab Integration) ===
+document.addEventListener('DOMContentLoaded', () => {
+    const submitBtn = document.getElementById('submitAllPredBtn');
+    if (!submitBtn) return;
+    
+    submitBtn.addEventListener('click', async () => {
+        // Determine active farming system
+        const aeroTab = document.getElementById('aeroponicsContainer');
+        const dwcTab = document.getElementById('dwcContainer');
+        const activeFarmingSystem = aeroTab?.classList.contains('active') ? 'aeroponics' : 'dwc';
+        
+        // Collect plant input values from all visible plant cards
+        const plants = [];
+        const cards = document.querySelectorAll('.plant-graph-card');
+        
+        for (let i = 0; i < cards.length; i++) {
+            const card = cards[i];
+            const plantNum = i + 1;
+            
+            // Get input values with class "prediction-input" from this card
+            const inputs = card.querySelectorAll('.prediction-input');
+            const plantData = {
+                plant_id: plantNum,
+                farming_system: activeFarmingSystem,
+                leaves: null,
+                branches: null,
+                height: null,
+                weight: null,
+                length: null
+            };
+            
+            for (const input of inputs) {
+                const metric = input.getAttribute('data-metric');
+                const value = parseFloat(input.value);
+                if (metric && !isNaN(value)) {
+                    if (metric === 'leaves') plantData.leaves = value;
+                    else if (metric === 'branches') plantData.branches = value;
+                    else if (metric === 'height') plantData.height = value;
+                    else if (metric === 'width' || metric === 'weight') plantData.weight = value;
+                    else if (metric === 'length') plantData.length = value;
+                }
+            }
+            
+            // Only add plant if at least one measurement is provided
+            if (plantData.leaves !== null || plantData.branches !== null || 
+                plantData.height !== null || plantData.weight !== null || plantData.length !== null) {
+                plants.push(plantData);
+            }
+        }
+        
+        if (plants.length === 0) {
+            alert('Please enter at least one plant measurement before submitting.');
+            return;
+        }
+        
+        try {
+            // Submit each plant reading
+            for (const plant of plants) {
+                const res = await fetch(`${RELAY_API_URL}/plant-reading`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(plant)
+                });
+                
+                if (!res.ok) {
+                    console.error(`Failed to submit plant ${plant.plant_id}:`, res.statusText);
+                }
+            }
+            
+            // Show success message
+            const successModal = document.getElementById('calSuccessModal');
+            if (successModal) {
+                const msgEl = document.getElementById('calSuccessMsg');
+                if (msgEl) msgEl.textContent = `Plant readings submitted successfully (${plants.length} plant${plants.length > 1 ? 's' : ''}).`;
+                successModal.style.display = 'flex';
+                setTimeout(() => { successModal.style.display = 'none'; }, 3000);
+            } else {
+                alert(`Plant readings submitted successfully (${plants.length} plant${plants.length > 1 ? 's' : ''}).`);
+            }
+            
+            // Clear input fields
+            document.querySelectorAll('.prediction-input').forEach(input => input.value = '');
+            
+        } catch (error) {
+            console.error('Error submitting plant readings:', error);
+            alert('Failed to submit plant readings. Check console for details.');
+        }
+    });
+});
+
+// === RELAY EVENT LOGGING (Actuator State Change Tracking) ===
+document.addEventListener('DOMContentLoaded', () => {
+    // Hook relay toggle buttons to log events
+    const relayButtons = document.querySelectorAll('[id^="relay"][id$="-toggle"], [data-relay-id]');
+    
+    relayButtons.forEach(btn => {
+        // Extract relay ID from button ID or data attribute
+        let relayId = null;
+        const idMatch = btn.id?.match(/relay(\d+)/);
+        if (idMatch) {
+            relayId = parseInt(idMatch[1]);
+        } else {
+            relayId = parseInt(btn.getAttribute('data-relay-id'));
+        }
+        
+        if (!relayId) return;
+        
+        // Wrap existing click handler or add new one
+        const originalHandler = btn.onclick;
+        btn.onclick = async function(e) {
+            // Call original handler first
+            if (originalHandler) {
+                originalHandler.call(this, e);
+            }
+            
+            // Determine new state from button class or aria-pressed
+            let newState = null;
+            if (btn.classList.contains('on')) newState = 1;
+            else if (btn.classList.contains('off')) newState = 0;
+            else if (btn.getAttribute('aria-pressed') === 'true') newState = 1;
+            else if (btn.getAttribute('aria-pressed') === 'false') newState = 0;
+            
+            if (newState === null) {
+                console.log(`Could not determine relay ${relayId} state after toggle`);
+                return;
+            }
+            
+            // Log the event to API
+            try {
+                const res = await fetch(`${RELAY_API_URL}/relay-event`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        relay_id: relayId,
+                        state: newState,
+                        meta: { source: 'dashboard' }
+                    })
+                });
+                
+                if (!res.ok) {
+                    console.error(`Failed to log relay ${relayId} event:`, res.statusText);
+                }
+            } catch (error) {
+                console.error(`Error logging relay ${relayId} event:`, error);
+            }
+        };
+    });
+});
