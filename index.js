@@ -1,5 +1,59 @@
 // === SIBOLTECH API Configuration ===
-const RELAY_API_URL = 'https://likelihood-glucose-struck-representing.trycloudflare.com/api';
+let RELAY_API_URL = 'https://likelihood-glucose-struck-representing.trycloudflare.com/api'; // fallback
+let apiUrlInitialized = false;
+
+// Initialize API URL dynamically (from /api/tunnel-url endpoint)
+async function initializeAPIUrl() {
+    try {
+        // First try to get tunnel URL from local API
+        const res = await fetch('/api/tunnel-url');
+        if (res.ok) {
+            const data = await res.json();
+            if (data.tunnel_url) {
+                RELAY_API_URL = `${data.tunnel_url}/api`;
+                console.log('API URL initialized from /api/tunnel-url:', RELAY_API_URL);
+                apiUrlInitialized = true;
+                return;
+            }
+        }
+    } catch (e) {
+        console.log('Could not fetch tunnel URL from local API, using fallback:', e);
+    }
+    
+    // Fallback: use localhost for local development
+    RELAY_API_URL = 'http://localhost:5000/api';
+    apiUrlInitialized = true;
+    console.log('Using fallback API URL:', RELAY_API_URL);
+}
+
+// Wait for API URL to be ready
+async function waitForAPIUrl() {
+    if (apiUrlInitialized) return;
+    
+    // Try to initialize if not already done
+    await initializeAPIUrl();
+    
+    // If still not initialized after 2 seconds, proceed anyway (use fallback)
+    return new Promise((resolve) => {
+        const checkInterval = setInterval(() => {
+            if (apiUrlInitialized) {
+                clearInterval(checkInterval);
+                resolve();
+            }
+        }, 50);
+        
+        setTimeout(() => {
+            clearInterval(checkInterval);
+            apiUrlInitialized = true;
+            resolve();
+        }, 2000);
+    });
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+    initializeAPIUrl();
+});
 
 // === CALIBRATION MODE (Disables Actuators) ===
 let calibrationModeActive = false;
@@ -940,6 +994,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 		// Fetch and populate history data
 		const fetchHistoryData = async () => {
+			await waitForAPIUrl();
+			
 			const method = historyState.method; // 'aero', 'dwc', 'trad'
 			const plant = historyState.plant;
 			const interval = historyState.interval.toLowerCase(); // 'daily' or '15-min'
@@ -4373,6 +4429,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!submitBtn) return;
     
     submitBtn.addEventListener('click', async () => {
+        // Wait for API URL to be initialized
+        await waitForAPIUrl();
+        
         // Determine active farming system
         const aeroTab = document.getElementById('aeroponicsContainer');
         const dwcTab = document.getElementById('dwcContainer');
@@ -4425,6 +4484,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             // Submit each plant reading
             for (const plant of plants) {
+                console.log('Submitting plant reading to:', `${RELAY_API_URL}/plant-reading`, plant);
                 const res = await fetch(`${RELAY_API_URL}/plant-reading`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -4432,7 +4492,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 
                 if (!res.ok) {
-                    console.error(`Failed to submit plant ${plant.plant_id}:`, res.statusText);
+                    const errText = await res.text();
+                    console.error(`Failed to submit plant ${plant.plant_id}:`, res.status, errText);
+                    throw new Error(`HTTP ${res.status}: ${errText}`);
                 }
             }
             
@@ -4496,6 +4558,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Log the event to API
             try {
+                await waitForAPIUrl();
                 const res = await fetch(`${RELAY_API_URL}/relay-event`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
