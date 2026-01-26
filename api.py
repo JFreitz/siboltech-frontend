@@ -495,35 +495,34 @@ def get_history():
                     'humidity': round(sum(bucket['humidity']) / len(bucket['humidity']), 1) if bucket['humidity'] else None
                 }
                 data.append(reading)
-            data.append(reading)
-    else:
-        # Daily averages
-        readings_by_day = {}
-        for r in rows:
-            day = str(r[0])
-            if day not in readings_by_day:
-                readings_by_day[day] = {
-                    'timestamp': day,
-                    'ph': None,
-                    'do': None,
-                    'tds': None,
-                    'temp': None,
-                    'humidity': None
-                }
-            sensor = r[1]
-            value = r[2]
-            if sensor == 'ph':
-                readings_by_day[day]['ph'] = round(value, 2) if value else None
-            elif sensor == 'do_mg_l':
-                readings_by_day[day]['do'] = round(value, 2) if value else None
-            elif sensor == 'tds_ppm':
-                readings_by_day[day]['tds'] = round(value, 1) if value else None
-            elif sensor == 'temperature_c':
-                readings_by_day[day]['temp'] = round(value, 1) if value else None
-            elif sensor == 'humidity':
-                readings_by_day[day]['humidity'] = round(value, 1) if value else None
-        
-        data = list(readings_by_day.values())[:limit]
+        else:
+            # Daily averages
+            readings_by_day = {}
+            for r in rows:
+                day = str(r[0])
+                if day not in readings_by_day:
+                    readings_by_day[day] = {
+                        'timestamp': day,
+                        'ph': None,
+                        'do': None,
+                        'tds': None,
+                        'temp': None,
+                        'humidity': None
+                    }
+                sensor = r[1]
+                value = r[2]
+                if sensor == 'ph':
+                    readings_by_day[day]['ph'] = round(value, 2) if value else None
+                elif sensor == 'do_mg_l':
+                    readings_by_day[day]['do'] = round(value, 2) if value else None
+                elif sensor == 'tds_ppm':
+                    readings_by_day[day]['tds'] = round(value, 1) if value else None
+                elif sensor == 'temperature_c':
+                    readings_by_day[day]['temp'] = round(value, 1) if value else None
+                elif sensor == 'humidity':
+                    readings_by_day[day]['humidity'] = round(value, 1) if value else None
+            
+            data = list(readings_by_day.values())[:limit]
     
     return jsonify({
         'success': True,
@@ -604,8 +603,10 @@ def save_plant_reading():
         )
         with Session() as session:
             session.add(reading)
+            session.flush()  # Assign ID without detaching object
+            reading_id = reading.id
             session.commit()
-        return {"ok": True, "id": reading.id}
+        return {"ok": True, "id": reading_id}
     except Exception as e:
         return {"ok": False, "error": str(e)}, 400
 
