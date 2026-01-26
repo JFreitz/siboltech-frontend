@@ -423,8 +423,8 @@ def get_history():
             })
         return jsonify({'success': True, 'type': 'actuator', 'count': len(data), 'events': data})
     
-    else:
-        # Default: Sensor readings (daily/15min)
+    elif history_type == 'sensor' or history_type not in ['plant', 'actuator']:
+        # Default: Sensor readings (daily/15min) for aero/dwc systems
         with Session() as session:
             if interval == '15min':
                 # Get all readings in the time range for 15-min bucketing
