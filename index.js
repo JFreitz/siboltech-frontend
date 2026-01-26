@@ -2387,15 +2387,35 @@ setTimeout(() => {
 		} catch (e) {
 			console.error('[Training Submit] Error waiting for API URL:', e);
 		}
+
+		// Determine farming system from active tab
+		const activeTab = document.querySelector('.training-tab-btn.active');
+		const tabSensor = activeTab?.getAttribute('data-sensor') || 'training-aero';
+		let farmingSystem, listId;
 		
-		const list = document.getElementById('aeroponicsPlantsList');
+		if (tabSensor === 'training-aero') {
+			farmingSystem = 'aeroponics';
+			listId = 'aeroponicsPlantsList';
+		} else if (tabSensor === 'training-dwc') {
+			farmingSystem = 'dwc';
+			listId = 'dwcPlantsList';
+		} else {
+			farmingSystem = 'traditional';
+			listId = 'traditionalPlantsList';
+		}
+		
+		console.log('[Training Submit] Farming system:', farmingSystem, 'List ID:', listId);
+		
+		const list = document.getElementById(listId);
 		if (!list) {
-			console.warn('[Training Submit] Could not find aeroponicsPlantsList');
+			console.warn(`[Training Submit] Could not find ${listId}`);
+			showValidationError();
 			return;
 		}
 		const card = list.querySelector('.sensor-input-card1');
 		if (!card) {
 			console.warn('[Training Submit] Could not find sensor-input-card1');
+			showValidationError();
 			return;
 		}
 
@@ -2425,14 +2445,6 @@ setTimeout(() => {
 			showValidationError();
 			return;
 		}
-
-		// Determine farming system from active tab
-		const activeTab = document.querySelector('.training-tab-btn.active');
-		const tabSensor = activeTab?.getAttribute('data-sensor') || 'training-aero';
-		const farmingSystem = tabSensor === 'training-aero' ? 'aeroponics' : 
-		                     tabSensor === 'training-dwc' ? 'dwc' : 'traditional';
-		
-		console.log('[Training Submit] Farming system:', farmingSystem);
 
 		// Submit each plant's data to the API
 		try {
