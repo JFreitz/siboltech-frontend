@@ -862,9 +862,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			// Special handling for prediction tab - toggle dropdown
 			const predictionItem = document.querySelector('.sidebar-dropdown');
 			const historyItem = document.querySelector('.sidebar-dropdown1');
+			
 			if(t === 'predicting') {
 				if(predictionItem) {
 					const isOpen = predictionItem.classList.toggle('open');
+					// Close history dropdown
+					if(historyItem) historyItem.classList.remove('open');
 					// If opening, automatically show height graphs
 					if(isOpen) {
 						document.querySelectorAll('[data-tab]').forEach(x=>x.classList.remove('active'));
@@ -887,6 +890,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			if(t === 'history') {
 				if(historyItem) {
 					const isOpen = historyItem.classList.toggle('open');
+					// Close prediction dropdown
+					if(predictionItem) predictionItem.classList.remove('open');
 					if(isOpen) {
 						document.querySelectorAll('[data-tab]').forEach(x=>x.classList.remove('active'));
 						a.classList.add('active');
@@ -896,14 +901,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
 						// mark first history subitem active
 						document.querySelectorAll('.history').forEach(h => h.classList.remove('active'));
 						document.querySelector('.history')?.classList.add('active');
+					} else {
+						// If dropdown is closed, switch to another tab instead
+						document.querySelectorAll('[data-tab]').forEach(x=>x.classList.remove('active'));
+						a.classList.add('active');
+						contents.forEach(c=>c.classList.remove('active'));
+						const target = document.getElementById(t);
+						if(target) target.classList.add('active');
 					}
 				}
 				return;
 			}
 			
 			// Close prediction and history dropdowns when switching to other tabs
-			if(t !== 'predicting' && predictionItem) predictionItem.classList.remove('open');
-			if(t !== 'history' && historyItem) historyItem.classList.remove('open');
+			if(predictionItem) predictionItem.classList.remove('open');
+			if(historyItem) historyItem.classList.remove('open');
 			
 			document.querySelectorAll('[data-tab]').forEach(x=>x.classList.remove('active'));
 			a.classList.add('active');
@@ -962,6 +974,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 					if (w.getAttribute('data-history-view') === view) w.style.display = '';
 					else w.style.display = 'none';
 				});
+				// Fetch history data immediately after switching farming system
+				setTimeout(() => fetchHistoryData(), 50);
 			});
 		});
 
@@ -978,6 +992,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				pill.classList.add('active');
 				historyState.plant = pill.textContent.trim();
 				updateHistoryEmpty();
+				// Fetch updated history data
+				setTimeout(() => fetchHistoryData(), 50);
 			});
 		});
 
@@ -987,6 +1003,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				chip.classList.add('active');
 				historyState.interval = chip.textContent.trim();
 				updateHistoryEmpty();
+				// Fetch updated history data
+				setTimeout(() => fetchHistoryData(), 50);
 			});
 		});
 
