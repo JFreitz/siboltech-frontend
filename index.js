@@ -1014,7 +1014,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			
 			const method = historyState.method; // 'aero', 'dwc', 'trad'
 			const plant = historyState.plant;
-			const interval = historyState.interval.toLowerCase(); // 'daily' or '15-min'
+			// Normalize interval: "Daily" -> "daily", "15-min" -> "15min"
+			let interval = historyState.interval.toLowerCase();
+			if (interval === '15-min') interval = '15min';
 			
 			try {
 				// For ALL systems, fetch plant readings (which includes sensor data joined in)
