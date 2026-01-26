@@ -2354,15 +2354,30 @@ setTimeout(() => {
 	}
 
 	async function submitAeroponicsPlantList() {
+		console.log('[Training Submit] Button clicked');
+		
 		// Wait for API URL to be initialized
-		await waitForAPIUrl();
+		try {
+			await waitForAPIUrl();
+			console.log('[Training Submit] API URL ready:', RELAY_API_URL);
+		} catch (e) {
+			console.error('[Training Submit] Error waiting for API URL:', e);
+		}
 		
 		const list = document.getElementById('aeroponicsPlantsList');
-		if (!list) return;
+		if (!list) {
+			console.warn('[Training Submit] Could not find aeroponicsPlantsList');
+			return;
+		}
 		const card = list.querySelector('.sensor-input-card1');
-		if (!card) return;
+		if (!card) {
+			console.warn('[Training Submit] Could not find sensor-input-card1');
+			return;
+		}
 
 		const rows = Array.from(card.querySelectorAll('.sensor-inputs-row1'));
+		console.log('[Training Submit] Found', rows.length, 'plant rows');
+		
 		const data = rows.map((row, idx) => {
 			return {
 				no: idx + 1,
@@ -2374,12 +2389,15 @@ setTimeout(() => {
 			};
 		});
 
+		console.log('[Training Submit] Collected data:', data);
+
 		// Validate all fields are filled
 		const hasEmptyFields = data.some(plant => 
 			!plant.height || !plant.length || !plant.width || !plant.leaves || !plant.branches
 		);
 
 		if (hasEmptyFields) {
+			console.warn('[Training Submit] Validation failed - empty fields detected');
 			showValidationError();
 			return;
 		}
@@ -2389,6 +2407,8 @@ setTimeout(() => {
 		const tabSensor = activeTab?.getAttribute('data-sensor') || 'training-aero';
 		const farmingSystem = tabSensor === 'training-aero' ? 'aeroponics' : 
 		                     tabSensor === 'training-dwc' ? 'dwc' : 'traditional';
+		
+		console.log('[Training Submit] Farming system:', farmingSystem);
 
 		// Submit each plant's data to the API
 		try {
@@ -2403,6 +2423,8 @@ setTimeout(() => {
 					length: parseFloat(plant.length) || null
 				};
 
+				console.log(`[Training Submit] Submitting plant ${plant.no}:`, payload);
+
 				const res = await fetch(`${RELAY_API_URL}/plant-reading`, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
@@ -2411,18 +2433,22 @@ setTimeout(() => {
 
 				if (!res.ok) {
 					const errText = await res.text();
-					console.error(`Failed to submit plant ${plant.no}:`, res.status, errText);
+					console.error(`[Training Submit] Failed to submit plant ${plant.no}:`, res.status, errText);
+				} else {
+					const resData = await res.json();
+					console.log(`[Training Submit] Plant ${plant.no} submitted successfully:`, resData);
 				}
 			}
 
 			// Show success modal
+			console.log('[Training Submit] All plants submitted - showing success message');
 			showSuccessModal(data);
 			showToast(`${data.length} plant${data.length > 1 ? 's' : ''} submitted to history!`, 'success');
 			
 			// Clear fields after successful submission
 			clearAllFields();
 		} catch (error) {
-			console.error('Error submitting plant readings:', error);
+			console.error('[Training Submit] Error submitting plant readings:', error);
 			showToast('Failed to submit plant readings. Check console for details.', 'dangerous');
 		}
 	}
