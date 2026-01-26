@@ -917,7 +917,7 @@
 					<li class="calibrate-tab-btn" data-history-tab="trad" id="historyTabTrad">Traditional</li>
 				</ul>
 
-				<div class="history-filters">
+				<div class="history-filters" id="plantHistoryFilters">
 					<div class="history-plant-pills" aria-label="Plant selector">
 						<span class="history-label">Plant No.:</span>
 						<span class="history-pill active">1</span>
@@ -933,8 +933,15 @@
 					</div>
 				</div>
 
-				<!-- Plant Readings Tab (Sensor + Plant combined) - AEROPONICS & DWC -->
-				<div class="history-table-wrap" data-history-view="plant" data-farming-system="aero-dwc">
+				<div class="history-filters" id="actuatorHistoryFilters" style="display:none;">
+					<div class="history-frequency" >
+						<button class="history-chip active">Daily</button>
+						<button class="history-chip">15-min</button>
+					</div>
+				</div>
+
+				<!-- Plant Readings Tab (Sensor + Plant combined) -->
+				<div class="history-table-wrap" data-history-view="plant" id="plantHistoryView">
 					<table class="history-table">
 						<thead>
 							<tr class="history-head-group">
@@ -961,35 +968,12 @@
 					</table>
 				</div>
 
-				<!-- Plant Readings Tab (Plant Only) - TRADITIONAL -->
-				<div class="history-table-wrap" data-history-view="plant" data-farming-system="trad" style="display:none;">
+				<!-- Actuator Events Tab (only actuator events, no sensors) -->
+				<div class="history-table-wrap" data-history-view="actuator" id="actuatorHistoryView">
 					<table class="history-table">
 						<thead>
 							<tr class="history-head-group">
-								<th colspan="6" class="group plant">Plant Readings</th>
-							</tr>
-							<tr class="history-head-cols">
-								<th>Timestamp</th>
-								<th>Leaves</th>
-								<th>Branches</th>
-								<th>Weight</th>
-								<th>Length</th>
-								<th>Height</th>
-							</tr>
-						</thead>
-						<tbody>
-							<tr><td colspan="6" class="history-empty">No data yet. Select a plant and interval to view history.</td></tr>
-						</tbody>
-					</table>
-				</div>
-
-				<!-- Actuator Events Tab (Shared across all systems) -->
-				<div class="history-table-wrap" data-history-view="actuator">
-					<table class="history-table">
-						<thead>
-							<tr class="history-head-group">
-								<th colspan="9" class="group actuator">Actuator State Changes</th>
-								<th colspan="5" class="group sensor">Sensor Readings</th>
+								<th colspan="10" class="group actuator">Actuator State Changes</th>
 							</tr>
 							<tr class="history-head-cols">
 								<th>Timestamp</th>
@@ -999,17 +983,13 @@
 								<th>Exhaust OUT</th>
 								<th>Lights Aero</th>
 								<th>Lights DWC</th>
-								<th>pH Control</th>
+								<th>pH Up</th>
+								<th>pH Down</th>
 								<th>Leafy Green</th>
-								<th>pH</th>
-								<th>DO</th>
-								<th>TDS</th>
-								<th>Temp</th>
-								<th>Humidity</th>
 							</tr>
 						</thead>
 						<tbody>
-							<tr><td colspan="14" class="history-empty">No actuator events recorded yet.</td></tr>
+							<tr><td colspan="10" class="history-empty">No actuator events recorded yet.</td></tr>
 						</tbody>
 					</table>
 				</div>

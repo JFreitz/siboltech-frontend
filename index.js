@@ -950,7 +950,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	// History board interactions (tabs, plant pills, frequency chips)
 	const historyBoard = document.querySelector('.history-board');
 	if (historyBoard) {
-		const historyState = { method: 'aero', plant: '1', interval: 'Daily' };
+		const historyState = { method: 'aero', plant: '1', interval: 'Daily', activeView: 'plant' };
 		const historyEmptyCell = historyBoard.querySelector('.history-empty');
 
 		const updateHistoryEmpty = () => {
@@ -961,6 +961,33 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			historyEmptyCell.textContent = `No data yet for Plant ${plantLabel} (${intervalLabel}, ${methodLabel}).`;
 		};
 
+		// Sidebar history menu (Plant / Actuator) click handlers
+		const sidebarHistoryItems = document.querySelectorAll('#historyMenu .history');
+		if(sidebarHistoryItems && sidebarHistoryItems.length) {
+			sidebarHistoryItems.forEach(item => {
+				item.addEventListener('click', (e) => {
+					const metric = item.getAttribute('data-metric');
+					if (metric === 'Plantbtn') {
+						historyState.activeView = 'plant';
+						// Show plant filters and table, hide actuator
+						document.getElementById('plantHistoryFilters').style.display = '';
+						document.getElementById('actuatorHistoryFilters').style.display = 'none';
+						document.getElementById('plantHistoryView').style.display = '';
+						document.getElementById('actuatorHistoryView').style.display = 'none';
+						setTimeout(() => fetchHistoryData(), 50);
+					} else if (metric === 'Actuatorbtn') {
+						historyState.activeView = 'actuator';
+						// Hide plant filters, show actuator filters and table
+						document.getElementById('plantHistoryFilters').style.display = 'none';
+						document.getElementById('actuatorHistoryFilters').style.display = '';
+						document.getElementById('plantHistoryView').style.display = 'none';
+						document.getElementById('actuatorHistoryView').style.display = '';
+						setTimeout(() => fetchHistoryData(), 50);
+					}
+				});
+			});
+		}
+
 		historyBoard.querySelectorAll('[data-history-tab]').forEach(btn => {
 			btn.addEventListener('click', (e) => {
 				e.preventDefault();
@@ -968,39 +995,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				btn.classList.add('active');
 				historyState.method = btn.getAttribute('data-history-tab') || historyState.method;
 				updateHistoryEmpty();
-				
-				// Show/hide plant tables based on farming system
-				const method = historyState.method;
-				historyBoard.querySelectorAll('[data-history-view="plant"]').forEach(w => {
-					const farmingSystemAttr = w.getAttribute('data-farming-system');
-					// aero-dwc tables shown for aero/dwc, trad table shown for trad
-					if ((method === 'aero' || method === 'dwc') && farmingSystemAttr === 'aero-dwc') {
-						w.style.display = '';
-					} else if (method === 'trad' && farmingSystemAttr === 'trad') {
-						w.style.display = '';
-					} else {
-						w.style.display = 'none';
-					}
-				});
-				
-				// Actuator table is always shown (shared across all systems)
-				historyBoard.querySelectorAll('[data-history-view="actuator"]').forEach(w => {
-					w.style.display = '';
-				});
-				
 				// Fetch history data immediately after switching farming system
 				setTimeout(() => fetchHistoryData(), 50);
 			});
 		});
 
-		// Initialize view visibility - show aero-dwc plant table + actuator, hide trad plant table
+		// Initialize view visibility - show plant table, hide actuator by default
 		historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
-			if (w.getAttribute('data-history-view') === 'plant' && w.getAttribute('data-farming-system') === 'aero-dwc') {
-				w.style.display = '';  // Show aero-dwc plant table
-			} else if (w.getAttribute('data-history-view') === 'plant' && w.getAttribute('data-farming-system') === 'trad') {
-				w.style.display = 'none';  // Hide trad plant table initially
-			} else if (w.getAttribute('data-history-view') === 'actuator') {
-				w.style.display = '';  // Always show actuator table
+			if (w.getAttribute('data-history-view') === 'plant') {
+				w.style.display = '';  // Show plant table
+			} else {
+				w.style.display = 'none';  // Hide actuator table initially
 			}
 		});
 
@@ -1017,7 +1022,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 		historyBoard.querySelectorAll('.history-chip').forEach(chip => {
 			chip.addEventListener('click', () => {
-				historyBoard.querySelectorAll('.history-chip').forEach(c => c.classList.remove('active'));
+				const parent = chip.parentElement;
+				parent.querySelectorAll('.history-chip').forEach(c => c.classList.remove('active'));
 				chip.classList.add('active');
 				historyState.interval = chip.textContent.trim();
 				updateHistoryEmpty();
@@ -1045,22 +1051,26 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			else farmingSystem = 'traditional';
 			
 			try {
-				// Fetch plant readings from the correct table based on farming system
-				const plantTableWrap = historyBoard.querySelector(`[data-history-view="plant"][data-farming-system="${method === 'trad' ? 'trad' : 'aero-dwc'}"]`);
+				// For ALL systems, fetch plant readings (which includes sensor data joined in)
+				// The API intelligently fetches:
+				// - For trad: plant data from PlantReading table
+				// - For aero/dwc: would be sensor data, but we use plant table which has the structure
+				const plantTableWrap = historyBoard.querySelector('[data-history-view="plant"]');
+				const actuatorTableWrap = historyBoard.querySelector('[data-history-view="actuator"]');
+				
+				// Fetch plant/sensor readings (always use type=plant for the combined table)
+				// IMPORTANT: Pass farming_system to filter by farming system
 				if (plantTableWrap) {
 					const plantRes = await fetch(`${RELAY_API_URL}/history?type=plant&plant_id=${plant}&interval=${interval}&farming_system=${farmingSystem}`);
 					if (plantRes.ok) {
 						const plantData = await plantRes.json();
-						// Determine column count based on farming system
-						const colSpan = method === 'trad' ? 6 : 11;
-						populatePlantHistoryTable(plantTableWrap, plantData, colSpan);
+						populatePlantHistoryTable(plantTableWrap, plantData);
 					}
 				}
 				
-				// Fetch actuator events (shared across all systems, pass farming_system for context)
-				const actuatorTableWrap = historyBoard.querySelector('[data-history-view="actuator"]');
+				// Fetch actuator events
 				if (actuatorTableWrap) {
-					const actuatorRes = await fetch(`${RELAY_API_URL}/history?type=actuator&plant_id=${plant}&interval=${interval}&farming_system=${farmingSystem}`);
+					const actuatorRes = await fetch(`${RELAY_API_URL}/history?type=actuator&plant_id=${plant}&interval=${interval}`);
 					if (actuatorRes.ok) {
 						const actuatorData = await actuatorRes.json();
 						populateActuatorHistoryTable(actuatorTableWrap, actuatorData);
@@ -1071,7 +1081,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			}
 		};
 		
-		const populatePlantHistoryTable = (tableWrap, data, colSpan = 11) => {
+		const populatePlantHistoryTable = (tableWrap, data) => {
 			const tbody = tableWrap.querySelector('tbody');
 			if (!tbody) return;
 			
@@ -1079,41 +1089,42 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			const readings = data.readings || data || [];
 			
 			if (!readings || readings.length === 0) {
-				tbody.innerHTML = `<tr><td colspan="${colSpan}" class="history-empty">No data available.</td></tr>`;
+				tbody.innerHTML = '<tr><td colspan="11" class="history-empty">No data available.</td></tr>';
 				return;
 			}
-			
-			let rows;
-			if (colSpan === 6) {
-				// Traditional (no sensors): only plant columns
-				rows = readings.map(row => `
-					<tr>
-						<td>${new Date(row.timestamp).toLocaleString()}</td>
-						<td>${(row.leaves !== null && row.leaves !== undefined) ? row.leaves.toFixed(1) : '-'}</td>
-						<td>${(row.branches !== null && row.branches !== undefined) ? row.branches.toFixed(1) : '-'}</td>
-						<td>${(row.weight !== null && row.weight !== undefined) ? row.weight.toFixed(1) : '-'}</td>
-						<td>${(row.length !== null && row.length !== undefined) ? row.length.toFixed(1) : '-'}</td>
-						<td>${(row.height !== null && row.height !== undefined) ? row.height.toFixed(1) : '-'}</td>
-					</tr>
-				`).join('');
-			} else {
-				// Aero/DWC (with sensors): 6 sensor + 5 plant columns
-				rows = readings.map(row => `
-					<tr>
-						<td>${new Date(row.timestamp).toLocaleString()}</td>
-						<td>${(row.ph !== null && row.ph !== undefined) ? row.ph.toFixed(2) : '-'}</td>
-						<td>${(row.do !== null && row.do !== undefined) ? row.do.toFixed(2) : '-'}</td>
-						<td>${(row.tds !== null && row.tds !== undefined) ? row.tds.toFixed(0) : '-'}</td>
-						<td>${(row.temperature !== null && row.temperature !== undefined) ? row.temperature.toFixed(1) : '-'}</td>
-						<td>${(row.humidity !== null && row.humidity !== undefined) ? row.humidity.toFixed(1) : '-'}</td>
-						<td>${(row.leaves !== null && row.leaves !== undefined) ? row.leaves.toFixed(1) : '-'}</td>
-						<td>${(row.branches !== null && row.branches !== undefined) ? row.branches.toFixed(1) : '-'}</td>
-						<td>${(row.weight !== null && row.weight !== undefined) ? row.weight.toFixed(1) : '-'}</td>
-						<td>${(row.length !== null && row.length !== undefined) ? row.length.toFixed(1) : '-'}</td>
-						<td>${(row.height !== null && row.height !== undefined) ? row.height.toFixed(1) : '-'}</td>
-					</tr>
-				`).join('');
+
+			// Hide sensor columns for traditional farming
+			const method = historyState.method;
+			const isTrad = method === 'trad';
+			const thead = tableWrap.querySelector('thead');
+			if (thead) {
+				const sensorHeader = thead.querySelector('th[colspan="6"]');
+				if (sensorHeader) {
+					sensorHeader.style.display = isTrad ? 'none' : '';
+				}
+				const sensorCols = thead.querySelectorAll('.history-head-cols th:nth-child(-n+6)');
+				sensorCols.forEach(col => {
+					col.style.display = isTrad ? 'none' : '';
+				});
 			}
+			
+			const rows = readings.map(row => {
+				const cells = [
+					`<td style="display: ${isTrad ? 'none' : ''}">${new Date(row.timestamp).toLocaleString()}</td>`,
+					`<td style="display: ${isTrad ? 'none' : ''}">${(row.ph !== null && row.ph !== undefined) ? row.ph.toFixed(2) : '-'}</td>`,
+					`<td style="display: ${isTrad ? 'none' : ''}">${(row.do !== null && row.do !== undefined) ? row.do.toFixed(2) : '-'}</td>`,
+					`<td style="display: ${isTrad ? 'none' : ''}">${(row.tds !== null && row.tds !== undefined) ? row.tds.toFixed(0) : '-'}</td>`,
+					`<td style="display: ${isTrad ? 'none' : ''}">${(row.temperature !== null && row.temperature !== undefined) ? row.temperature.toFixed(1) : '-'}</td>`,
+					`<td style="display: ${isTrad ? 'none' : ''}">${(row.humidity !== null && row.humidity !== undefined) ? row.humidity.toFixed(1) : '-'}</td>`,
+					`<td>${new Date(row.timestamp).toLocaleString()}</td>`,
+					`<td>${(row.leaves !== null && row.leaves !== undefined) ? row.leaves.toFixed(1) : '-'}</td>`,
+					`<td>${(row.branches !== null && row.branches !== undefined) ? row.branches.toFixed(1) : '-'}</td>`,
+					`<td>${(row.weight !== null && row.weight !== undefined) ? row.weight.toFixed(1) : '-'}</td>`,
+					`<td>${(row.length !== null && row.length !== undefined) ? row.length.toFixed(1) : '-'}</td>`,
+					`<td>${(row.height !== null && row.height !== undefined) ? row.height.toFixed(1) : '-'}</td>`
+				];
+				return `<tr>${cells.join('')}</tr>`;
+			}).join('');
 			
 			tbody.innerHTML = rows;
 		};
@@ -1126,12 +1137,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			const readings = data.readings || data || [];
 			
 			if (!readings || readings.length === 0) {
-				tbody.innerHTML = '<tr><td colspan="14" class="history-empty">No actuator events recorded.</td></tr>';
+				tbody.innerHTML = '<tr><td colspan="10" class="history-empty">No actuator events recorded.</td></tr>';
 				return;
 			}
 			
+			// Relay names mapping
+			const relayNames = {
+				1: 'Misting', 2: 'Air Pump', 3: 'Exhaust IN', 4: 'Exhaust OUT',
+				5: 'Lights Aero', 6: 'Lights DWC', 7: 'pH Up', 8: 'pH Down', 9: 'Leafy Green'
+			};
+			
 			const rows = readings.map(row => {
-				// Relay states: 1=Misting, 2=Air Pump, 3=Exhaust IN, 4=Exhaust OUT, 5=Lights Aero, 6=Lights DWC, 7=pH Control, 9=Leafy Green
+				// Parse relay events
 				const relayStates = Array(9).fill('-');
 				if (row.relay_events && Array.isArray(row.relay_events)) {
 					row.relay_events.forEach(evt => {
@@ -1152,12 +1169,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 						<td>${relayStates[4]}</td>
 						<td>${relayStates[5]}</td>
 						<td>${relayStates[6]}</td>
+						<td>${relayStates[7]}</td>
 						<td>${relayStates[8]}</td>
-						<td>${(row.ph !== null && row.ph !== undefined) ? row.ph.toFixed(2) : '-'}</td>
-						<td>${(row.do !== null && row.do !== undefined) ? row.do.toFixed(2) : '-'}</td>
-						<td>${(row.tds !== null && row.tds !== undefined) ? row.tds.toFixed(0) : '-'}</td>
-						<td>${(row.temperature !== null && row.temperature !== undefined) ? row.temperature.toFixed(1) : '-'}</td>
-						<td>${(row.humidity !== null && row.humidity !== undefined) ? row.humidity.toFixed(1) : '-'}</td>
 					</tr>
 				`;
 			}).join('');
@@ -1175,80 +1188,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		if (historyTab) {
 			historyTab.addEventListener('click', () => {
 				setTimeout(() => fetchHistoryData(), 100);
-			});
-		}
-
-		// Sidebar history menu (Plant / Actuator) click handlers
-		const sidebarHistoryItems = document.querySelectorAll('#historyMenu .history');
-		if(sidebarHistoryItems && sidebarHistoryItems.length) {
-			sidebarHistoryItems.forEach(item => {
-				item.addEventListener('click', (e) => {
-					e.preventDefault();
-					const metric = item.getAttribute('data-metric'); // 'Plantbtn' or 'Actuatorbtn'
-					// Do not navigate to other tabs or dashboard when submenu items are clicked.
-					// Update history board view in-place instead.
-					if (metric && metric.toLowerCase().includes('actuator')) {
-						// When Actuator submenu is clicked, open History and show the actuator table.
-						const historyAnchor = document.querySelector('[data-tab="history"]');
-						if (historyAnchor) {
-							document.querySelectorAll('[data-tab]').forEach(x => x.classList.remove('active'));
-							historyAnchor.classList.add('active');
-							document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-							const histSec = document.getElementById('history');
-							if (histSec) histSec.classList.add('active');
-						}
-						// Show actuator view (the actuator events table)
-						historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
-							if (w.getAttribute('data-history-view') === 'actuator') w.style.display = '';
-							else w.style.display = 'none';
-						});
-						// Also show in history-board1 if present
-						const historyBoard1 = document.querySelector('.history-board1');
-						if (historyBoard1) {
-							historyBoard1.querySelectorAll('.history-table-wrap').forEach(w => {
-								if (w.getAttribute('data-history-view') === 'actuator') w.style.display = '';
-								else w.style.display = 'none';
-							});
-						}
-					} else if (metric && metric.toLowerCase().includes('plant')) {
-						// Ensure History tab is active
-						const historyAnchor = document.querySelector('[data-tab="history"]');
-						if (historyAnchor) {
-							document.querySelectorAll('[data-tab]').forEach(x => x.classList.remove('active'));
-							historyAnchor.classList.add('active');
-							document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-							const histSec = document.getElementById('history');
-							if (histSec) histSec.classList.add('active');
-						}
-
-						// Show sensor and plant table views (not actuator)
-						historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
-							const view = w.getAttribute('data-history-view');
-							if (view === 'sensor' || view === 'plant') w.style.display = '';
-							else w.style.display = 'none';
-						});
-						// Also update history-board1 if present
-						const historyBoard1 = document.querySelector('.history-board1');
-						if (historyBoard1) {
-							historyBoard1.querySelectorAll('.history-table-wrap').forEach(w => {
-								const view = w.getAttribute('data-history-view');
-								if (view === 'sensor' || view === 'plant') w.style.display = '';
-								else w.style.display = 'none';
-							});
-						}
-					} else {
-						// Other metrics: show sensor view by default
-						historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
-							if (w.getAttribute('data-history-view') === 'sensor') w.style.display = '';
-							else w.style.display = 'none';
-						});
-					}
-					// Update active state for sidebar items
-					sidebarHistoryItems.forEach(s => s.classList.remove('active'));
-					item.classList.add('active');
-					// Update empty message if needed
-					updateHistoryEmpty();
-				});
 			});
 		}
 	}
