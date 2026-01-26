@@ -968,22 +968,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				btn.classList.add('active');
 				historyState.method = btn.getAttribute('data-history-tab') || historyState.method;
 				updateHistoryEmpty();
-				// Toggle history table views based on selected method
-				const view = historyState.method === 'trad' ? 'plant' : 'sensor';
-				historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
-					if (w.getAttribute('data-history-view') === view) w.style.display = '';
-					else w.style.display = 'none';
-				});
+				// Note: All systems use the same plant table which contains sensor+plant data combined
+				// No need to toggle views based on method
 				// Fetch history data immediately after switching farming system
 				setTimeout(() => fetchHistoryData(), 50);
 			});
 		});
 
-		// Initialize view visibility
+		// Initialize view visibility - both plant and actuator tables always visible
 		historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
-			const view = historyState.method === 'trad' ? 'plant' : 'sensor';
-			if (w.getAttribute('data-history-view') === view) w.style.display = '';
-			else w.style.display = 'none';
+			w.style.display = '';  // Show all views by default
 		});
 
 		historyBoard.querySelectorAll('.history-pill').forEach(pill => {
@@ -1019,15 +1013,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			const interval = historyState.interval.toLowerCase(); // 'daily' or '15-min'
 			
 			try {
-				// Determine which table to populate based on selected method
-				let type = method === 'trad' ? 'plant' : 'sensor'; // Default to plant for trad, sensor for aero/dwc
-				
-				// For aero/dwc, also fetch plant data if available
+				// For ALL systems, fetch plant readings (which includes sensor data joined in)
+				// The API intelligently fetches:
+				// - For trad: plant data from PlantReading table
+				// - For aero/dwc: would be sensor data, but we use plant table which has the structure
 				const plantTableWrap = historyBoard.querySelector('[data-history-view="plant"]');
 				const actuatorTableWrap = historyBoard.querySelector('[data-history-view="actuator"]');
 				
-				// Fetch sensor/plant readings
-				if (plantTableWrap && plantTableWrap.style.display !== 'none') {
+				// Fetch plant/sensor readings (always use type=plant for the combined table)
+				if (plantTableWrap) {
 					const plantRes = await fetch(`${RELAY_API_URL}/history?type=plant&plant_id=${plant}&interval=${interval}`);
 					if (plantRes.ok) {
 						const plantData = await plantRes.json();
@@ -1036,7 +1030,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				}
 				
 				// Fetch actuator events
-				if (actuatorTableWrap && actuatorTableWrap.style.display !== 'none') {
+				if (actuatorTableWrap) {
 					const actuatorRes = await fetch(`${RELAY_API_URL}/history?type=actuator&plant_id=${plant}&interval=${interval}`);
 					if (actuatorRes.ok) {
 						const actuatorData = await actuatorRes.json();
