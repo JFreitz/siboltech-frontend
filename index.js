@@ -969,7 +969,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 					const metric = item.getAttribute('data-metric');
 					if (metric === 'Plantbtn') {
 						historyState.activeView = 'plant';
-						// Show plant filters and table, hide actuator
+						// Show farming system tabs, plant filters and table, hide actuator
+						document.getElementById('historyTabs').style.display = '';
 						document.getElementById('plantHistoryFilters').style.display = '';
 						document.getElementById('actuatorHistoryFilters').style.display = 'none';
 						document.getElementById('plantHistoryView').style.display = '';
@@ -977,7 +978,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 						setTimeout(() => fetchHistoryData(), 50);
 					} else if (metric === 'Actuatorbtn') {
 						historyState.activeView = 'actuator';
-						// Hide plant filters, show actuator filters and table
+						// Hide farming system tabs, plant filters, show actuator filters and table
+						document.getElementById('historyTabs').style.display = 'none';
 						document.getElementById('plantHistoryFilters').style.display = 'none';
 						document.getElementById('actuatorHistoryFilters').style.display = '';
 						document.getElementById('plantHistoryView').style.display = 'none';
