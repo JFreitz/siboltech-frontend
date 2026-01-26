@@ -1034,12 +1034,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			const tbody = tableWrap.querySelector('tbody');
 			if (!tbody) return;
 			
-			if (!data || data.length === 0) {
+			// API returns {readings: [...], success: true, ...}
+			const readings = data.readings || data || [];
+			
+			if (!readings || readings.length === 0) {
 				tbody.innerHTML = '<tr><td colspan="11" class="history-empty">No data available.</td></tr>';
 				return;
 			}
 			
-			const rows = data.map(row => `
+			const rows = readings.map(row => `
 				<tr>
 					<td>${new Date(row.timestamp).toLocaleString()}</td>
 					<td>${row.ph !== null ? row.ph.toFixed(2) : '-'}</td>
@@ -1062,7 +1065,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			const tbody = tableWrap.querySelector('tbody');
 			if (!tbody) return;
 			
-			if (!data || data.length === 0) {
+			// API returns {readings: [...], success: true, ...}
+			const readings = data.readings || data || [];
+			
+			if (!readings || readings.length === 0) {
 				tbody.innerHTML = '<tr><td colspan="15" class="history-empty">No actuator events recorded.</td></tr>';
 				return;
 			}
@@ -1073,7 +1079,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				5: 'Lights Aero', 6: 'Lights DWC', 7: 'pH Up', 8: 'pH Down', 9: 'Leafy Green'
 			};
 			
-			const rows = data.map(row => {
+			const rows = readings.map(row => {
 				// Parse relay events
 				const relayStates = Array(9).fill('-');
 				if (row.relay_events && Array.isArray(row.relay_events)) {
