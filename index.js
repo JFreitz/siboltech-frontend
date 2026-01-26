@@ -968,19 +968,39 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				btn.classList.add('active');
 				historyState.method = btn.getAttribute('data-history-tab') || historyState.method;
 				updateHistoryEmpty();
-				// Note: All systems use the same plant table which contains sensor+plant data combined
-				// No need to toggle views based on method
+				
+				// Show/hide plant tables based on farming system
+				const method = historyState.method;
+				historyBoard.querySelectorAll('[data-history-view="plant"]').forEach(w => {
+					const farmingSystemAttr = w.getAttribute('data-farming-system');
+					// aero-dwc tables shown for aero/dwc, trad table shown for trad
+					if ((method === 'aero' || method === 'dwc') && farmingSystemAttr === 'aero-dwc') {
+						w.style.display = '';
+					} else if (method === 'trad' && farmingSystemAttr === 'trad') {
+						w.style.display = '';
+					} else {
+						w.style.display = 'none';
+					}
+				});
+				
+				// Actuator table is always shown (shared across all systems)
+				historyBoard.querySelectorAll('[data-history-view="actuator"]').forEach(w => {
+					w.style.display = '';
+				});
+				
 				// Fetch history data immediately after switching farming system
 				setTimeout(() => fetchHistoryData(), 50);
 			});
 		});
 
-		// Initialize view visibility - show plant table, hide actuator by default
+		// Initialize view visibility - show aero-dwc plant table + actuator, hide trad plant table
 		historyBoard.querySelectorAll('.history-table-wrap').forEach(w => {
-			if (w.getAttribute('data-history-view') === 'plant') {
-				w.style.display = '';  // Show plant table
-			} else {
-				w.style.display = 'none';  // Hide actuator table initially
+			if (w.getAttribute('data-history-view') === 'plant' && w.getAttribute('data-farming-system') === 'aero-dwc') {
+				w.style.display = '';  // Show aero-dwc plant table
+			} else if (w.getAttribute('data-history-view') === 'plant' && w.getAttribute('data-farming-system') === 'trad') {
+				w.style.display = 'none';  // Hide trad plant table initially
+			} else if (w.getAttribute('data-history-view') === 'actuator') {
+				w.style.display = '';  // Always show actuator table
 			}
 		});
 
@@ -1025,26 +1045,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			else farmingSystem = 'traditional';
 			
 			try {
-				// For ALL systems, fetch plant readings (which includes sensor data joined in)
-				// The API intelligently fetches:
-				// - For trad: plant data from PlantReading table
-				// - For aero/dwc: would be sensor data, but we use plant table which has the structure
-				const plantTableWrap = historyBoard.querySelector('[data-history-view="plant"]');
-				const actuatorTableWrap = historyBoard.querySelector('[data-history-view="actuator"]');
-				
-				// Fetch plant/sensor readings (always use type=plant for the combined table)
-				// IMPORTANT: Pass farming_system to filter by farming system
+				// Fetch plant readings from the correct table based on farming system
+				const plantTableWrap = historyBoard.querySelector(`[data-history-view="plant"][data-farming-system="${method === 'trad' ? 'trad' : 'aero-dwc'}"]`);
 				if (plantTableWrap) {
 					const plantRes = await fetch(`${RELAY_API_URL}/history?type=plant&plant_id=${plant}&interval=${interval}&farming_system=${farmingSystem}`);
 					if (plantRes.ok) {
 						const plantData = await plantRes.json();
-						populatePlantHistoryTable(plantTableWrap, plantData);
+						// Determine column count based on farming system
+						const colSpan = method === 'trad' ? 6 : 11;
+						populatePlantHistoryTable(plantTableWrap, plantData, colSpan);
 					}
 				}
 				
-				// Fetch actuator events
+				// Fetch actuator events (shared across all systems, pass farming_system for context)
+				const actuatorTableWrap = historyBoard.querySelector('[data-history-view="actuator"]');
 				if (actuatorTableWrap) {
-					const actuatorRes = await fetch(`${RELAY_API_URL}/history?type=actuator&plant_id=${plant}&interval=${interval}`);
+					const actuatorRes = await fetch(`${RELAY_API_URL}/history?type=actuator&plant_id=${plant}&interval=${interval}&farming_system=${farmingSystem}`);
 					if (actuatorRes.ok) {
 						const actuatorData = await actuatorRes.json();
 						populateActuatorHistoryTable(actuatorTableWrap, actuatorData);
@@ -1055,7 +1071,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			}
 		};
 		
-		const populatePlantHistoryTable = (tableWrap, data) => {
+		const populatePlantHistoryTable = (tableWrap, data, colSpan = 11) => {
 			const tbody = tableWrap.querySelector('tbody');
 			if (!tbody) return;
 			
@@ -1063,25 +1079,41 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			const readings = data.readings || data || [];
 			
 			if (!readings || readings.length === 0) {
-				tbody.innerHTML = '<tr><td colspan="11" class="history-empty">No data available.</td></tr>';
+				tbody.innerHTML = `<tr><td colspan="${colSpan}" class="history-empty">No data available.</td></tr>`;
 				return;
 			}
 			
-			const rows = readings.map(row => `
-				<tr>
-					<td>${new Date(row.timestamp).toLocaleString()}</td>
-					<td>${(row.ph !== null && row.ph !== undefined) ? row.ph.toFixed(2) : '-'}</td>
-					<td>${(row.do !== null && row.do !== undefined) ? row.do.toFixed(2) : '-'}</td>
-					<td>${(row.tds !== null && row.tds !== undefined) ? row.tds.toFixed(0) : '-'}</td>
-					<td>${(row.temperature !== null && row.temperature !== undefined) ? row.temperature.toFixed(1) : '-'}</td>
-					<td>${(row.humidity !== null && row.humidity !== undefined) ? row.humidity.toFixed(1) : '-'}</td>
-					<td>${(row.leaves !== null && row.leaves !== undefined) ? row.leaves.toFixed(1) : '-'}</td>
-					<td>${(row.branches !== null && row.branches !== undefined) ? row.branches.toFixed(1) : '-'}</td>
-					<td>${(row.weight !== null && row.weight !== undefined) ? row.weight.toFixed(1) : '-'}</td>
-					<td>${(row.length !== null && row.length !== undefined) ? row.length.toFixed(1) : '-'}</td>
-					<td>${(row.height !== null && row.height !== undefined) ? row.height.toFixed(1) : '-'}</td>
-				</tr>
-			`).join('');
+			let rows;
+			if (colSpan === 6) {
+				// Traditional (no sensors): only plant columns
+				rows = readings.map(row => `
+					<tr>
+						<td>${new Date(row.timestamp).toLocaleString()}</td>
+						<td>${(row.leaves !== null && row.leaves !== undefined) ? row.leaves.toFixed(1) : '-'}</td>
+						<td>${(row.branches !== null && row.branches !== undefined) ? row.branches.toFixed(1) : '-'}</td>
+						<td>${(row.weight !== null && row.weight !== undefined) ? row.weight.toFixed(1) : '-'}</td>
+						<td>${(row.length !== null && row.length !== undefined) ? row.length.toFixed(1) : '-'}</td>
+						<td>${(row.height !== null && row.height !== undefined) ? row.height.toFixed(1) : '-'}</td>
+					</tr>
+				`).join('');
+			} else {
+				// Aero/DWC (with sensors): 6 sensor + 5 plant columns
+				rows = readings.map(row => `
+					<tr>
+						<td>${new Date(row.timestamp).toLocaleString()}</td>
+						<td>${(row.ph !== null && row.ph !== undefined) ? row.ph.toFixed(2) : '-'}</td>
+						<td>${(row.do !== null && row.do !== undefined) ? row.do.toFixed(2) : '-'}</td>
+						<td>${(row.tds !== null && row.tds !== undefined) ? row.tds.toFixed(0) : '-'}</td>
+						<td>${(row.temperature !== null && row.temperature !== undefined) ? row.temperature.toFixed(1) : '-'}</td>
+						<td>${(row.humidity !== null && row.humidity !== undefined) ? row.humidity.toFixed(1) : '-'}</td>
+						<td>${(row.leaves !== null && row.leaves !== undefined) ? row.leaves.toFixed(1) : '-'}</td>
+						<td>${(row.branches !== null && row.branches !== undefined) ? row.branches.toFixed(1) : '-'}</td>
+						<td>${(row.weight !== null && row.weight !== undefined) ? row.weight.toFixed(1) : '-'}</td>
+						<td>${(row.length !== null && row.length !== undefined) ? row.length.toFixed(1) : '-'}</td>
+						<td>${(row.height !== null && row.height !== undefined) ? row.height.toFixed(1) : '-'}</td>
+					</tr>
+				`).join('');
+			}
 			
 			tbody.innerHTML = rows;
 		};
@@ -1094,18 +1126,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			const readings = data.readings || data || [];
 			
 			if (!readings || readings.length === 0) {
-				tbody.innerHTML = '<tr><td colspan="15" class="history-empty">No actuator events recorded.</td></tr>';
+				tbody.innerHTML = '<tr><td colspan="14" class="history-empty">No actuator events recorded.</td></tr>';
 				return;
 			}
 			
-			// Relay names mapping
-			const relayNames = {
-				1: 'Misting', 2: 'Air Pump', 3: 'Exhaust IN', 4: 'Exhaust OUT',
-				5: 'Lights Aero', 6: 'Lights DWC', 7: 'pH Up', 8: 'pH Down', 9: 'Leafy Green'
-			};
-			
 			const rows = readings.map(row => {
-				// Parse relay events
+				// Relay states: 1=Misting, 2=Air Pump, 3=Exhaust IN, 4=Exhaust OUT, 5=Lights Aero, 6=Lights DWC, 7=pH Control, 9=Leafy Green
 				const relayStates = Array(9).fill('-');
 				if (row.relay_events && Array.isArray(row.relay_events)) {
 					row.relay_events.forEach(evt => {
@@ -1116,6 +1142,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
 					});
 				}
 				
+				return `
+					<tr>
+						<td>${new Date(row.timestamp).toLocaleString()}</td>
+						<td>${relayStates[0]}</td>
+						<td>${relayStates[1]}</td>
+						<td>${relayStates[2]}</td>
+						<td>${relayStates[3]}</td>
+						<td>${relayStates[4]}</td>
+						<td>${relayStates[5]}</td>
+						<td>${relayStates[6]}</td>
+						<td>${relayStates[8]}</td>
+						<td>${(row.ph !== null && row.ph !== undefined) ? row.ph.toFixed(2) : '-'}</td>
+						<td>${(row.do !== null && row.do !== undefined) ? row.do.toFixed(2) : '-'}</td>
+						<td>${(row.tds !== null && row.tds !== undefined) ? row.tds.toFixed(0) : '-'}</td>
+						<td>${(row.temperature !== null && row.temperature !== undefined) ? row.temperature.toFixed(1) : '-'}</td>
+						<td>${(row.humidity !== null && row.humidity !== undefined) ? row.humidity.toFixed(1) : '-'}</td>
+					</tr>
+				`;
+			}).join('');
+			
+			tbody.innerHTML = rows;
+		};
 				return `
 					<tr>
 						<td>${new Date(row.timestamp).toLocaleString()}</td>
