@@ -933,12 +933,12 @@
 					</div>
 				</div>
 
+				<!-- Sensor Readings Tab -->
 				<div class="history-table-wrap" data-history-view="sensor">
 					<table class="history-table">
 						<thead>
 							<tr class="history-head-group">
 								<th colspan="6" class="group sensor">Sensor Readings</th>
-								<th colspan="5" class="group plant">Plant Readings</th>
 							</tr>
 							<tr class="history-head-cols">
 								<th>Timestamp</th>
@@ -947,55 +947,23 @@
 								<th>Total Dissolved Solids</th>
 								<th>Temperature</th>
 								<th>Humidity</th>
-								<th>No. of Leaves</th>
-								<th>No. of Branches</th>
-								<th>Weight</th>
-								<th>Length</th>
-								<th>Height</th>
 							</tr>
 						</thead>
 						<tbody>
-							<tr><td colspan="11" class="history-empty">No data yet. Select a plant and interval to view history.</td></tr>
+							<tr><td colspan="6" class="history-empty">No data yet. Select a plant and interval to view history.</td></tr>
 						</tbody>
 					</table>
-
 				</div>
 
+				<!-- Plant Readings Tab -->
 				<div class="history-table-wrap" data-history-view="plant">
 					<table class="history-table">
 						<thead>
 							<tr class="history-head-group">
-								<th colspan="5" class="group plant">Plant Readings</th>
-							</tr>
-							<tr class="history-head-cols">
-								<th>No. of Leaves</th>
-								<th>No. of Branches</th>
-								<th>Weight</th>
-								<th>Length</th>
-								<th>Height</th>
-							</tr>
-						</thead>
-						<tbody>
-							<tr><td colspan="11" class="history-empty">No data yet. Select a plant and interval to view history.</td></tr>
-						</tbody>
-					</table>
-				</div>
-			</div>
-				<div class="history-board1">
-				<div class="history-table-wrap" data-history-view="sensor">
-					<table class="history-table">
-						<thead>
-							<tr class="history-head-group">
-								<th colspan="6" class="group sensor">Sensor Readings</th>
-								<th colspan="5" class="group plant">Plant Readings</th>
+								<th colspan="6" class="group plant">Plant Readings</th>
 							</tr>
 							<tr class="history-head-cols">
 								<th>Timestamp</th>
-								<th>pH Level</th>
-								<th>Dissolved Oxygen</th>
-								<th>Total Dissolved Solids</th>
-								<th>Temperature</th>
-								<th>Humidity</th>
 								<th>No. of Leaves</th>
 								<th>No. of Branches</th>
 								<th>Weight</th>
@@ -1004,34 +972,60 @@
 							</tr>
 						</thead>
 						<tbody>
-							<tr><td colspan="11" class="history-empty">No data yet. Select a plant and interval to view history.</td></tr>
+							<tr><td colspan="6" class="history-empty">No data yet. Select a plant and interval to view history.</td></tr>
 						</tbody>
 					</table>
-
 				</div>
 
-					<div class="history-table-wrap" data-history-view="actuator">
-					<table class="history-table">
-						<thead>
-							<tr class="history-head-group">
-								<th colspan="5" class="group actuator">Actuator Events</th>
-							</tr>
-							<tr class="history-head-cols">
-								<th>Air pump</th>
-								<th>Exhaust Fan (IN)</th>
-								<th>Exhaust Fan (Out)</th>
-								<th>Grow Lights (Aeroponics)</th>
-								<th>Grow Lights (DWC)</th>
-								<th>pH Up</th>
-								<th>pH Down</th>
-								<th>Leafy Green</th>
-								<th>Misting Pump</th>
-							</tr>
-						</thead>
-						<tbody>
-							<tr><td colspan="5" class="history-empty">No actuator history yet.</td></tr>
-						</tbody>
-					</table>
+				<!-- Actuator Events Tab with Sensor Readings -->
+				<div class="history-table-wrap" data-history-view="actuator">
+					<div style="margin-bottom: 30px;">
+						<h3 style="margin-bottom: 15px; font-size: 1rem; color: #888;">Actuator Events</h3>
+						<table class="history-table">
+							<thead>
+								<tr class="history-head-group">
+									<th colspan="10" class="group actuator">Actuator State Changes</th>
+								</tr>
+								<tr class="history-head-cols">
+									<th>Timestamp</th>
+									<th>Relay 1 (Misting Pump)</th>
+									<th>Relay 2 (Air Pump)</th>
+									<th>Relay 3 (Exhaust IN)</th>
+									<th>Relay 4 (Exhaust OUT)</th>
+									<th>Relay 5 (Grow Lights Aero)</th>
+									<th>Relay 6 (Grow Lights DWC)</th>
+									<th>Relay 7 (pH Up)</th>
+									<th>Relay 8 (pH Down)</th>
+									<th>Relay 9 (Leafy Green)</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr><td colspan="10" class="history-empty">No actuator events recorded yet.</td></tr>
+							</tbody>
+						</table>
+					</div>
+
+					<div>
+						<h3 style="margin-bottom: 15px; font-size: 1rem; color: #888;">Sensor Readings</h3>
+						<table class="history-table">
+							<thead>
+								<tr class="history-head-group">
+									<th colspan="6" class="group sensor">Sensor Readings</th>
+								</tr>
+								<tr class="history-head-cols">
+									<th>Timestamp</th>
+									<th>pH Level</th>
+									<th>Dissolved Oxygen</th>
+									<th>Total Dissolved Solids</th>
+									<th>Temperature</th>
+									<th>Humidity</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr><td colspan="6" class="history-empty">No data yet. Select a plant and interval to view history.</td></tr>
+							</tbody>
+						</table>
+					</div>
 				</div>
 			</div>
 			
