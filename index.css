@@ -89,8 +89,8 @@
 	padding-left: 4px;
     justify-content: flex-start;
     flex-direction: row;}
-.calibrate-tab-btn { background: transparent; border: none; font-weight: 700; cursor: pointer; font-size: 20px; font-family: 'Poppins', sans-serif; color: #4b5c3a; padding: 8px 10px; border-bottom: 2px solid transparent; transition: color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease; }
-.calibrate-tab-btn.active { color: #3b7a2a; border-color: #3b7a2a; }
+.calibrate-tab-btn { background: transparent; border: none; font-weight: 700; cursor: pointer; font-size: 20px; font-family: 'Poppins', sans-serif; color: #4b5c3a; padding: 8px 10px; border-bottom: 2px solid transparent; transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease; }
+.calibrate-tab-btn.active { color: #fff; background-color: #3b7a2a; border-color: #3b7a2a; border-radius: 4px; }
 .calibrate-tab-btn:hover { color: #2f5f1f; border-color: #5fa63a; }
 
 /* Training tabs use the same styles as calibration/history tabs */
