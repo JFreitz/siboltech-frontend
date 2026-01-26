@@ -1,0 +1,1197 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>SibolTech - Dashboard</title>
+	<link rel="stylesheet" href="index.css">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+	<script>
+		// Auto-redirect to mobile version on small screens
+		if (window.innerWidth <= 768 && !localStorage.getItem('preferDesktop')) {
+			window.location.href = 'mobile.html';
+		}
+	</script>
+</head>
+<body>
+	<header class="topbar">
+		<button id="burger" aria-label="Toggle navigation" class="burger">
+			<span></span>
+			<span></span>
+			<span></span>
+		</button>
+		<div class="brand">
+			<img src="STLogoFinal2.png" alt="SibolTech" class="brand-logo">
+		</div>
+		
+		<div class="topbar-right">
+			<div id="topbarClock" class="topbar-clock" aria-live="polite">
+				<div id="topbarTime" class="topbar-time">--:--:--</div>
+				<div id="topbarDate" class="topbar-date">----</div>
+			</div>
+		</div>
+	</header>
+
+	<aside id="sidebar" class="sidebar">
+		<nav>
+			<ul>
+				<li><a href="#" data-tab="home"><span class="icon"><img src="dashboardicon.png" alt="Dashboard"></span><span>Dashboard</span></a></li>
+				<li><a href="#" data-tab="training"><span class="icon"><img src="trainingicon.png" alt="Training"></span><span>Training</span></a></li>
+                <li class="sidebar-dropdown">
+                <a href="#" id="predictiontab" data-tab="predicting"><span class="icon"><img src="predictionicon.png" alt="Prediction"></span><span>Prediction</span>
+                <span class="caret">▾</span>
+				</a>
+				<ul class="dropdown-menu" id="predictionMenu">
+					<li><a href="#" class="prediction-option" data-metric="height">Height</a></li>
+					<li><a href="#" class="prediction-option" data-metric="length">Length</a></li>
+					<li><a href="#" class="prediction-option" data-metric="width">Width</a></li>
+					<li><a href="#" class="prediction-option" data-metric="leaves">No. of Leaves</a></li>
+					<li><a href="#" class="prediction-option" data-metric="branches">No. of Branches</a></li>
+					</ul>
+                </li>	
+				<li><a href="#" data-tab="sensors"><span class="icon"><img src="sensorreadingsicon.png" alt="Sensor Readings"></span><span>Sensor Readings</span></a></li>
+				<li><a href="#" data-tab="calibrate"><span class="icon"><img src="Calibrateicon.png" alt="Calibrate"></span><span>Calibrate</span></a></li>
+				<li><a href="#" data-tab="manual"><span class="icon"><img src="manualicon.png" alt="Manual"></span><span>Manual</span></a></li>
+				<li><a href="#" data-tab="history"><span class="icon"><img src="historicon.png" alt="History"></span><span>History</span></a></li>
+				<li><a href="#" data-tab="logout"><span class="icon"><img src="logoutlogo.png" alt="Logout"></span><span>Logout</span></a></li>
+				
+			</ul>
+		</nav>
+	</aside>
+
+	<main class="main">
+		<section id="home" class="tab-content active">
+			<div class="dashboard-grid">
+				<div class="main-col">
+					<div class="sensor-cards card">
+                        <div class="card-header">Sensor Readings</div>
+						<div class="sensor" data-key="ph">
+							<div class="label">
+								<span>pH Level</span>
+								<img src="informationicon.png" alt="Info" class="info-icon" data-sensor="ph">
+							</div>
+                        <div class="value" id="val-ph"></div>
+						<div class="alert" id="alert-ph"></div></div>
+						<div class="sensor" data-key="do">
+							<div class="label">
+								<span>Dissolved Oxygen</span>
+								<img src="informationicon.png" alt="Info" class="info-icon" data-sensor="do">
+							</div>
+                        <div class="value" id="val-do"></div>
+						<div class="alert" id="alert-do"></div></div>
+						<div class="sensor" data-key="temp">
+							<div class="label">
+								<span>Temperature</span>
+								<img src="informationicon.png" alt="Info" class="info-icon" data-sensor="temp">
+							</div>
+                        <div class="value" id="val-temp"></div>
+						<div class="alert" id="alert-temp"></div></div>
+						<div class="sensor" data-key="hum">
+							<div class="label">
+								<span>Humidity</span>
+								<img src="informationicon.png" alt="Info" class="info-icon" data-sensor="hum">
+							</div>
+                        <div class="value" id="val-hum"></div>
+						<div class="alert" id="alert-hum"></div></div>
+						<div class="sensor" data-key="tds">
+							<div class="label">
+								<span>Total Dissolved Solids</span>
+								<img src="informationicon.png" alt="Info" class="info-icon" data-sensor="tds">
+							</div>
+                        <div class="value" id="val-tds"></div>
+						<div class="alert" id="alert-tds"></div></div>
+					</div>
+					<div class="actuator-card">
+						<div class="card-header actuator-header">
+							<span>Actuator Status</span>
+							<div class="override-toggle">
+								<span class="override-label">OVERRIDE:</span>
+								<label class="toggle-switch actuator-override">
+									<input type="checkbox" id="actuatorOverrideToggle">
+									<span class="toggle-slider"></span>
+									<span class="toggle-text">OFF</span>
+								</label>
+							</div>
+						</div>
+						<div class="actuators">
+							<div class="act">
+								<div>Misting Pump</div>
+								<label class="toggle-switch actuator-toggle">
+								<input type="checkbox" id="act-water" checked>
+									<span class="toggle-slider"></span>
+									<span class="toggle-text">ON</span>
+								</label>
+							</div>
+							<div class="act">
+								<div>Air Pump</div>
+								<label class="toggle-switch actuator-toggle">
+								<input type="checkbox" id="act-air">
+									<span class="toggle-slider"></span>
+									<span class="toggle-text">OFF</span>
+								</label>
+							</div>
+							<div class="act">
+								<div>Exhaust Fan (In)</div>
+								<label class="toggle-switch actuator-toggle">
+								<input type="checkbox" id="act-fan-in" checked>
+									<span class="toggle-slider"></span>
+									<span class="toggle-text">ON</span>
+								</label>
+							</div>
+							<div class="act">
+								<div>Exhaust Fan (Out)</div>
+								<label class="toggle-switch actuator-toggle">
+								<input type="checkbox" id="act-fan-out" checked>
+									<span class="toggle-slider"></span>
+									<span class="toggle-text">ON</span>
+								</label>
+							</div>
+							<div class="act">
+								<div>Grow Lights (Aerponics)</div>
+								<label class="toggle-switch actuator-toggle">
+								<input type="checkbox" id="act-lights-aerponics" checked>
+									<span class="toggle-slider"></span>
+									<span class="toggle-text">ON</span>
+								</label>
+							</div>
+							<div class="act">
+								<div>Grow Lights(DWC)</div>
+								<label class="toggle-switch actuator-toggle">
+								<input type="checkbox" id="act-lights-dwc" checked>
+									<span class="toggle-slider"></span>
+									<span class="toggle-text">ON</span>
+								</label>
+							</div>
+						</div>
+					</div>
+					<div class="nutrition-solution-card">
+						<div class="card-header">Nutrient Solution</div>
+						<div class="nutrient-grid">
+							<div class="nutrient-item">
+								<div class="nutrient-label">pH Up</div>
+								<button class="nutrient-btn" id="btn-ph-up" aria-label="Activate pH Up"></button>
+							</div>
+							<div class="nutrient-item">
+								<div class="nutrient-label">pH Down</div>
+								<button class="nutrient-btn" id="btn-ph-down" aria-label="Activate pH Down"></button>
+							</div>
+							<div class="nutrient-item">
+								<div class="nutrient-label">Leafy Green</div>
+								<button class="nutrient-btn" id="btn-leafy-green" aria-label="Activate Leafy Green"></button>
+							</div>
+						</div>
+					</div>
+
+                    <div class="card comparison-graph-card">
+                        <div class="graph-header">
+                            <div class="card-header">Growth Comparison</div>
+                            <div class="time-period-buttons">
+                                <button class="time-btn active" data-days="1">1 Day</button>
+                                <button class="time-btn" data-days="2">2 Days</button>
+                                <button class="time-btn" data-days="7">7 Days</button>
+                                <button class="time-btn" data-days="14">14 Days</button>
+                                <button class="time-btn" data-days="30">30 Days</button>
+                            </div>
+                        </div>
+                        <div class="graph-legend">
+                            <div class="legend-item">
+                                <span class="legend-color" style="background: #4CAF50;"></span>
+                                <span>Aeroponic</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-color" style="background: #2196F3;"></span>
+                                <span>Deep Water Culture</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-color" style="background: #FF9800;"></span>
+                                <span>Traditional</span>
+                            </div>
+                        </div>
+                        <div class="graph-container">
+                            <canvas id="comparisonGraph"></canvas>
+                            <div id="graphTooltip" class="graph-tooltip"></div>
+                        </div>
+                    </div>
+						<!-- Notification Container -->
+					<div id="notificationContainer" class="notification-container"></div>
+					<!-- Notifications will appear as popups on the side -->
+					 
+				<!-- Threshold Information Modal -->
+			<div id="thresholdModal" class="threshold-modal">
+			<div class="threshold-modal-content">
+			<div class="threshold-modal-header">
+				<h3 id="thresholdTitle">Sensor Thresholds</h3>
+				<button class="threshold-close" id="thresholdClose">&times;</button>
+			</div>
+			<div class="threshold-modal-body">
+				<div class="threshold-item neutral-threshold">
+					<div class="threshold-indicator neutral-indicator"></div>
+					<div class="threshold-info">
+						<div class="threshold-label">Optimal Range</div>
+						<div class="threshold-range" id="thresholdNeutral">-</div>
+					</div>
+				</div>
+				<div class="threshold-item normal-threshold">
+					<div class="threshold-indicator normal-indicator"></div>
+					<div class="threshold-info">
+						<div class="threshold-label">Acceptable Range</div>
+						<div class="threshold-range" id="thresholdNormal">-</div>
+					</div>
+				</div>
+				<div class="threshold-item dangerous-threshold">
+					<div class="threshold-indicator dangerous-indicator"></div>
+					<div class="threshold-info">
+						<div class="threshold-label">Critical Range</div>
+						<div class="threshold-range" id="thresholdDangerous">-</div>
+					</div>
+				</div>
+			</div>
+			<div class="threshold-modal-footer">
+				<div class="threshold-unit" id="thresholdUnit"></div>
+			</div>
+				</div>
+			</div>
+				
+				
+				</div>
+				
+			</div>
+		</section>
+
+		<section id="training" class="tab-content">
+				<div class="training-header">
+				<ul class="training-tabs">
+					<li class="training-tab-btn active" data-sensor="training-aero">Aeroponics</li>
+					<li class="training-tab-btn" data-sensor="training-dwc">Deep Water Culture</li>
+					<li class="training-tab-btn" data-sensor="training-trad">Traditional</li>
+				</ul>	
+				<div class="inline-actions">
+					<button id="clear" class="clear-btn">Clear</button>
+					<button id="submit-btn" class="submit-btn">Submit</button>
+				</div>
+			</div>
+			<div class="training-side-by-side">
+					<div class="aeroponics-params card params-card" id="aeroponicsParams">
+						<div class="card-header">
+						<span>Aeroponics</span>
+						</div>
+                    
+						<div id="aeroponicsPlantsList">
+						<!-- Single Aeroponics card containing six plant rows -->
+						<div class="sensor-input-card1" data-sensor="all">
+							<!-- Row 1 -->
+							<div class="sensor-inputs-row1">
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">1</span></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+							</div>
+							<!-- Row 2 -->
+							<div class="sensor-inputs-row1">
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1"></span><span class="sensor-number-display1">2</span></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+							</div>
+							<!-- Row 3 -->
+							<div class="sensor-inputs-row1">
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1"></span><span class="sensor-number-display1">3</span></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+							</div>
+							<!-- Row 4 -->
+							<div class="sensor-inputs-row1">
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1"></span><span class="sensor-number-display1">4</span></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+							</div>
+							<!-- Row 5 -->
+							<div class="sensor-inputs-row1">
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1"></span><span class="sensor-number-display1">5</span></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+							</div>
+							<!-- Row 6 -->
+							<div class="sensor-inputs-row1">
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1"></span><span class="sensor-number-display1">6</span></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+								<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+							</div>
+						</div>
+						</div>
+						
+					 </div>
+					
+					
+					
+					
+				
+				
+					<div class="dwc-params card params-card" id="dwcParams">
+						<div class="card-header">
+							<span>Deep Water Culture</span>
+						</div>
+						
+						<div id="dwcPlantsList">
+							<!-- Single DWC card containing six plant rows -->
+							<div class="sensor-input-card1" data-sensor="all">
+								<!-- Row 1 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">1</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 2 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1"></span><span class="sensor-number-display1">2</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 3 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1"></span><span class="sensor-number-display1">3</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 4 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1"></span><span class="sensor-number-display1">4</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 5 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1"></span><span class="sensor-number-display1">5</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 6 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1"></span><span class="sensor-number-display1">6</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+									</div>
+								</div>
+							</div>
+						</div>
+						
+
+						<div class="traditional-params card params-card" id="traditionalParams">
+						<div class="card-header">
+							<span>Traditional Farming</span>
+						</div>
+
+							
+						
+						<div id="traditionalPlantsList">
+							<!-- Single Traditional card containing six plant rows -->
+							<div class="sensor-input-card1" data-sensor="all">
+								<!-- Row 1 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No</span><span class="sensor-number-display1">1</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 2 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1"></span><span class="sensor-number-display1">2</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 3 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1"></span><span class="sensor-number-display1">3</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 4 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1"></span><span class="sensor-number-display1">4</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 5 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1"></span><span class="sensor-number-display1">5</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+								<!-- Row 6 -->
+								<div class="sensor-inputs-row1">
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1"></span><span class="sensor-number-display1">6</span></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Height</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="height"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Length</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="length"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">Width</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="width"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Leaves</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="leaves"></label></div>
+									<div class="sensor-column1"><label class="sensor-input-label1"><span class="sensor-label-text1">No. of Branches</span><input type="number" step="0.1" class="sensor-input1" data-sensor="all" data-field="branches"></label></div>
+								</div>
+							</div>
+						</div>
+					</div>			
+			</div>
+			</div>
+							
+			
+		</section>
+			
+		<!-- Validation Error Modal -->
+		<div id="validationErrorModal" class="validation-error-modal" style=" display: none;">
+			<div id="validationConnector" class="validation-connector"></div>
+			<div class="validation-error-content">
+				<div class="validation-error-header">
+					<h3>⚠️ Missing Values</h3>
+					<button class="validation-close-btn" id="validationErrorClose">&times;</button>
+				</div>
+				<div class="validation-error-body">
+					<p>Please fill in all values before submitting.</p>
+				</div>
+				<div class="validation-error-footer">
+					<button class="validation-ok-btn" id="validationErrorClose2">OK</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Success Modal for Training -->
+		<div id="successModal" class="success-modal simple-success-modal" style=" display: none;">
+			<div class="success-modal-content">
+				<div class="simple-success-icon">✓</div>
+				<div class="simple-success-text">Successfully Submitted</div>
+			</div>
+		</div>
+
+		<!-- Success Modal for Prediction -->
+		<div id="predictionSuccessModal" class="success-modal simple-success-modal" style=" display: none;">
+			<div class="success-modal-content">
+				<div class="simple-success-text">Successfully Submitted</div>
+				<div class="simple-success-icon">✓</div>
+			</div>
+		</div>
+
+	
+		<section id="predicting" class="tab-content">
+		<div class="aero-dwc-header">
+				<ul class="calibrate-tabs">
+					<li class="calibrate-tab-btn active aero-dwc-tab-btn" data-sensor="aeroponicssystem">Aeroponics</li>
+					<li class="calibrate-tab-btn aero-dwc-tab-btn" data-sensor="deepwaterculturesystem">Deep Water Culture</li>
+				</ul>
+				<button class="btn submit-all-pred-btn" id="submitAllPredBtn">SUBMIT</button>
+			</div>
+	
+		<div class="prediction-graphs-two-column">
+			<div id="aeroponicsContainer" class="farming-method-container active"> 
+				<div id="plantsGraphsContainer-aeroponics" class="plants-graphs-container">
+					<!-- Aeroponics plant graphs will be generated here -->
+					<!-- Example static template (one plant) -->
+					<div class="plant-graph-card">
+						<div class="card-header">Plant 1</div>
+						<div class="metrics-row">
+							<div class="metric-card">
+								<div class="metric-label">NO OF LEAVES</div>
+								<div class="metric-value" data-metric="leaves" data-value="leaves"></div>
+							</div>
+							<div class="metric-card">
+								<div class="metric-label">NO OF BRANCHES</div>
+								<div class="metric-value" data-metric="branches" data-value="branches"></div>
+							</div>
+							<div class="metric-card">
+								<div class="metric-label">HEIGHT</div>
+								<div class="metric-value" data-metric="height" data-value="height"></div>
+							</div>
+							<div class="metric-card">
+								<div class="metric-label">WEIGHT</div>
+								<div class="metric-value" data-metric="width" data-value="width"></div>
+							</div>
+							<div class="metric-card">
+								<div class="metric-label">LENGTH</div>
+								<div class="metric-value" data-metric="length" data-value="length"></div>
+							</div>
+						</div>
+						<canvas id="plant-1-aeroponics-graph" class="plant-graph-canvas" width="600" height="300"></canvas>
+						<div class="prediction-input-panel">
+							<div class="inputs-row">
+								<div class="input-group-mini"><label class="input-mini-label">NO OF LEAVES<input type="number" step="0.1" class="prediction-input" data-metric="leaves"></label></div>
+								<div class="input-group-mini"><label class="input-mini-label">NO OF BRANCHES<input type="number" step="0.1" class="prediction-input" data-metric="branches"></label></div>
+								<div class="input-group-mini"><label class="input-mini-label">HEIGHT<input type="number" step="0.1" class="prediction-input" data-metric="height"></label></div>
+								<div class="input-group-mini"><label class="input-mini-label">WEIGHT<input type="number" step="0.1" class="prediction-input" data-metric="width"></label></div>
+								<div class="input-group-mini"><label class="input-mini-label">LENGTH<input type="number" step="0.1" class="prediction-input" data-metric="length"></label></div>
+							</div>
+							<div class="controls-row">
+								<div class="canvas-legend">
+									<div class="legend-item"><span class="legend-swatch actual"></span><span>Actual</span></div>
+									<div class="legend-item"><span class="legend-swatch predicted"></span><span>Predicted</span></div>
+								</div>
+							</div>
+						</div>
+						<button class="btn show-all-btn" aria-label="Show all data">Show all</button>
+					</div>
+				</div>
+				
+			</div>
+			<div id="dwcContainer" class="farming-method-container"> 
+				<div id="plantsGraphsContainer-dwc" class="plants-graphs-container"> 
+					<!-- DWC plant graphs will be generated here -->
+					<!-- Example static template (one plant) -->
+					<div class="plant-graph-card">
+						<div class="card-header">Plant 1</div>
+						<div class="metrics-row">
+							<div class="metric-card">
+								<div class="metric-label">NO OF LEAVES</div>
+								<div class="metric-value" data-metric="leaves" data-value="leave"></div>
+							</div>
+							<div class="metric-card">
+								<div class="metric-label">NO OF BRANCHES</div>
+								<div class="metric-value" data-metric="branches" data-value="branch"></div>
+							</div>
+							<div class="metric-card">
+								<div class="metric-label">HEIGHT</div>
+								<div class="metric-value" data-metric="height" data-value="height"></div>
+							</div>
+							<div class="metric-card">
+								<div class="metric-label">WEIGHT</div>
+								<div class="metric-value" data-metric="width" data-value="width"></div>
+							</div>
+							<div class="metric-card">
+								<div class="metric-label">LENGTH</div>
+								<div class="metric-value" data-metric="length" data-value="length"></div>
+							</div>
+						</div>
+						<canvas id="plant-1-dwc-graph" class="plant-graph-canvas" width="600" height="250"></canvas>
+						<div class="prediction-input-panel">
+							<div class="inputs-row">
+								<div class="input-group-mini"><label class="input-mini-label">NO OF LEAVES<input type="number" step="0.1" class="prediction-input" data-metric="leaves"></label></div>
+								<div class="input-group-mini"><label class="input-mini-label">NO OF BRANCHES<input type="number" step="0.1" class="prediction-input" data-metric="branches"></label></div>
+								<div class="input-group-mini"><label class="input-mini-label">HEIGHT<input type="number" step="0.1" class="prediction-input" data-metric="height"></label></div>
+								<div class="input-group-mini"><label class="input-mini-label">WEIGHT<input type="number" step="0.1" class="prediction-input" data-metric="width"></label></div>
+								<div class="input-group-mini"><label class="input-mini-label">LENGTH<input type="number" step="0.1" class="prediction-input" data-metric="length"></label></div>
+							</div>
+							<div class="controls-row">
+								<div class="canvas-legend">
+									<div class="legend-item"><span class="legend-swatch actual"></span><span>Actual</span></div>
+									<div class="legend-item"><span class="legend-swatch predicted"></span><span>Predicted</span></div>
+								</div>
+							</div>
+						</div> 
+						<button class="btn show-all-btn" aria-label="Show all data">Show all</button>
+						</div>
+			</div>
+		</div>
+		
+		</section>
+			
+		
+		
+		<section id="sensors" class="tab-content">
+			<h2>Sensor Readings</h2>
+
+				<div class="sensor-graphs-grid">
+				<div class="sensor-graph-card">
+					<div class="sensor-graph-header">pH Level</div>
+					<div class="sensor-graph-canvas-wrapper">
+						<canvas id="sensorGraph-ph" class="sensor-graph-canvas"></canvas>
+					</div>
+				</div>
+				<div class="sensor-graph-card">
+					<div class="sensor-graph-header">Dissolved Oxygen</div>
+					<div class="sensor-graph-canvas-wrapper">
+						<canvas id="sensorGraph-do" class="sensor-graph-canvas"></canvas>
+					</div>
+				</div>
+				<div class="sensor-graph-card">
+					<div class="sensor-graph-header">Total Dissolved Solids</div>
+					<div class="sensor-graph-canvas-wrapper">
+						<canvas id="sensorGraph-tds" class="sensor-graph-canvas"></canvas>
+					</div>
+				</div>
+				<div class="sensor-graph-card">
+					<div class="sensor-graph-header">Temperature</div>
+					<div class="sensor-graph-canvas-wrapper">
+						<canvas id="sensorGraph-temp" class="sensor-graph-canvas"></canvas>
+					</div>
+				</div>
+				</div>
+			
+			<div class="sensor-graph-card sensor-graph-card-full">
+				<div class="sensor-graph-header">Humidity</div>
+				<div class="sensor-graph-canvas-wrapper">
+					<canvas id="sensorGraph-hum" class="sensor-graph-canvas"></canvas>
+				</div>
+			</div>
+		</section>
+
+		<!-- Manual Control Tab (Relay Controls) -->
+		<section id="manual" class="tab-content">
+			<div class="manual-header">
+				<h2>Manual Actuator Control</h2>
+				<p>Control relays directly from here</p>
+			</div>
+			
+			<div class="relay-control-grid">
+				<!-- Relay 1: Misting Pump -->
+				<div class="relay-card" data-relay-id="1">
+					<div class="relay-header">
+						<h3>Misting Pump</h3>
+					</div>
+					<div class="relay-body">
+						<div class="relay-state state-off">OFF</div>
+						<button class="relay-toggle-btn">Toggle</button>
+					</div>
+				</div>
+
+				<!-- Relay 2: Air Pump -->
+				<div class="relay-card" data-relay-id="2">
+					<div class="relay-header">
+						<h3>Air Pump</h3>
+					</div>
+					<div class="relay-body">
+						<div class="relay-state state-off">OFF</div>
+						<button class="relay-toggle-btn">Toggle</button>
+					</div>
+				</div>
+
+				<!-- Relay 3: Exhaust Fan (In) -->
+				<div class="relay-card" data-relay-id="3">
+					<div class="relay-header">
+						<h3>Exhaust Fan (In)</h3>
+					</div>
+					<div class="relay-body">
+						<div class="relay-state state-off">OFF</div>
+						<button class="relay-toggle-btn">Toggle</button>
+					</div>
+				</div>
+
+				<!-- Relay 4: Exhaust Fan (Out) -->
+				<div class="relay-card" data-relay-id="4">
+					<div class="relay-header">
+						<h3>Exhaust Fan (Out)</h3>
+					</div>
+					<div class="relay-body">
+						<div class="relay-state state-off">OFF</div>
+						<button class="relay-toggle-btn">Toggle</button>
+					</div>
+				</div>
+
+				<!-- Relay 5: Grow Lights (Aeroponics) -->
+				<div class="relay-card" data-relay-id="5">
+					<div class="relay-header">
+						<h3>Grow Lights (Aeroponics)</h3>
+					</div>
+					<div class="relay-body">
+						<div class="relay-state state-off">OFF</div>
+						<button class="relay-toggle-btn">Toggle</button>
+					</div>
+				</div>
+
+				<!-- Relay 6: Grow Lights (DWC) -->
+				<div class="relay-card" data-relay-id="6">
+					<div class="relay-header">
+						<h3>Grow Lights (DWC)</h3>
+					</div>
+					<div class="relay-body">
+						<div class="relay-state state-off">OFF</div>
+						<button class="relay-toggle-btn">Toggle</button>
+					</div>
+				</div>
+
+				<!-- Relay 7: pH Up -->
+				<div class="relay-card" data-relay-id="7">
+					<div class="relay-header">
+						<h3>pH Up</h3>
+					</div>
+					<div class="relay-body">
+						<div class="relay-state state-off">OFF</div>
+						<button class="relay-toggle-btn">Toggle</button>
+					</div>
+				</div>
+
+				<!-- Relay 8: pH Down -->
+				<div class="relay-card" data-relay-id="8">
+					<div class="relay-header">
+						<h3>pH Down</h3>
+					</div>
+					<div class="relay-body">
+						<div class="relay-state state-off">OFF</div>
+						<button class="relay-toggle-btn">Toggle</button>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section id="calibrate" class="tab-content calibrate-tab">
+			<h2>Sensor Calibration</h2>
+			
+			<!-- Sensor Selection Tabs -->
+			<div class="calibrate-header">
+				<ul class="calibrate-tabs">
+					<li class="calibrate-tab-btn active" data-sensor="ph">pH Level</li>
+					<li class="calibrate-tab-btn" data-sensor="do">Dissolved Oxygen</li>
+					<li class="calibrate-tab-btn" data-sensor="tds">TDS</li>
+				</ul>	
+			</div>
+
+			<!-- ========== pH CALIBRATION ========== -->
+			<div class="simple-cal-panel" data-sensor-type="ph">
+				<div class="cal-status-card">
+					<div class="cal-status-header">
+						<span class="cal-status-title">Current Calibration</span>
+						<span class="cal-status-badge" id="phCalStatus">Not Calibrated</span>
+					</div>
+					<div class="cal-status-values">
+						<div class="cal-stat"><span class="cal-stat-label">Slope</span><span class="cal-stat-value" id="phCurrentSlope">--</span></div>
+						<div class="cal-stat"><span class="cal-stat-label">Offset</span><span class="cal-stat-value" id="phCurrentOffset">--</span></div>
+					</div>
+				</div>
+
+				<div class="cal-live-card">
+					<div class="cal-live-header">Live Voltage Reading</div>
+					<div class="cal-live-value" id="phLiveVoltage">-- V</div>
+					<div class="cal-live-hint">Updates every 2 seconds</div>
+				</div>
+
+				<div class="cal-points-card">
+					<div class="cal-points-header">
+						<span>Calibration Points</span>
+						<select id="phPointMode" class="cal-point-select">
+							<option value="2">2-Point (Recommended)</option>
+							<option value="3">3-Point (Most Accurate)</option>
+						</select>
+					</div>
+
+					<div class="cal-temp-row">
+						<label>Water Temperature:</label>
+						<input type="number" id="phBufferTemp" value="25" step="0.1" class="cal-temp-input"> °C
+					</div>
+
+					<!-- Point 1: pH 4.00 -->
+					<div class="cal-point" id="phPoint1">
+						<div class="cal-point-header">
+							<span class="cal-point-num">1</span>
+							<span class="cal-point-label">pH 4.00 Buffer</span>
+							<span class="cal-point-status" id="phPoint1Status">Waiting</span>
+						</div>
+						<div class="cal-point-body">
+							<div class="cal-point-voltage">Captured: <span id="phPoint1Voltage">--</span> V</div>
+							<button class="cal-capture-btn" id="phCapture1">Capture pH 4.00</button>
+						</div>
+					</div>
+
+					<!-- Point 2: pH 6.86 -->
+					<div class="cal-point" id="phPoint2">
+						<div class="cal-point-header">
+							<span class="cal-point-num">2</span>
+							<span class="cal-point-label">pH 6.86 Buffer</span>
+							<span class="cal-point-status" id="phPoint2Status">Waiting</span>
+						</div>
+						<div class="cal-point-body">
+							<div class="cal-point-voltage">Captured: <span id="phPoint2Voltage">--</span> V</div>
+							<button class="cal-capture-btn" id="phCapture2">Capture pH 6.86</button>
+						</div>
+					</div>
+
+					<!-- Point 3: pH 9.18 (optional) -->
+					<div class="cal-point" id="phPoint3" style="display:none;">
+						<div class="cal-point-header">
+							<span class="cal-point-num">3</span>
+							<span class="cal-point-label">pH 9.18 Buffer</span>
+							<span class="cal-point-status" id="phPoint3Status">Waiting</span>
+						</div>
+						<div class="cal-point-body">
+							<div class="cal-point-voltage">Captured: <span id="phPoint3Voltage">--</span> V</div>
+							<button class="cal-capture-btn" id="phCapture3">Capture pH 9.18</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="cal-result-card" id="phResultCard" style="display:none;">
+					<div class="cal-result-header">Calibration Result</div>
+					<div class="cal-result-values">
+						<div class="cal-result-item"><span>Slope:</span><span id="phNewSlope">--</span></div>
+						<div class="cal-result-item"><span>Offset:</span><span id="phNewOffset">--</span></div>
+					</div>
+				</div>
+
+				<div class="cal-actions">
+					<button class="cal-btn cal-btn-secondary" id="phClearBtn">Clear</button>
+					<button class="cal-btn cal-btn-primary" id="phApplyBtn" disabled>Apply Calibration</button>
+				</div>
+			</div>
+
+			<!-- ========== DO CALIBRATION ========== -->
+			<div class="simple-cal-panel" data-sensor-type="do" style="display:none;">
+				<div class="cal-status-card">
+					<div class="cal-status-header">
+						<span class="cal-status-title">Current Calibration</span>
+						<span class="cal-status-badge" id="doCalStatus">Not Calibrated</span>
+					</div>
+					<div class="cal-status-values">
+						<div class="cal-stat"><span class="cal-stat-label">Slope</span><span class="cal-stat-value" id="doCurrentSlope">--</span></div>
+						<div class="cal-stat"><span class="cal-stat-label">Offset</span><span class="cal-stat-value" id="doCurrentOffset">--</span></div>
+					</div>
+				</div>
+
+				<div class="cal-live-card">
+					<div class="cal-live-header">Live Voltage Reading</div>
+					<div class="cal-live-value" id="doLiveVoltage">-- V</div>
+					<div class="cal-live-hint">Updates every 2 seconds</div>
+				</div>
+
+				<div class="cal-points-card">
+					<div class="cal-points-header">
+						<span>Calibration Points</span>
+						<select id="doPointMode" class="cal-point-select">
+							<option value="1">1-Point (Air Saturation)</option>
+							<option value="2">2-Point (Air + Zero)</option>
+						</select>
+					</div>
+
+					<div class="cal-temp-row">
+						<label>Water Temperature:</label>
+						<input type="number" id="doBufferTemp" value="25" step="0.1" class="cal-temp-input"> °C
+					</div>
+
+					<!-- Point 1: 100% Saturation -->
+					<div class="cal-point" id="doPoint1">
+						<div class="cal-point-header">
+							<span class="cal-point-num">1</span>
+							<span class="cal-point-label">Air-Saturated Water (100%)</span>
+							<span class="cal-point-status" id="doPoint1Status">Waiting</span>
+						</div>
+						<div class="cal-point-body">
+							<div class="cal-point-voltage">Captured: <span id="doPoint1Voltage">--</span> V</div>
+							<button class="cal-capture-btn" id="doCapture1">Capture 100%</button>
+						</div>
+					</div>
+
+					<!-- Point 2: 0% (optional) -->
+					<div class="cal-point" id="doPoint2" style="display:none;">
+						<div class="cal-point-header">
+							<span class="cal-point-num">2</span>
+							<span class="cal-point-label">Zero Oxygen Solution (0%)</span>
+							<span class="cal-point-status" id="doPoint2Status">Waiting</span>
+						</div>
+						<div class="cal-point-body">
+							<div class="cal-point-voltage">Captured: <span id="doPoint2Voltage">--</span> V</div>
+							<button class="cal-capture-btn" id="doCapture2">Capture 0%</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="cal-result-card" id="doResultCard" style="display:none;">
+					<div class="cal-result-header">Calibration Result</div>
+					<div class="cal-result-values">
+						<div class="cal-result-item"><span>Slope:</span><span id="doNewSlope">--</span></div>
+						<div class="cal-result-item"><span>Offset:</span><span id="doNewOffset">--</span></div>
+					</div>
+				</div>
+
+				<div class="cal-actions">
+					<button class="cal-btn cal-btn-secondary" id="doClearBtn">Clear</button>
+					<button class="cal-btn cal-btn-primary" id="doApplyBtn" disabled>Apply Calibration</button>
+				</div>
+			</div>
+
+			<!-- ========== TDS CALIBRATION ========== -->
+			<div class="simple-cal-panel" data-sensor-type="tds" style="display:none;">
+				<div class="cal-status-card">
+					<div class="cal-status-header">
+						<span class="cal-status-title">Current Calibration</span>
+						<span class="cal-status-badge" id="tdsCalStatus">Not Calibrated</span>
+					</div>
+					<div class="cal-status-values">
+						<div class="cal-stat"><span class="cal-stat-label">Slope</span><span class="cal-stat-value" id="tdsCurrentSlope">--</span></div>
+						<div class="cal-stat"><span class="cal-stat-label">Offset</span><span class="cal-stat-value" id="tdsCurrentOffset">--</span></div>
+					</div>
+				</div>
+
+				<div class="cal-live-card">
+					<div class="cal-live-header">Live Voltage Reading</div>
+					<div class="cal-live-value" id="tdsLiveVoltage">-- V</div>
+					<div class="cal-live-hint">Updates every 2 seconds</div>
+				</div>
+
+				<div class="cal-points-card">
+					<div class="cal-points-header">
+						<span>Calibration Points</span>
+						<select id="tdsPointMode" class="cal-point-select">
+							<option value="1">1-Point</option>
+							<option value="2">2-Point</option>
+						</select>
+					</div>
+
+					<div class="cal-temp-row">
+						<label>Water Temperature:</label>
+						<input type="number" id="tdsBufferTemp" value="25" step="0.1" class="cal-temp-input"> °C
+					</div>
+
+					<!-- Point 1 -->
+					<div class="cal-point" id="tdsPoint1">
+						<div class="cal-point-header">
+							<span class="cal-point-num">1</span>
+							<span class="cal-point-label">Standard Solution</span>
+							<span class="cal-point-status" id="tdsPoint1Status">Waiting</span>
+						</div>
+						<div class="cal-point-body">
+							<input type="number" id="tdsStandard1" placeholder="Enter ppm (e.g. 1000)" class="cal-standard-input">
+							<div class="cal-point-voltage">Captured: <span id="tdsPoint1Voltage">--</span> V</div>
+							<button class="cal-capture-btn" id="tdsCapture1">Capture</button>
+						</div>
+					</div>
+
+					<!-- Point 2 (optional) -->
+					<div class="cal-point" id="tdsPoint2" style="display:none;">
+						<div class="cal-point-header">
+							<span class="cal-point-num">2</span>
+							<span class="cal-point-label">Second Standard</span>
+							<span class="cal-point-status" id="tdsPoint2Status">Waiting</span>
+						</div>
+						<div class="cal-point-body">
+							<input type="number" id="tdsStandard2" placeholder="Enter ppm (e.g. 500)" class="cal-standard-input">
+							<div class="cal-point-voltage">Captured: <span id="tdsPoint2Voltage">--</span> V</div>
+							<button class="cal-capture-btn" id="tdsCapture2">Capture</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="cal-result-card" id="tdsResultCard" style="display:none;">
+					<div class="cal-result-header">Calibration Result</div>
+					<div class="cal-result-values">
+						<div class="cal-result-item"><span>Slope:</span><span id="tdsNewSlope">--</span></div>
+						<div class="cal-result-item"><span>Offset:</span><span id="tdsNewOffset">--</span></div>
+					</div>
+				</div>
+
+				<div class="cal-actions">
+					<button class="cal-btn cal-btn-secondary" id="tdsClearBtn">Clear</button>
+					<button class="cal-btn cal-btn-primary" id="tdsApplyBtn" disabled>Apply Calibration</button>
+				</div>
+			</div>
+
+			<!-- Success Modal -->
+			<div class="cal-modal" id="calSuccessModal" style="display:none;">
+				<div class="cal-modal-content">
+					<div class="cal-modal-icon">✅</div>
+					<div class="cal-modal-title">Calibration Saved!</div>
+					<div class="cal-modal-msg" id="calSuccessMsg">pH calibration applied successfully.</div>
+					<button class="cal-btn cal-btn-primary" onclick="document.getElementById('calSuccessModal').style.display='none'">OK</button>
+				</div>
+			</div>
+		</section>
+
+		<section id="history" class="tab-content">
+			<div class="history-board">
+				<ul class="calibrate-tabs" id="historyTabs">
+					<li class="calibrate-tab-btn active" data-history-tab="aero" id="historyTabAero">Aeroponics</li>
+					<li class="calibrate-tab-btn" data-history-tab="dwc" id="historyTabDwc">Deep Water Culture</li>
+					<li class="calibrate-tab-btn" data-history-tab="trad" id="historyTabTrad">Traditional</li>
+				</ul>
+
+				<div class="history-filters">
+					<div class="history-plant-pills" aria-label="Plant selector">
+						<span class="history-label">Plant No.:</span>
+						<span class="history-pill active">1</span>
+						<span class="history-pill">2</span>
+						<span class="history-pill">3</span>
+						<span class="history-pill">4</span>
+						<span class="history-pill">5</span>
+						<span class="history-pill">6</span>
+					</div>
+					<div class="history-frequency" >
+						<button class="history-chip active">Daily</button>
+						<button class="history-chip">15-min</button>
+					</div>
+				</div>
+
+				<div class="history-table-wrap" data-history-view="sensor">
+					<table class="history-table">
+						<thead>
+							<tr class="history-head-group">
+								<th colspan="6" class="group sensor">Sensor Readings</th>
+								<th colspan="5" class="group plant">Plant Readings</th>
+							</tr>
+							<tr class="history-head-cols">
+								<th>Timestamp</th>
+								<th>pH Level</th>
+								<th>Dissolved Oxygen</th>
+								<th>Total Dissolved Solids</th>
+								<th>Temperature</th>
+								<th>Humidity</th>
+								<th>No. of Leaves</th>
+								<th>No. of Branches</th>
+								<th>Weight</th>
+								<th>Length</th>
+								<th>Height</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr><td colspan="11" class="history-empty">No data yet. Select a plant and interval to view history.</td></tr>
+						</tbody>
+					</table>
+
+				</div>
+
+				<div class="history-table-wrap" data-history-view="plant">
+					<table class="history-table">
+						<thead>
+							<tr class="history-head-group">
+								<th colspan="5" class="group plant">Plant Readings</th>
+							</tr>
+							<tr class="history-head-cols">
+								<th>No. of Leaves</th>
+								<th>No. of Branches</th>
+								<th>Weight</th>
+								<th>Length</th>
+								<th>Height</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr><td colspan="11" class="history-empty">No data yet. Select a plant and interval to view history.</td></tr>
+						</tbody>
+					</table>
+			</div>
+		</section>
+	
+		<!-- Logout Confirmation Modal -->
+		<div id="logoutModal" class="logout-modal" style="display: none;">
+			<div class="logout-modal-content">
+				<div class="logout-modal-header">
+					<div class="logout-title">
+						<h3>Sign out</h3>
+					</div>
+				</div>
+				<div class="logout-modal-body">
+					<p>Are you sure you want to logout? Any unsaved changes will be lost.</p>
+				</div>
+				<div class="logout-modal-footer">
+					<button class="logout-cancel-btn" id="logoutCancel">Cancel</button>
+					<button class="logout-confirm-btn" id="logoutConfirm">Sign out</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Calibration Validation Modal -->
+		<div id="calibrationValidationModal" class="calibration-validation-modal" style="display: none;">
+			<div class="calibration-validation-content">
+				<div class="calibration-validation-header">
+					<h3>⚠️ Missing Values</h3>
+					<button class="calibration-validation-close" id="calibrationValidationClose">&times;</button>
+				</div>
+				<div class="calibration-validation-body">
+					<p id="calibrationValidationMessage">Please fill in all values before proceeding.</p>
+				</div>
+				<div class="calibration-validation-footer">
+					<button class="calibration-validation-ok-btn" id="calibrationValidationOk">OK</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Calibration Confirmation Modal -->
+		<div id="calibrationConfirmModal" class="calibration-validation-modal" style="display: none;">
+			<div class="calibration-validation-content">
+				<div class="calibration-validation-header">
+					<h3>⚠️ Confirm Calibration Update</h3>
+					<button class="calibration-validation-close" id="calibrationConfirmClose">&times;</button>
+				</div>
+				<div class="calibration-validation-body">
+					<p>Are you sure you want to update calibration?</p>
+					<p style="margin-top: 10px; font-size: 0.95em; color: #666;">This will turn off the calibration mode.</p>
+				</div>
+				<div class="calibration-validation-footer">
+					<button class="calibration-validation-ok-btn" id="calibrationConfirmCancel" style="background: #666;">Cancel</button>
+					<button class="calibration-validation-ok-btn" id="calibrationConfirmOk">Confirm</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Show All Modal (large chart for full-range view) -->
+		<div id="showAllModal" class="validation-error-modal" style="display: none;">
+			<div class="validation-error-content" style="max-width:1100px;">
+				<div class="validation-error-header">
+					<h3 id="showAllTitle">Plant Data</h3>
+					
+				</div>
+				<div class="validation-error-body" style="padding:12px;">
+					<div class="show-all-table-wrapper" style="height:288px; overflow:auto;">
+						<table id="showAllTable" style="width:100%; border-collapse:collapse;">
+							<thead>
+								<tr style="background:#f7faf7;">
+									<th style="text-align:left; padding:10px; border-bottom:1px solid #e8f0e8;">Date</th>
+									<th style="text-align:right; padding:10px; border-bottom:1px solid #e8f0e8;">Actual</th>
+									<th style="text-align:right; padding:10px; border-bottom:1px solid #e8f0e8;">Predicted</th>
+								</tr>
+							</thead>
+							<tbody>
+							</tbody>
+						</table>
+					</div>
+				</div>
+				<div class="validation-error-footer">
+					<button class="validation-ok-btn" id="showAllOk">Close</button>
+				</div>
+			</div>
+		</div>
+
+	<!-- Calibration Success Modal -->
+	<div id="calSuccessModal" class="cal-modal" style="display:none;">
+		<div class="cal-modal-content">
+			<div class="cal-modal-icon">✅</div>
+			<h3>Calibration Saved!</h3>
+			<p id="calSuccessMsg">Calibration has been saved successfully.</p>
+			<button class="cal-modal-close" onclick="document.getElementById('calSuccessModal').style.display='none'">OK</button>
+		</div>
+	</div>
+
+		<script src="index.js"></script>
+</body>
+
+</html>
+

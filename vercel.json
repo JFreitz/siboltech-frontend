@@ -1,6 +1,9 @@
 {
   "buildCommand": "",
-  "outputDirectory": "dashboard",
+  "outputDirectory": ".",
   "framework": null,
-  "installCommand": ""
+  "installCommand": "",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
