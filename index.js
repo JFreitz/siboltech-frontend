@@ -1164,29 +1164,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			
 			tbody.innerHTML = rows;
 		};
-				return `
-					<tr>
-						<td>${new Date(row.timestamp).toLocaleString()}</td>
-						<td>${relayStates[0]}</td>
-						<td>${relayStates[1]}</td>
-						<td>${relayStates[2]}</td>
-						<td>${relayStates[3]}</td>
-						<td>${relayStates[4]}</td>
-						<td>${relayStates[5]}</td>
-						<td>${relayStates[6]}</td>
-						<td>${relayStates[7]}</td>
-						<td>${relayStates[8]}</td>
-						<td>${row.ph !== null ? row.ph.toFixed(2) : '-'}</td>
-						<td>${row.do !== null ? row.do.toFixed(2) : '-'}</td>
-						<td>${row.tds !== null ? row.tds.toFixed(0) : '-'}</td>
-						<td>${row.temperature !== null ? row.temperature.toFixed(1) : '-'}</td>
-						<td>${row.humidity !== null ? row.humidity.toFixed(1) : '-'}</td>
-					</tr>
-				`;
-			}).join('');
-			
-			tbody.innerHTML = rows;
-		};
 		
 		// Fetch history data when tab/plant/interval changes
 		historyBoard.addEventListener('click', () => {
