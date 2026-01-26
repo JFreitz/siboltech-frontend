@@ -6,18 +6,18 @@ let apiUrlInitialized = false;
 async function initializeAPIUrl() {
     try {
         // First try to get tunnel URL from local API
-        const res = await fetch('/api/tunnel-url');
+        const res = await fetch('/api/tunnel-url', { cache: 'no-store' });
         if (res.ok) {
             const data = await res.json();
-            if (data.tunnel_url) {
-                RELAY_API_URL = `${data.tunnel_url}/api`;
+            if (data.url) {  // API returns "url", not "tunnel_url"
+                RELAY_API_URL = `${data.url}/api`;
                 console.log('API URL initialized from /api/tunnel-url:', RELAY_API_URL);
                 apiUrlInitialized = true;
                 return;
             }
         }
     } catch (e) {
-        console.log('Could not fetch tunnel URL from local API, using fallback:', e);
+        console.log('Could not fetch tunnel URL from local API, will use fallback:', e);
     }
     
     // Fallback: use localhost for local development

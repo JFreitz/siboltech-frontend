@@ -282,10 +282,10 @@ def get_tunnel_url():
         with open(tunnel_file, "r") as f:
             url = f.read().strip()
         if url:
-            return {"url": url}
+            return jsonify({"url": url})
     except Exception:
         pass
-    return {"url": None}
+    return jsonify({"url": None})
 
 @app.route("/api/db_status")
 def db_status():
