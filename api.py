@@ -363,7 +363,7 @@ def get_history():
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     
     if history_type == 'plant':
-        # Get plant readings
+        # Get plant readings with latest sensor data for each timestamp
         with Session() as session:
             query = session.query(PlantReading).filter(PlantReading.timestamp >= cutoff)
             if plant_id:
@@ -371,19 +371,38 @@ def get_history():
             if farming_system:
                 query = query.filter(PlantReading.farming_system == farming_system)
             
-            rows = query.order_by(PlantReading.timestamp.desc()).limit(limit).all()
+            plant_rows = query.order_by(PlantReading.timestamp.desc()).limit(limit).all()
         
         data = []
-        for r in rows:
+        for p in plant_rows:
+            # Get latest sensor readings at or before this plant reading timestamp
+            with Session() as session:
+                sensor_rows = session.execute(
+                    text("""
+                        SELECT sensor, AVG(value) as avg_value
+                        FROM sensor_readings
+                        WHERE timestamp <= :ts AND sensor IN ('temperature_c', 'humidity', 'tds_ppm', 'ph', 'do_mg_l')
+                        GROUP BY sensor
+                    """),
+                    {"ts": p.timestamp}
+                ).fetchall()
+            
+            sensor_data = {row[0]: row[1] for row in sensor_rows}
+            
             data.append({
-                'timestamp': _format_ts_for_display(r.timestamp),
-                'plant_id': r.plant_id,
-                'farming_system': r.farming_system,
-                'leaves': r.leaves,
-                'branches': r.branches,
-                'height': r.height,
-                'weight': r.weight,
-                'length': r.length
+                'timestamp': _format_ts_for_display(p.timestamp),
+                'plant_id': p.plant_id,
+                'farming_system': p.farming_system,
+                'ph': sensor_data.get('ph'),
+                'do': sensor_data.get('do_mg_l'),
+                'tds': sensor_data.get('tds_ppm'),
+                'temperature': sensor_data.get('temperature_c'),
+                'humidity': sensor_data.get('humidity'),
+                'leaves': p.leaves,
+                'branches': p.branches,
+                'height': p.height,
+                'weight': p.weight,
+                'length': p.length
             })
         return jsonify({'success': True, 'type': 'plant', 'count': len(data), 'readings': data})
     

@@ -1045,16 +1045,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			const rows = readings.map(row => `
 				<tr>
 					<td>${new Date(row.timestamp).toLocaleString()}</td>
-					<td>${row.ph !== null ? row.ph.toFixed(2) : '-'}</td>
-					<td>${row.do !== null ? row.do.toFixed(2) : '-'}</td>
-					<td>${row.tds !== null ? row.tds.toFixed(0) : '-'}</td>
-					<td>${row.temperature !== null ? row.temperature.toFixed(1) : '-'}</td>
-					<td>${row.humidity !== null ? row.humidity.toFixed(1) : '-'}</td>
-					<td>${row.leaves !== null ? row.leaves.toFixed(1) : '-'}</td>
-					<td>${row.branches !== null ? row.branches.toFixed(1) : '-'}</td>
-					<td>${row.weight !== null ? row.weight.toFixed(1) : '-'}</td>
-					<td>${row.length !== null ? row.length.toFixed(1) : '-'}</td>
-					<td>${row.height !== null ? row.height.toFixed(1) : '-'}</td>
+					<td>${(row.ph !== null && row.ph !== undefined) ? row.ph.toFixed(2) : '-'}</td>
+					<td>${(row.do !== null && row.do !== undefined) ? row.do.toFixed(2) : '-'}</td>
+					<td>${(row.tds !== null && row.tds !== undefined) ? row.tds.toFixed(0) : '-'}</td>
+					<td>${(row.temperature !== null && row.temperature !== undefined) ? row.temperature.toFixed(1) : '-'}</td>
+					<td>${(row.humidity !== null && row.humidity !== undefined) ? row.humidity.toFixed(1) : '-'}</td>
+					<td>${(row.leaves !== null && row.leaves !== undefined) ? row.leaves.toFixed(1) : '-'}</td>
+					<td>${(row.branches !== null && row.branches !== undefined) ? row.branches.toFixed(1) : '-'}</td>
+					<td>${(row.weight !== null && row.weight !== undefined) ? row.weight.toFixed(1) : '-'}</td>
+					<td>${(row.length !== null && row.length !== undefined) ? row.length.toFixed(1) : '-'}</td>
+					<td>${(row.height !== null && row.height !== undefined) ? row.height.toFixed(1) : '-'}</td>
 				</tr>
 			`).join('');
 			
