@@ -865,28 +865,19 @@ def get_voltage():
     """Get latest raw voltage readings for calibration.
     
     Returns the most recent voltage values for pH, TDS, and DO sensors.
-    Voltage is stored in metadata as 'voltage' field.
     """
     with Session() as session:
         result = {}
-        sensor_map = {"ph": "ph", "tds_ppm": "tds", "do_mg_l": "do"}
-        
-        for sensor_name, sensor_key in sensor_map.items():
+        for sensor in ["ph_voltage_v", "tds_voltage_v", "do_voltage_v"]:
             row = session.execute(
-                text("SELECT value, meta, timestamp FROM sensor_readings WHERE sensor = :s ORDER BY timestamp DESC LIMIT 1"),
-                {"s": sensor_name}
+                text("SELECT value, timestamp FROM sensor_readings WHERE sensor = :s ORDER BY timestamp DESC LIMIT 1"),
+                {"s": sensor}
             ).first()
             if row:
-                value, meta, timestamp = row
-                voltage = None
-                if meta and isinstance(meta, dict) and "voltage" in meta:
-                    voltage = meta["voltage"]
-                
-                if voltage is not None:
-                    result[sensor_key] = {
-                        "voltage": float(voltage),
-                        "timestamp": _format_ts_for_display(timestamp)
-                    }
+                result[sensor.replace("_voltage_v", "")] = {
+                    "voltage": row[0],
+                    "timestamp": _format_ts_for_display(row[1])
+                }
         return jsonify(result)
 
 
