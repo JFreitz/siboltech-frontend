@@ -105,6 +105,11 @@ def sync_to_cloud():
 
     use_http = bool(cloud_ingest_url) or (cloud_db_url and _is_railway_internal_host(cloud_db_url))
 
+    # Skip if URL is placeholder
+    if use_http and cloud_ingest_url and cloud_ingest_url.startswith("https://your-"):
+        print("Sync: CLOUD_INGEST_URL is placeholder. Skipping sync.")
+        return
+
     if use_http and not cloud_ingest_url:
         # If you only provided an internal Railway Postgres URL, you must sync via the API.
         print("CLOUD_DATABASE_URL is Railway-internal; set CLOUD_INGEST_URL to sync via HTTP.")
