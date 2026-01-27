@@ -20,8 +20,8 @@ async function initializeAPIUrl() {
         console.log('Could not fetch tunnel URL from local API, will use fallback:', e);
     }
     
-    // Fallback: use localhost for local development
-    RELAY_API_URL = 'http://localhost:5000/api';
+    // Fallback: keep using the hardcoded tunnel URL (already set at line 1)
+    // Note: Localhost only works from RPi directly, not from remote devices
     apiUrlInitialized = true;
     console.log('Using fallback API URL:', RELAY_API_URL);
 }
@@ -4123,7 +4123,8 @@ function updateMiniCharts(){
 
 // ==================== FULL CALIBRATION SYSTEM ====================
 (function initCalibrationSystem() {
-    const API_URL = 'https://likelihood-glucose-struck-representing.trycloudflare.com/api';
+    // Use dynamic RELAY_API_URL instead of hardcoded URL
+    const getApiUrl = () => RELAY_API_URL || 'https://drove-modems-organizer-hip.trycloudflare.com/api';
     
     // pH buffer values
     const phBuffers = [4.00, 6.86, 9.18];
@@ -4160,7 +4161,7 @@ function updateMiniCharts(){
     // Load current calibration from API
     async function loadCalibration() {
         try {
-            const res = await fetch(`${API_URL}/calibration`);
+            const res = await fetch(`${getApiUrl()}/calibration`);
             const data = await res.json();
             
             for (const sensor of ['ph', 'do', 'tds']) {
@@ -4185,7 +4186,7 @@ function updateMiniCharts(){
     // Fetch live voltage readings
     async function fetchVoltage() {
         try {
-            const res = await fetch(`${API_URL}/voltage`);
+            const res = await fetch(`${getApiUrl()}/voltage`);
             const data = await res.json();
             
             for (const sensor of ['ph', 'do', 'tds']) {
@@ -4298,7 +4299,7 @@ function updateMiniCharts(){
         if (!cal) return;
         
         try {
-            const res = await fetch(`${API_URL}/calibration`, {
+            const res = await fetch(`${getApiUrl()}/calibration`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sensor, slope: cal.slope, offset: cal.offset })
