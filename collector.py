@@ -20,9 +20,10 @@ def collect_once(session):
         insert(session, "humidity", b["humidity"], "%", {"source": "bme280"})
         insert(session, "pressure_hpa", b["pressure_hpa"], "hPa", {"source": "bme280"})
     a = read_analog()
-    insert(session, "ph", a["ph"], "pH", {"voltage": a["ph_voltage"]})
-    insert(session, "tds_ppm", a["tds_ppm"], "ppm", {"voltage": a["tds_voltage"]})
-    insert(session, "do_mg_per_l", a["do_mg_per_l"], "mg/L", {"voltage": a["do_voltage"]})
+    if a:  # Only insert analog data if available
+        insert(session, "ph", a["ph"], "pH", {"voltage": a["ph_voltage"]})
+        insert(session, "tds_ppm", a["tds_ppm"], "ppm", {"voltage": a["tds_voltage"]})
+        insert(session, "do_mg_per_l", a["do_mg_per_l"], "mg/L", {"voltage": a["do_voltage"]})
     session.commit()
 
 def main():

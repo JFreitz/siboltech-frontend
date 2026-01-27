@@ -123,15 +123,12 @@ def readings_to_rows(payload: dict[str, Any]) -> list[SensorReading]:
 
     # Default sensors stored.
     # Override by setting ALLOWED_SENSORS="sensor1,sensor2".
-    allowed = os.getenv("ALLOWED_SENSORS", "temperature_c,humidity,tds_ppm,ph,do_mg_l")
+    allowed = os.getenv("ALLOWED_SENSORS", "temperature_c,humidity")
     allowed_sensors = {s.strip() for s in allowed.split(",") if s.strip()}
 
     units = {
         "temperature_c": "C",
         "humidity": "%",
-        "tds_ppm": "ppm",
-        "ph": "pH",
-        "do_mg_l": "mg/L",
     }
 
     tds_voltage_v = None

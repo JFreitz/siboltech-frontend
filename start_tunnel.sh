@@ -38,6 +38,18 @@ TUNNEL_URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' logs/tunnel.log | 
 
 if [ -n "$TUNNEL_URL" ]; then
     echo "$TUNNEL_URL" > logs/tunnel_url.txt
+    
+    # Automatically update all hardcoded URLs in code files
+    echo "🔄 Updating hardcoded URLs in code files..."
+    find . -type f \( -name "*.js" -o -name "*.html" \) ! -path "./backup_*/*" ! -path "./.venv/*" ! -path "./node_modules/*" \
+        -exec sed -i "s|https://[a-z0-9-]*\.trycloudflare\.com|$TUNNEL_URL|g" {} \;
+    
+    # Also update the esp32-bme280-usb copy
+    if [ -d "../esp32-bme280-usb" ]; then
+        find ../esp32-bme280-usb -type f \( -name "*.js" -o -name "*.html" \) ! -path "*/backup_*/*" ! -path "*/.venv/*" ! -path "*/node_modules/*" \
+            -exec sed -i "s|https://[a-z0-9-]*\.trycloudflare\.com|$TUNNEL_URL|g" {} \;
+    fi
+    
     echo ""
     echo "=========================================="
     echo "✅ YOUR PUBLIC URL:"
@@ -49,7 +61,7 @@ if [ -n "$TUNNEL_URL" ]; then
     echo "   Sensors:   $TUNNEL_URL/api/latest"
     echo "   Relays:    $TUNNEL_URL/api/relay/status"
     echo ""
-    echo "⚠️  URL changes on restart. Update ESP32 if needed."
+    echo "✅ All code files updated automatically"
     echo ""
 else
     echo "❌ Could not get tunnel URL. Check logs/tunnel.log"

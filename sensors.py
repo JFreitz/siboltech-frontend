@@ -52,15 +52,8 @@ def read_bme():
 def read_analog():
     """Read analog channels and return raw voltages and converted values."""
     if not ads:
-        # Mock data for testing without hardware
-        return {
-            "ph_voltage": 1.5,
-            "ph": calibrate_ph(1.5),
-            "tds_voltage": 1.0,
-            "tds_ppm": calibrate_tds(1.0),
-            "do_voltage": 2.0,
-            "do_mg_per_l": calibrate_do(2.0),
-        }
+        # No mock data - return empty dict when ADS1115 not available
+        return {}
     v_ph = chan_ph.voltage
     v_tds = chan_tds.voltage
     v_do = chan_do.voltage

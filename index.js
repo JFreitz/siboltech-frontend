@@ -1,5 +1,5 @@
 // === SIBOLTECH API Configuration ===
-let RELAY_API_URL = 'https://surrey-enhancements-tunes-valid.trycloudflare.com/api'; // fallback - update this when tunnel restarts
+let RELAY_API_URL = 'https://yea-configuration-coast-interview.trycloudflare.com/api'; // fallback - update this when tunnel restarts
 let apiUrlInitialized = false;
 
 // Initialize API URL dynamically (from /api/tunnel-url endpoint)
@@ -171,8 +171,8 @@ async function fetchSensorData() {
 }
 
 // Start fetching sensor data
-setInterval(fetchSensorData, 3000);
-setTimeout(fetchSensorData, 500);
+setInterval(fetchSensorData, 1000);
+setTimeout(fetchSensorData, 200);
 
 // --- Calibrate UI logic ---
 (function initCalibrate() {
@@ -4124,7 +4124,7 @@ function updateMiniCharts(){
 // ==================== FULL CALIBRATION SYSTEM ====================
 (function initCalibrationSystem() {
     // Use dynamic RELAY_API_URL instead of hardcoded URL
-    const getApiUrl = () => RELAY_API_URL || 'https://drove-modems-organizer-hip.trycloudflare.com/api';
+    const getApiUrl = () => RELAY_API_URL || 'https://yea-configuration-coast-interview.trycloudflare.com/api';
     
     // pH buffer values
     const phBuffers = [4.00, 6.86, 9.18];
