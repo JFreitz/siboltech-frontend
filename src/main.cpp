@@ -234,8 +234,11 @@ void loop() {
   if (now - last_print_ms < 1000) { return; }
   last_print_ms = now;
 
-  float temp_c = bme_ok ? bme.readTemperature() : 25.0f;
-  float humidity = bme_ok ? bme.readHumidity() : 50.0f;
+  // Only read real sensor data - no mock fallbacks
+  if (!bme_ok) { return; }
+  
+  float temp_c = bme.readTemperature();
+  float humidity = bme.readHumidity();
 
   const int samples = 20;
   uint32_t acc = 0, acc_ph = 0, acc_do = 0;
