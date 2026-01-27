@@ -250,14 +250,13 @@ void loop() {
   if (now - last_print_ms < 1000) { return; }
   last_print_ms = now;
 
-  // Read BME280 if available
-  float temp_c = 25.0f;
-  float humidity = 50.0f;
+  if (!bme_ok) { return; }  // NO FALLBACK - exit if sensor not connected
   
-  if (bme_ok) {
-    temp_c = bme.readTemperature();
-    humidity = bme.readHumidity();
-  }
+  float temp_c = bme.readTemperature();
+  float humidity = bme.readHumidity();
+  
+  // DEBUG: Show what we're actually reading
+  Serial.printf("[DEBUG] BME280: temp=%.2f°C humidity=%.2f%%\n", temp_c, humidity);
 
   const int samples = 20;
   uint32_t acc = 0, acc_ph = 0, acc_do = 0;
