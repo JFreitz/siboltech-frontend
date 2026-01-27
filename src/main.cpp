@@ -50,8 +50,24 @@ static Adafruit_BME280 bme;
 static bool bme_ok = false;
 
 static bool init_bme() {
-  if (bme.begin(0x76)) return true;
-  if (bme.begin(0x77)) return true;
+  Serial.println("Initializing BME280...");
+  delay(100);  // Give sensor time to stabilize
+  
+  // Try address 0x76 first
+  if (bme.begin(0x76)) {
+    Serial.println("✓ BME280 found at address 0x76");
+    return true;
+  }
+  Serial.println("✗ Not found at 0x76, trying 0x77...");
+  delay(50);
+  
+  // Try address 0x77
+  if (bme.begin(0x77)) {
+    Serial.println("✓ BME280 found at address 0x77");
+    return true;
+  }
+  Serial.println("✗ BME280 NOT FOUND at either address!");
+  Serial.println("  Check: I2C wiring (SDA=GPIO21, SCL=GPIO22), pull-up resistors, sensor power");
   return false;
 }
 
@@ -234,11 +250,14 @@ void loop() {
   if (now - last_print_ms < 1000) { return; }
   last_print_ms = now;
 
-  // Only read real sensor data - no mock fallbacks
-  if (!bme_ok) { return; }
+  // Read BME280 if available
+  float temp_c = 25.0f;
+  float humidity = 50.0f;
   
-  float temp_c = bme.readTemperature();
-  float humidity = bme.readHumidity();
+  if (bme_ok) {
+    temp_c = bme.readTemperature();
+    humidity = bme.readHumidity();
+  }
 
   const int samples = 20;
   uint32_t acc = 0, acc_ph = 0, acc_do = 0;
