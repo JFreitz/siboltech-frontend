@@ -233,6 +233,13 @@ def ingest():
     except Exception:
         do_voltage_v = None
 
+    tds_voltage_v = None
+    try:
+        if "tds_voltage_v" in computed_readings:
+            tds_voltage_v = float(computed_readings.get("tds_voltage_v"))
+    except Exception:
+        tds_voltage_v = None
+
     for sensor, value in computed_readings.items():
         sensor_name = str(sensor)
         if allowed_sensors and sensor_name not in allowed_sensors:
@@ -249,6 +256,9 @@ def ingest():
         if sensor_name == "do_mg_l" and do_voltage_v is not None:
             meta = dict(meta)
             meta["do_voltage_v"] = do_voltage_v
+        if sensor_name == "tds_ppm" and tds_voltage_v is not None:
+            meta = dict(meta)
+            meta["tds_voltage_v"] = tds_voltage_v
         to_insert.append(
             SensorReading(
                 timestamp=ts,
@@ -868,19 +878,51 @@ def get_voltage():
     """Get latest raw voltage readings for calibration.
     
     Returns the most recent voltage values for pH, TDS, and DO sensors.
+    Extracts voltage from metadata of ph and do_mg_l sensor readings.
     """
+    import json as _json
     with Session() as session:
         result = {}
-        for sensor in ["ph_voltage_v", "tds_voltage_v", "do_voltage_v"]:
-            row = session.execute(
-                text("SELECT value, timestamp FROM sensor_readings WHERE sensor = :s ORDER BY timestamp DESC LIMIT 1"),
-                {"s": sensor}
-            ).first()
-            if row:
-                result[sensor.replace("_voltage_v", "")] = {
-                    "voltage": row[0],
-                    "timestamp": _format_ts_for_display(row[1])
+        
+        # Get pH voltage from ph sensor's meta
+        ph_row = session.execute(
+            text("SELECT meta, timestamp FROM sensor_readings WHERE sensor = 'ph' ORDER BY timestamp DESC LIMIT 1")
+        ).first()
+        if ph_row and ph_row[0]:
+            meta_raw = ph_row[0]
+            meta = meta_raw if isinstance(meta_raw, dict) else _json.loads(meta_raw) if isinstance(meta_raw, str) else {}
+            if "ph_voltage_v" in meta:
+                result["ph"] = {
+                    "voltage": meta["ph_voltage_v"],
+                    "timestamp": _format_ts_for_display(ph_row[1])
                 }
+        
+        # Get DO voltage from do_mg_l sensor's meta
+        do_row = session.execute(
+            text("SELECT meta, timestamp FROM sensor_readings WHERE sensor = 'do_mg_l' ORDER BY timestamp DESC LIMIT 1")
+        ).first()
+        if do_row and do_row[0]:
+            meta_raw = do_row[0]
+            meta = meta_raw if isinstance(meta_raw, dict) else _json.loads(meta_raw) if isinstance(meta_raw, str) else {}
+            if "do_voltage_v" in meta:
+                result["do"] = {
+                    "voltage": meta["do_voltage_v"],
+                    "timestamp": _format_ts_for_display(do_row[1])
+                }
+        
+        # Get TDS voltage from tds_ppm sensor's meta
+        tds_row = session.execute(
+            text("SELECT meta, timestamp FROM sensor_readings WHERE sensor = 'tds_ppm' ORDER BY timestamp DESC LIMIT 1")
+        ).first()
+        if tds_row and tds_row[0]:
+            meta_raw = tds_row[0]
+            meta = meta_raw if isinstance(meta_raw, dict) else _json.loads(meta_raw) if isinstance(meta_raw, str) else {}
+            if "tds_voltage_v" in meta:
+                result["tds"] = {
+                    "voltage": meta["tds_voltage_v"],
+                    "timestamp": _format_ts_for_display(tds_row[1])
+                }
+        
         return jsonify(result)
 
 

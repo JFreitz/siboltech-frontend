@@ -1,5 +1,5 @@
 // === SIBOLTECH API Configuration ===
-let RELAY_API_URL = 'https://exports-versus-belongs-tend.trycloudflare.com/api'; // fallback - update this when tunnel restarts
+let RELAY_API_URL = 'https://sim-terry-coast-tractor.trycloudflare.com/api'; // fallback - update this when tunnel restarts
 let apiUrlInitialized = false;
 
 // Initialize API URL dynamically (from /api/tunnel-url endpoint)

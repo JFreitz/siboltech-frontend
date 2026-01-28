@@ -10,8 +10,8 @@ static const uint32_t BAUD = 115200;
 static const char* DEVICE_ID = "esp32-wroom32";
 
 // --- WiFi Configuration ---
-static const char* WIFI_SSID = "JP";
-static const char* WIFI_PASSWORD = "qwertyuiopa";
+static const char* WIFI_SSID = "Ysa";
+static const char* WIFI_PASSWORD = "Ysabela18";
 
 // --- MQTT Configuration (HiveMQ Cloud Free Tier) ---
 // Sign up at: https://www.hivemq.com/mqtt-cloud-broker/
@@ -20,7 +20,7 @@ static const char* WIFI_PASSWORD = "qwertyuiopa";
 
 // --- Cloud API Configuration (for sensor data upload) ---
 // Use LOCAL RPi IP for fast sensor uploads, relay polling stays on local network
-static const char* API_BASE_URL = "http://172.20.10.2:5000";  // Local RPi - much faster!
+static const char* API_BASE_URL = "http://10.175.163.194:5000";  // Local RPi - much faster!
 static const char* API_KEY = "espkey123";
 static uint32_t last_sensor_upload_ms = 0;
 static const uint32_t SENSOR_UPLOAD_INTERVAL = 2000;  // Upload every 2 seconds (fast local network)
@@ -126,7 +126,7 @@ void connectWiFi() {
 
 
 
-void uploadSensorData(float temp_c, float humidity, float tds_ppm, float ph_v, float do_v) {
+void uploadSensorData(float temp_c, float humidity, float tds_ppm, float tds_v, float ph_v, float do_v) {
   if (!wifi_connected) return;
   HTTPClient http;
   String url = String(API_BASE_URL) + "/api/ingest";
@@ -137,6 +137,7 @@ void uploadSensorData(float temp_c, float humidity, float tds_ppm, float ph_v, f
   readings["temperature_c"] = temp_c;
   readings["humidity"] = humidity;
   readings["tds_ppm"] = tds_ppm;
+  readings["tds_voltage_v"] = tds_v;
   readings["ph_voltage_v"] = ph_v;
   readings["do_voltage_v"] = do_v;
   String payload;
@@ -198,6 +199,22 @@ void setup() {
   analogSetPinAttenuation(DO_PIN, ADC_11db);
 
   Wire.begin(I2C_SDA, I2C_SCL);
+  Wire.setClock(100000);  // 100kHz slower for reliability
+  
+  Serial.printf("I2C pins: SDA=%d, SCL=%d\n", I2C_SDA, I2C_SCL);
+  
+  // I2C Scanner
+  Serial.println("Scanning I2C bus...");
+  int devices = 0;
+  for (byte addr = 1; addr < 127; addr++) {
+    Wire.beginTransmission(addr);
+    if (Wire.endTransmission() == 0) {
+      Serial.printf("  Found device at 0x%02X\n", addr);
+      devices++;
+    }
+  }
+  Serial.printf("I2C scan: %d device(s) found\n", devices);
+  
   bme_ok = init_bme();
   Serial.println(bme_ok ? "BME280: OK" : "BME280: NOT FOUND");
 
@@ -253,11 +270,11 @@ void loop() {
   float comp_v = comp > 0 ? voltage / comp : voltage;
   float tds_ppm = (133.42f*comp_v*comp_v*comp_v - 255.86f*comp_v*comp_v + 857.39f*comp_v) * TDS_FACTOR;
 
-  Serial.printf("{\"device\":\"%s\",\"readings\":{\"temp\":%.2f,\"humidity\":%.2f,\"tds\":%.2f}}\n",
-                DEVICE_ID, temp_c, humidity, tds_ppm);
+  Serial.printf("{\"device\":\"%s\",\"readings\":{\"temp\":%.2f,\"humidity\":%.2f,\"tds\":%.2f,\"ph_v\":%.3f,\"tds_v\":%.3f}}\n",
+                DEVICE_ID, temp_c, humidity, tds_ppm, ph_voltage, voltage);
 
   if (now - last_sensor_upload_ms >= SENSOR_UPLOAD_INTERVAL) {
     last_sensor_upload_ms = now;
-    uploadSensorData(temp_c, humidity, tds_ppm, ph_voltage, do_voltage);
+    uploadSensorData(temp_c, humidity, tds_ppm, voltage, ph_voltage, do_voltage);
   }
 }
