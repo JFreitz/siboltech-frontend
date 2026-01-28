@@ -136,6 +136,9 @@ def ingest():
         return {"ok": False, "error": "unauthorized"}, 401
 
     payload = request.get_json(silent=True) or {}
+    
+    # DEBUG: Log raw ESP32 payload
+    print(f"[INGEST] Raw payload: {json.dumps(payload, default=str)[:500]}")
 
     rows = payload.get("rows")
     if isinstance(rows, list):
