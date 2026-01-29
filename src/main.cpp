@@ -10,8 +10,8 @@ static const uint32_t BAUD = 115200;
 static const char* DEVICE_ID = "esp32-wroom32";
 
 // --- WiFi Configuration ---
-static const char* WIFI_SSID = "Ysa";
-static const char* WIFI_PASSWORD = "Ysabela18";
+static const char* WIFI_SSID = "JP";
+static const char* WIFI_PASSWORD = "qwertyuiopa";
 
 // --- MQTT Configuration (HiveMQ Cloud Free Tier) ---
 // Sign up at: https://www.hivemq.com/mqtt-cloud-broker/
@@ -20,7 +20,7 @@ static const char* WIFI_PASSWORD = "Ysabela18";
 
 // --- Cloud API Configuration (for sensor data upload) ---
 // Use LOCAL RPi IP for fast sensor uploads, relay polling stays on local network
-static const char* API_BASE_URL = "http://10.175.163.194:5000";  // Local RPi - much faster!
+static const char* API_BASE_URL = "http://172.20.10.2:5000";  // Local RPi - much faster!
 static const char* API_KEY = "espkey123";
 static uint32_t last_sensor_upload_ms = 0;
 static const uint32_t SENSOR_UPLOAD_INTERVAL = 2000;  // Upload every 2 seconds (fast local network)
@@ -199,21 +199,20 @@ void setup() {
   analogSetPinAttenuation(DO_PIN, ADC_11db);
 
   Wire.begin(I2C_SDA, I2C_SCL);
-  Wire.setClock(100000);  // 100kHz slower for reliability
+  Wire.setClock(100000);
+  delay(100);
   
   Serial.printf("I2C pins: SDA=%d, SCL=%d\n", I2C_SDA, I2C_SCL);
   
-  // I2C Scanner
-  Serial.println("Scanning I2C bus...");
-  int devices = 0;
-  for (byte addr = 1; addr < 127; addr++) {
-    Wire.beginTransmission(addr);
-    if (Wire.endTransmission() == 0) {
-      Serial.printf("  Found device at 0x%02X\n", addr);
-      devices++;
-    }
-  }
-  Serial.printf("I2C scan: %d device(s) found\n", devices);
+  // Quick I2C scan for BME280
+  Serial.println("Scanning for BME280...");
+  Wire.beginTransmission(0x76);
+  byte err76 = Wire.endTransmission();
+  Serial.printf("  0x76: %s\n", err76 == 0 ? "FOUND!" : "not found");
+  
+  Wire.beginTransmission(0x77);
+  byte err77 = Wire.endTransmission();
+  Serial.printf("  0x77: %s\n", err77 == 0 ? "FOUND!" : "not found");
   
   bme_ok = init_bme();
   Serial.println(bme_ok ? "BME280: OK" : "BME280: NOT FOUND");
