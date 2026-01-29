@@ -600,6 +600,96 @@ def _init_relay_states():
 # Initialize on startup
 _init_relay_states()
 
+# ==================== GROWTH COMPARISON ====================
+@app.route("/api/growth-comparison")
+def get_growth_comparison():
+    """Get growth data for comparison graph grouped by farming system.
+    
+    Query params:
+    - metric: 'height|length|width|leaves|branches' (default: 'height')
+    - days: number of days to look back (default: 14, 'all' for all data)
+    
+    Returns daily averages per farming system for the selected metric.
+    """
+    metric = request.args.get('metric', 'height').lower()
+    days_param = request.args.get('days', '14')
+    
+    # Map metric to database column
+    metric_map = {
+        'height': 'height',
+        'length': 'length', 
+        'width': 'weight',  # width is stored as weight in DB
+        'leaves': 'leaves',
+        'branches': 'branches'
+    }
+    
+    db_column = metric_map.get(metric, 'height')
+    
+    with Session() as session:
+        # Build cutoff
+        if days_param.lower() == 'all':
+            cutoff = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        else:
+            try:
+                days = int(days_param)
+            except:
+                days = 14
+            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        
+        # Get daily averages per farming system
+        # SQLite compatible date extraction
+        query = text(f"""
+            SELECT 
+                DATE(timestamp) as day,
+                farming_system,
+                AVG({db_column}) as avg_value,
+                COUNT(*) as count
+            FROM plant_readings
+            WHERE timestamp >= :cutoff
+              AND {db_column} IS NOT NULL
+            GROUP BY DATE(timestamp), farming_system
+            ORDER BY day ASC
+        """)
+        
+        rows = session.execute(query, {"cutoff": cutoff}).fetchall()
+    
+    # Organize by farming system
+    aeroponics_data = []
+    dwc_data = []
+    traditional_data = []
+    dates = set()
+    
+    for row in rows:
+        day = str(row[0])  # date as string
+        system = row[1]
+        value = float(row[2]) if row[2] else 0
+        dates.add(day)
+        
+        if system == 'aeroponics':
+            aeroponics_data.append({'date': day, 'value': value})
+        elif system == 'dwc':
+            dwc_data.append({'date': day, 'value': value})
+        elif system == 'traditional':
+            traditional_data.append({'date': day, 'value': value})
+    
+    # Sort dates and create aligned arrays
+    sorted_dates = sorted(list(dates))
+    
+    def get_values_aligned(data_list, dates_list):
+        """Align data to sorted dates, fill gaps with None"""
+        date_map = {d['date']: d['value'] for d in data_list}
+        return [date_map.get(d) for d in dates_list]
+    
+    return jsonify({
+        'success': True,
+        'metric': metric,
+        'days': days_param,
+        'dates': sorted_dates,
+        'aeroponic': get_values_aligned(aeroponics_data, sorted_dates),
+        'dwc': get_values_aligned(dwc_data, sorted_dates),
+        'traditional': get_values_aligned(traditional_data, sorted_dates)
+    })
+
 # ==================== PLANT READINGS ====================
 @app.route("/api/plant-reading", methods=["POST"])
 def save_plant_reading():

@@ -1,5 +1,5 @@
 // === SIBOLTECH API Configuration ===
-let RELAY_API_URL = 'https://sim-terry-coast-tractor.trycloudflare.com/api'; // fallback - update this when tunnel restarts
+let RELAY_API_URL = 'https://url-prozac-folks-project.trycloudflare.com/api'; // fallback - update this when tunnel restarts
 let apiUrlInitialized = false;
 
 // Initialize API URL dynamically (from /api/tunnel-url endpoint)
@@ -1938,7 +1938,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		btn.addEventListener('click', () => {
 			timeButtons.forEach(b => b.classList.remove('active'));
 			btn.classList.add('active');
-			currentDays = parseInt(btn.getAttribute('data-days'));
+			const daysAttr = btn.getAttribute('data-days');
+			currentDays = daysAttr === 'all' ? 'all' : parseInt(daysAttr);
+			graphDataCache = {}; // Clear cache when changing time period
 			drawComparisonGraph();
 		});
 	});
@@ -1950,6 +1952,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			metricButtons.forEach(b => b.classList.remove('active'));
 			btn.classList.add('active');
 			currentMetric = btn.getAttribute('data-metric') || 'height';
+			graphDataCache = {}; // Clear cache when changing metric
 			drawComparisonGraph();
 		});
 	});
@@ -3236,16 +3239,64 @@ setTimeout(() => {
 }, 500);
 
 // Comparison Graph Functionality
-let currentDays = 7;
+let currentDays = 14;
 let currentMetric = 'height';
 let graphData = {
 	aeroponic: [],
 	dwc: [],
-	traditional: []
+	traditional: [],
+	dates: []
 };
+let graphDataCache = {}; // Cache fetched data
 
-function generateGraphData(days, metric) {
-	const points = Math.min(days * 4, 120); // Max 120 points for smoothness
+// Fetch real growth data from API
+async function fetchGrowthData(days, metric) {
+	const cacheKey = `${days}-${metric}`;
+	if (graphDataCache[cacheKey]) {
+		return graphDataCache[cacheKey];
+	}
+	
+	try {
+		const daysParam = days === 'all' ? 'all' : days;
+		const res = await fetch(`${RELAY_API_URL}/growth-comparison?metric=${metric}&days=${daysParam}`);
+		if (!res.ok) throw new Error('API error');
+		const data = await res.json();
+		
+		if (data.success && data.dates && data.dates.length > 0) {
+			// Convert nulls to interpolated values or 0
+			const fillGaps = (arr) => arr.map((v, i, a) => {
+				if (v !== null) return v;
+				// Find nearest non-null values
+				let prev = null, next = null;
+				for (let j = i - 1; j >= 0; j--) if (a[j] !== null) { prev = a[j]; break; }
+				for (let j = i + 1; j < a.length; j++) if (a[j] !== null) { next = a[j]; break; }
+				if (prev !== null && next !== null) return (prev + next) / 2;
+				if (prev !== null) return prev;
+				if (next !== null) return next;
+				return 0;
+			});
+			
+			const result = {
+				aeroponic: fillGaps(data.aeroponic || []),
+				dwc: fillGaps(data.dwc || []),
+				traditional: fillGaps(data.traditional || []),
+				dates: data.dates || [],
+				hasRealData: true
+			};
+			graphDataCache[cacheKey] = result;
+			return result;
+		}
+	} catch (e) {
+		console.log('[GrowthComparison] API fetch failed, using mock data:', e.message);
+	}
+	
+	// Fallback to generated mock data if no real data
+	return generateMockGraphData(days, metric);
+}
+
+function generateMockGraphData(days, metric) {
+	const points = typeof days === 'number' ? Math.min(days * 4, 120) : 120;
+
 
 	// Pick base values per metric to simulate different scales
 	const metricBases = {
@@ -3277,11 +3328,12 @@ function generateGraphData(days, metric) {
 		aeroponic: aeroponicData,
 		dwc: dwcData,
 		traditional: traditionalData,
-		points: points
+		dates: [],
+		hasRealData: false
 	};
 }
 
-function drawComparisonGraph() {
+async function drawComparisonGraph() {
 	const canvas = document.getElementById('comparisonGraph');
 	if(!canvas || !canvas.getContext) return;
 	
@@ -3311,12 +3363,23 @@ function drawComparisonGraph() {
 	const plotW = w - leftPad - rightPad;
 	const plotH = h - topPad - bottomPad;
 	
-	// Generate data based on current days and selected metric
-	const data = generateGraphData(currentDays, currentMetric);
+	// Fetch real data from API (falls back to mock if no data)
+	const data = await fetchGrowthData(currentDays, currentMetric);
 	graphData = data;
 	
+	// Check if we have any data to display
+	const allValues = [...(data.aeroponic || []), ...(data.dwc || []), ...(data.traditional || [])].filter(v => v !== null && v !== undefined);
+	
+	if (allValues.length === 0) {
+		// No data - show message
+		ctx.fillStyle = '#888';
+		ctx.font = '16px Poppins, sans-serif';
+		ctx.textAlign = 'center';
+		ctx.fillText('No growth data yet. Submit plant measurements in Training tab.', w/2, h/2);
+		return;
+	}
+	
 	// Find min and max for scaling
-	const allValues = [...data.aeroponic, ...data.dwc, ...data.traditional];
 	const min = Math.min(...allValues);
 	const max = Math.max(...allValues);
 	const range = max - min || 1;
@@ -3362,18 +3425,24 @@ function drawComparisonGraph() {
 	
 	// Draw lines for each method
 	const methods = [
-		{ data: data.aeroponic, color: '#4CAF50', name: 'Aeroponic' },
-		{ data: data.dwc, color: '#2196F3', name: 'Deep Water Culture' },
-		{ data: data.traditional, color: '#FF9800', name: 'Traditional' }
+		{ data: data.aeroponic || [], color: '#4CAF50', name: 'Aeroponic' },
+		{ data: data.dwc || [], color: '#2196F3', name: 'Deep Water Culture' },
+		{ data: data.traditional || [], color: '#FF9800', name: 'Traditional' }
 	];
 	
 	methods.forEach(method => {
+		// Skip if no data for this method
+		if (!method.data || method.data.length === 0) return;
+		
 		const points = [];
 		method.data.forEach((val, i) => {
-			const x = leftPad + (i / (method.data.length - 1)) * plotW;
+			if (val === null || val === undefined) return;
+			const x = leftPad + (i / Math.max(method.data.length - 1, 1)) * plotW;
 			const y = topPad + (1 - (val - min) / range) * plotH;
 			points.push({ x, y, val });
 		});
+		
+		if (points.length < 2) return; // Need at least 2 points to draw a line
 		
 		// Draw gradient fill using rgba
 		const gradient = ctx.createLinearGradient(0, topPad, 0, h - bottomPad);
