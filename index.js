@@ -1677,7 +1677,152 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		}
 	}
 
-	let actuatorOverride = false;
+	// Override starts ON (manual mode) - actuators won't go crazy on startup
+	// When OFF (auto mode), actuators respond to sensor readings
+	let actuatorOverride = true;
+
+	// Mapping between dashboard actuator IDs and relay numbers
+	const ACTUATOR_TO_RELAY = {
+		'act-water': 1,        // Misting Pump
+		'act-air': 2,          // Air Pump
+		'act-fan-in': 3,       // Exhaust Fan (In)
+		'act-fan-out': 4,      // Exhaust Fan (Out)
+		'act-lights-aerponics': 5, // Grow Lights (Aeroponics)
+		'act-lights-dwc': 6,   // Grow Lights (DWC)
+		'btn-ph-up': 7,        // pH Up (nutrient)
+		'btn-ph-down': 8,      // pH Down (nutrient)
+		'btn-leafy-green': 9   // Leafy Green (nutrient)
+	};
+
+	const RELAY_TO_ACTUATOR = Object.fromEntries(
+		Object.entries(ACTUATOR_TO_RELAY).map(([k, v]) => [v, k])
+	);
+
+	// Nutrient threshold configuration with hysteresis
+	const NUTRIENT_THRESHOLDS = {
+		'btn-ph-up': { 
+			sensor: 'ph', 
+			condition: 'below', 
+			triggerOn: 5.5,
+			triggerOff: 5.8,
+			consecutiveRequired: 3
+		},
+		'btn-ph-down': { 
+			sensor: 'ph', 
+			condition: 'above', 
+			triggerOn: 6.5,
+			triggerOff: 6.2,
+			consecutiveRequired: 3
+		},
+		'btn-leafy-green': { 
+			sensor: 'tds', 
+			condition: 'below', 
+			triggerOn: 600,
+			triggerOff: 650,
+			consecutiveRequired: 3
+		}
+	};
+
+	const NUTRIENT_PULSE_DURATION = 2000;
+	const NUTRIENT_AUTO_COOLDOWN = 30000;
+	const MOVING_AVG_WINDOW = 5;
+
+	const nutrientLastActivation = { 'btn-ph-up': 0, 'btn-ph-down': 0, 'btn-leafy-green': 0 };
+	const sensorHistory = { ph: [], tds: [] };
+	const consecutiveBreaches = { 'btn-ph-up': 0, 'btn-ph-down': 0, 'btn-leafy-green': 0 };
+	const nutrientActiveState = { 'btn-ph-up': false, 'btn-ph-down': false, 'btn-leafy-green': false };
+
+	function updateMovingAverage(sensor, newValue) {
+		const history = sensorHistory[sensor];
+		if (!history) return newValue;
+		history.push(newValue);
+		if (history.length > MOVING_AVG_WINDOW) history.shift();
+		return history.reduce((a, b) => a + b, 0) / history.length;
+	}
+
+	// Toggle relay via API
+	async function toggleRelay(relayNum, newState, stateEl) {
+		try {
+			const action = newState ? 'on' : 'off';
+			const response = await fetch(`${RELAY_API_URL}/relay/${relayNum}/${action}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' }
+			});
+			if (response.ok) {
+				if (stateEl) {
+					stateEl.classList.remove('state-off', 'state-on');
+					stateEl.classList.add(newState ? 'state-on' : 'state-off');
+					stateEl.textContent = newState ? 'ON' : 'OFF';
+				}
+				const actuatorId = RELAY_TO_ACTUATOR[relayNum];
+				if (actuatorId) syncActuatorUI(actuatorId, newState);
+			}
+		} catch (error) {
+			console.error(`Error toggling relay ${relayNum}:`, error);
+		}
+	}
+
+	function syncActuatorUI(actuatorId, state) {
+		const checkbox = document.getElementById(actuatorId);
+		if (!checkbox) return;
+		checkbox.checked = state;
+		const label = checkbox.closest('.toggle-switch');
+		const toggleText = label ? label.querySelector('.toggle-text') : null;
+		if (toggleText) toggleText.textContent = state ? 'ON' : 'OFF';
+	}
+
+	// Check sensor thresholds for auto-activation (only when override is OFF)
+	function checkNutrientAutoActivation(phValue, tdsValue) {
+		if (actuatorOverride) return; // Skip auto-control in manual mode
+		
+		const now = Date.now();
+		const avgPH = updateMovingAverage('ph', phValue);
+		const avgTDS = updateMovingAverage('tds', tdsValue);
+		const avgValues = { ph: avgPH, tds: avgTDS };
+
+		Object.entries(NUTRIENT_THRESHOLDS).forEach(([btnId, config]) => {
+			const { sensor, condition, triggerOn, triggerOff, consecutiveRequired } = config;
+			const avgValue = avgValues[sensor];
+			if (avgValue === undefined || isNaN(avgValue)) return;
+
+			let thresholdBreached = false;
+			if (condition === 'below' && avgValue < triggerOn) thresholdBreached = true;
+			else if (condition === 'above' && avgValue > triggerOn) thresholdBreached = true;
+
+			let shouldDeactivate = false;
+			if (nutrientActiveState[btnId]) {
+				if (condition === 'below' && avgValue > triggerOff) shouldDeactivate = true;
+				else if (condition === 'above' && avgValue < triggerOff) shouldDeactivate = true;
+			}
+
+			if (thresholdBreached && !nutrientActiveState[btnId]) {
+				consecutiveBreaches[btnId]++;
+			} else if (!thresholdBreached || shouldDeactivate) {
+				consecutiveBreaches[btnId] = 0;
+				if (shouldDeactivate) {
+					nutrientActiveState[btnId] = false;
+					console.log(`[Auto] ${btnId} deactivated: ${sensor}=${avgValue.toFixed(2)}`);
+				}
+			}
+
+			const shouldActivate = 
+				consecutiveBreaches[btnId] >= consecutiveRequired &&
+				!nutrientActiveState[btnId] &&
+				(now - nutrientLastActivation[btnId]) > NUTRIENT_AUTO_COOLDOWN;
+
+			if (shouldActivate) {
+				nutrientLastActivation[btnId] = now;
+				nutrientActiveState[btnId] = true;
+				consecutiveBreaches[btnId] = 0;
+				const relayNum = ACTUATOR_TO_RELAY[btnId];
+				if (relayNum) {
+					console.log(`[Auto] ${btnId} activated: ${sensor}=${avgValue.toFixed(2)} (relay ${relayNum})`);
+					toggleRelay(relayNum, true, null);
+					setTimeout(() => toggleRelay(relayNum, false, null), NUTRIENT_PULSE_DURATION);
+				}
+			}
+		});
+	}
 
 	function updateSensorsAndActuators(){
 		// Sensor values are now fetched from API via fetchSensorData()
@@ -1704,8 +1849,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		updateSensorAlert('hum', humValue);
 		updateSensorAlert('tds', tdsValue);
 
-		// actuators - auto control is handled by backend based on sensor readings
-		// This only updates UI state, actual control comes from API
+		// Auto-control actuators based on sensor readings (only when override is OFF)
+		if (!actuatorOverride) {
+			checkNutrientAutoActivation(parseFloat(phValue), parseFloat(tdsValue));
+		}
 	}
 
 	// helper: set actuator state text + checkbox
@@ -1719,7 +1866,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		if(toggleText) toggleText.textContent = state;
 	}
 
-	// Add event listeners to actuator toggles to update text
+	// Add event listeners to actuator toggles to update text and control relays
 	document.querySelectorAll('.actuator-toggle input[type="checkbox"]').forEach(checkbox => {
 		checkbox.addEventListener('change', () => {
 			const label = checkbox.closest('.toggle-switch');
@@ -1727,12 +1874,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			if(toggleText) {
 				toggleText.textContent = checkbox.checked ? 'ON' : 'OFF';
 			}
+			// If override is ON (manual mode), send to relay API
+			if (actuatorOverride) {
+				const relayNum = ACTUATOR_TO_RELAY[checkbox.id];
+				if (relayNum) {
+					toggleRelay(relayNum, checkbox.checked, null);
+				}
+			}
 		});
 	});
 
-	// Override toggle: when ON, freeze auto-updates to actuators; manual toggles still work
+	// Override toggle: ON = manual mode (user controls), OFF = auto mode (sensors control)
+	// Starts ON to prevent actuators from going crazy on page load
 	const overrideToggle = document.getElementById('actuatorOverrideToggle');
 	if(overrideToggle){
+		// Set checkbox to checked on page load (override ON = manual mode)
+		overrideToggle.checked = true;
+		
 		const updateOverrideState = () => {
 			const label = overrideToggle.closest('.toggle-switch');
 			const textEl = label ? label.querySelector('.toggle-text') : null;
@@ -1747,6 +1905,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 					actuatorCard.classList.remove('override-active');
 				}
 			}
+			console.log(`Override mode: ${actuatorOverride ? 'MANUAL (user controls actuators)' : 'AUTO (sensors control actuators)'}`);
 		};
 		overrideToggle.addEventListener('change', updateOverrideState);
 		updateOverrideState();
