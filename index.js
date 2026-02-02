@@ -1,5 +1,5 @@
 // === SIBOLTECH API Configuration ===
-let RELAY_API_URL = 'https://manufacturing-valuable-suits-politicians.trycloudflare.com/api'; // fallback - update this when tunnel restarts
+let RELAY_API_URL = 'https://centres-provide-oxford-kansas.trycloudflare.com/api'; // fallback - update this when tunnel restarts
 let apiUrlInitialized = false;
 
 // Initialize API URL dynamically (from /api/tunnel-url endpoint)
