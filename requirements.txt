@@ -10,3 +10,6 @@ sqlite-web
 gunicorn
 pyserial
 paho-mqtt
+scikit-learn
+pandas
+numpy

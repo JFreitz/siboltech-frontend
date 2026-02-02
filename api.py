@@ -963,6 +963,104 @@ def set_calibration():
     
     return jsonify({"success": True, "sensor": sensor, "slope": slope, "offset": offset})
 
+@app.route("/api/predict", methods=["GET", "POST"])
+def predict_growth():
+    """Predict plant growth using trained ML models.
+    
+    Query params or JSON body:
+    - day: Target day number (1-30, default: current day)
+    - farming_system: 'Aquaponics', 'Hydroponics', or 'Soil-based'
+    
+    Returns predictions for: height, length, width, leaf_count, branch_count
+    """
+    import pickle
+    import numpy as np
+    
+    MODEL_DIR = os.path.join(os.path.dirname(__file__), 'models')
+    
+    # Check if models exist
+    model_info_path = os.path.join(MODEL_DIR, 'model_info.json')
+    if not os.path.exists(model_info_path):
+        return jsonify({"error": "No trained models found. Run train_model.py first."}), 404
+    
+    # Get parameters
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+    else:
+        data = {}
+    
+    day = int(request.args.get('day') or data.get('day') or 1)
+    farming_system = request.args.get('farming_system') or data.get('farming_system') or 'Aquaponics'
+    
+    try:
+        # Load model artifacts
+        with open(os.path.join(MODEL_DIR, 'scaler.pkl'), 'rb') as f:
+            scaler = pickle.load(f)
+        with open(os.path.join(MODEL_DIR, 'label_encoder.pkl'), 'rb') as f:
+            le = pickle.load(f)
+        with open(os.path.join(MODEL_DIR, 'feature_cols.json'), 'r') as f:
+            feature_cols = json.load(f)
+        with open(model_info_path, 'r') as f:
+            model_info = json.load(f)
+        
+        # Encode farming system
+        try:
+            system_encoded = le.transform([farming_system])[0]
+        except ValueError:
+            return jsonify({"error": f"Unknown farming_system: {farming_system}. Use: {list(le.classes_)}"}), 400
+        
+        # Get current sensor readings for features
+        with Session() as session:
+            latest = {}
+            for sensor in ['temperature', 'humidity', 'ph', 'tds', 'do']:
+                row = session.execute(
+                    text(f"SELECT value FROM sensor_readings WHERE sensor = :s ORDER BY timestamp DESC LIMIT 1"),
+                    {"s": sensor}
+                ).first()
+                latest[sensor] = float(row[0]) if row else 0
+        
+        # Build feature vector
+        features = []
+        for col in feature_cols:
+            if col == 'day_num':
+                features.append(day)
+            elif col == 'farming_system_encoded':
+                features.append(system_encoded)
+            elif col in latest:
+                features.append(latest[col])
+            else:
+                features.append(0)
+        
+        # Scale features
+        X = scaler.transform([features])
+        
+        # Make predictions with each target's model
+        predictions = {}
+        for target in ['height', 'length', 'width', 'leaf_count', 'branch_count']:
+            model_path = os.path.join(MODEL_DIR, f'{target}_model.pkl')
+            if os.path.exists(model_path):
+                with open(model_path, 'rb') as f:
+                    model = pickle.load(f)
+                pred = model.predict(X)[0]
+                predictions[target] = round(max(0, pred), 2)
+        
+        return jsonify({
+            "day": day,
+            "farming_system": farming_system,
+            "predictions": predictions,
+            "model_info": {
+                "trained_at": model_info.get("trained_at"),
+                "training_days": model_info.get("training_days"),
+                "testing_days": model_info.get("testing_days"),
+                "best_models": model_info.get("best_models", {})
+            },
+            "current_conditions": latest
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/voltage", methods=["GET"])
 def get_voltage():
     """Get latest raw voltage readings for calibration.

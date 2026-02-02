@@ -10,8 +10,8 @@ static const uint32_t BAUD = 115200;
 static const char* DEVICE_ID = "esp32-wroom32";
 
 // --- WiFi Configuration ---
-static const char* WIFI_SSID = "JP";
-static const char* WIFI_PASSWORD = "qwertyuiopa";
+static const char* WIFI_SSID = "ayawkonga";
+static const char* WIFI_PASSWORD = "yokonga.";
 
 // --- MQTT Configuration (HiveMQ Cloud Free Tier) ---
 // Sign up at: https://www.hivemq.com/mqtt-cloud-broker/
@@ -20,7 +20,7 @@ static const char* WIFI_PASSWORD = "qwertyuiopa";
 
 // --- Cloud API Configuration (for sensor data upload) ---
 // Use LOCAL RPi IP for fast sensor uploads, relay polling stays on local network
-static const char* API_BASE_URL = "http://172.20.10.2:5000";  // Local RPi - much faster!
+static const char* API_BASE_URL = "http://10.196.153.194:5000";  // Local RPi - much faster!
 static const char* API_KEY = "espkey123";
 static uint32_t last_sensor_upload_ms = 0;
 static const uint32_t SENSOR_UPLOAD_INTERVAL = 2000;  // Upload every 2 seconds (fast local network)
@@ -250,8 +250,8 @@ void loop() {
   if (now - last_print_ms < 1000) { return; }
   last_print_ms = now;
 
-  float temp_c = bme_ok ? bme.readTemperature() : 25.0f;
-  float humidity = bme_ok ? bme.readHumidity() : 50.0f;
+  float temp_c = bme_ok ? bme.readTemperature() : 0.0f;
+  float humidity = bme_ok ? bme.readHumidity() : 0.0f;
 
   const int samples = 20;
   uint32_t acc = 0, acc_ph = 0, acc_do = 0;
