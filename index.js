@@ -1683,15 +1683,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	// Mapping between dashboard actuator IDs and relay numbers
 	const ACTUATOR_TO_RELAY = {
-		'act-water': 1,        // Misting Pump
-		'act-air': 2,          // Air Pump
-		'act-fan-in': 3,       // Exhaust Fan (In)
-		'act-fan-out': 4,      // Exhaust Fan (Out)
-		'act-lights-aerponics': 5, // Grow Lights (Aeroponics)
-		'act-lights-dwc': 6,   // Grow Lights (DWC)
-		'btn-ph-up': 7,        // pH Up (nutrient)
-		'btn-ph-down': 8,      // pH Down (nutrient)
-		'btn-leafy-green': 9   // Leafy Green (nutrient)
+		'act-water': 4,        // Misting Pump
+		'act-air': 7,          // Air Pump
+		'act-fan-in': 9,       // Exhaust Fan (In)
+		'act-fan-out': 5,      // Exhaust Fan (Out)
+		'act-lights-aerponics': 6, // Grow Lights (Aeroponics)
+		'act-lights-dwc': 8,   // Grow Lights (DWC)
+		'btn-ph-up': 3,        // pH Up (nutrient)
+		'btn-ph-down': 2,      // pH Down (nutrient)
+		'btn-leafy-green': 1   // Leafy Green (nutrient)
 	};
 
 	const RELAY_TO_ACTUATOR = Object.fromEntries(
@@ -1993,10 +1993,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	function setupNutrientButtons(){
 		const actions = [
-			{ id: 'btn-ph-up', label: 'pH Up', relay: 7 },
-			{ id: 'btn-ph-down', label: 'pH Down', relay: 8 },
-			{ id: 'btn-leafy-green', label: 'Leafy Green', relay: 9 },
-			{ id: 'btn-misting-pump', label: 'Misting Pump', relay: 1 }
+			{ id: 'btn-ph-up', label: 'pH Up', relay: 3 },
+			{ id: 'btn-ph-down', label: 'pH Down', relay: 2 },
+			{ id: 'btn-leafy-green', label: 'Leafy Green', relay: 1 },
+			{ id: 'btn-misting-pump', label: 'Misting Pump', relay: 4 }
 		];
 
 		actions.forEach(action => {
