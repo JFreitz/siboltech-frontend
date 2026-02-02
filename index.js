@@ -1993,26 +1993,41 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	function setupNutrientButtons(){
 		const actions = [
-			{ id: 'btn-ph-up', label: 'pH Up' },
-			{ id: 'btn-ph-down', label: 'pH Down' },
-			{ id: 'btn-leafy-green', label: 'Leafy Green' },
-			{ id: 'btn-misting-pump', label: 'Misting Pump' }
+			{ id: 'btn-ph-up', label: 'pH Up', relay: 7 },
+			{ id: 'btn-ph-down', label: 'pH Down', relay: 8 },
+			{ id: 'btn-leafy-green', label: 'Leafy Green', relay: 9 },
+			{ id: 'btn-misting-pump', label: 'Misting Pump', relay: 1 }
 		];
 
 		actions.forEach(action => {
 			const btn = document.getElementById(action.id);
 			if(!btn) return;
-			btn.addEventListener('click', () => {
+			btn.addEventListener('click', async () => {
 				if(btn.disabled) return;
 				btn.disabled = true;
 				btn.classList.add('is-dosing');
 				btn.setAttribute('aria-pressed', 'true');
 				showNutrientNotification(action.label);
+				
+				// Pulse the relay: ON for 2 seconds, then OFF
+				if(action.relay) {
+					try {
+						await fetch(`${RELAY_API_URL}/relay/${action.relay}/on`, { method: 'POST' });
+						console.log(`[Nutrient] ${action.label} relay ${action.relay} ON`);
+						setTimeout(async () => {
+							await fetch(`${RELAY_API_URL}/relay/${action.relay}/off`, { method: 'POST' });
+							console.log(`[Nutrient] ${action.label} relay ${action.relay} OFF`);
+						}, 2000);
+					} catch(err) {
+						console.error(`[Nutrient] Failed to control relay ${action.relay}:`, err);
+					}
+				}
+				
 				setTimeout(() => {
 					btn.disabled = false;
 					btn.classList.remove('is-dosing');
 					btn.setAttribute('aria-pressed', 'false');
-				}, 5000);
+				}, 2500);
 			});
 		});
 	}
