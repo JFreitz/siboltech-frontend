@@ -1771,6 +1771,53 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		if (toggleText) toggleText.textContent = state ? 'ON' : 'OFF';
 	}
 
+	// Fetch relay status from API and sync all actuator UIs
+	async function loadRelayStatus() {
+		try {
+			const response = await fetch(`${RELAY_API_URL}/relay/status`);
+			if (response.ok) {
+				const data = await response.json();
+				if (data.relays) {
+					data.relays.forEach(relay => {
+						const actuatorId = RELAY_TO_ACTUATOR[relay.id];
+						if (actuatorId) {
+							syncActuatorUI(actuatorId, relay.state);
+						}
+					});
+				}
+			}
+		} catch (error) {
+			console.error('Error loading relay status:', error);
+		}
+	}
+
+	// Turn all actuators/relays OFF
+	async function turnAllActuatorsOff() {
+		try {
+			await fetch(`${RELAY_API_URL}/relay/all/off`, { method: 'POST' });
+			// Update all actuator UIs to OFF
+			Object.keys(ACTUATOR_TO_RELAY).forEach(actuatorId => {
+				syncActuatorUI(actuatorId, false);
+			});
+			console.log('All actuators turned OFF');
+		} catch (error) {
+			console.error('Error turning all actuators off:', error);
+		}
+	}
+
+	// Initialize all actuator toggles to OFF state on page load
+	function initializeActuatorsOff() {
+		Object.keys(ACTUATOR_TO_RELAY).forEach(actuatorId => {
+			syncActuatorUI(actuatorId, false);
+		});
+	}
+
+	// Call on page load - set UI to OFF initially
+	initializeActuatorsOff();
+
+	// Periodically sync relay status with UI (every 3 seconds)
+	setInterval(loadRelayStatus, 3000);
+
 	// Check sensor thresholds for auto-activation (only when override is OFF)
 	function checkNutrientAutoActivation(phValue, tdsValue) {
 		if (actuatorOverride) return; // Skip auto-control in manual mode
@@ -1891,10 +1938,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		// Set checkbox to checked on page load (override ON = manual mode)
 		overrideToggle.checked = true;
 		
-		const updateOverrideState = () => {
+		const updateOverrideState = async (isInitial = false) => {
 			const label = overrideToggle.closest('.toggle-switch');
 			const textEl = label ? label.querySelector('.toggle-text') : null;
 			const actuatorCard = overrideToggle.closest('.actuator-card');
+			const wasOverride = actuatorOverride;
 			actuatorOverride = overrideToggle.checked;
 			if(textEl) textEl.textContent = actuatorOverride ? 'ON' : 'OFF';
 			// Add/remove orange border class when override is active
@@ -1905,10 +1953,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
 					actuatorCard.classList.remove('override-active');
 				}
 			}
+			
+			// When switching from MANUAL to AUTO, turn all actuators OFF for fresh start
+			if (!isInitial && wasOverride && !actuatorOverride) {
+				console.log('Switching to AUTO mode - turning all actuators OFF for fresh start');
+				await turnAllActuatorsOff();
+				// Reset the auto-control state
+				Object.keys(nutrientActiveState).forEach(k => nutrientActiveState[k] = false);
+				Object.keys(consecutiveBreaches).forEach(k => consecutiveBreaches[k] = 0);
+				Object.keys(sensorHistory).forEach(k => sensorHistory[k] = []);
+			}
+			
 			console.log(`Override mode: ${actuatorOverride ? 'MANUAL (user controls actuators)' : 'AUTO (sensors control actuators)'}`);
 		};
-		overrideToggle.addEventListener('change', updateOverrideState);
-		updateOverrideState();
+		overrideToggle.addEventListener('change', () => updateOverrideState(false));
+		updateOverrideState(true); // Initial call
 	}
 
 	// Nutrient solution quick actions
