@@ -4575,7 +4575,7 @@ function updateMiniCharts(){
     
     // Voltage smoothing - keeps last 15 readings and averages
     const VOLTAGE_HISTORY_SIZE = 15;
-    const STABILITY_THRESHOLD = 5; // mV - readings must be within this range to be "stable"
+    const STABILITY_THRESHOLD = 20; // mV - readings must be within this range to be "stable"
     
     function smoothVoltage(sensor, newValue) {
         const state = calState[sensor];
