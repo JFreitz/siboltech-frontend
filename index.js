@@ -1,29 +1,14 @@
 // === SIBOLTECH API Configuration ===
-let RELAY_API_URL = 'https://centres-provide-oxford-kansas.trycloudflare.com/api'; // fallback - update this when tunnel restarts
-let apiUrlInitialized = false;
+// Auto-detect API URL from current page origin (works with any tunnel URL!)
+let RELAY_API_URL = window.location.origin + '/api';
+let apiUrlInitialized = true; // Always ready since we use current origin
 
-// Initialize API URL dynamically (from /api/tunnel-url endpoint)
+// Initialize API URL - now automatic, no server call needed!
 async function initializeAPIUrl() {
-    try {
-        // First try to get tunnel URL from local API
-        const res = await fetch('/api/tunnel-url', { cache: 'no-store' });
-        if (res.ok) {
-            const data = await res.json();
-            if (data.url) {  // API returns "url", not "tunnel_url"
-                RELAY_API_URL = `${data.url}/api`;
-                console.log('API URL initialized from /api/tunnel-url:', RELAY_API_URL);
-                apiUrlInitialized = true;
-                return;
-            }
-        }
-    } catch (e) {
-        console.log('Could not fetch tunnel URL from local API, will use fallback:', e);
-    }
-    
-    // Fallback: keep using the hardcoded tunnel URL (already set at line 1)
-    // Note: Localhost only works from RPi directly, not from remote devices
+    // Use the same origin as the page (tunnel URL or localhost)
+    RELAY_API_URL = window.location.origin + '/api';
+    console.log('API URL auto-detected:', RELAY_API_URL);
     apiUrlInitialized = true;
-    console.log('Using fallback API URL:', RELAY_API_URL);
 }
 
 // Wait for API URL to be ready
@@ -4425,8 +4410,8 @@ function updateMiniCharts(){
 
 // ==================== FULL CALIBRATION SYSTEM ====================
 (function initCalibrationSystem() {
-    // Use dynamic RELAY_API_URL instead of hardcoded URL
-    const getApiUrl = () => RELAY_API_URL || 'https://yea-configuration-coast-interview.trycloudflare.com/api';
+    // Use dynamic RELAY_API_URL (auto-detected from page origin)
+    const getApiUrl = () => RELAY_API_URL || (window.location.origin + '/api');
     
     // pH buffer values
     const phBuffers = [4.00, 6.86, 9.18];
