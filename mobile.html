@@ -348,14 +348,19 @@
             btn.classList.add('updating');
             
             try {
-                await fetch(`${API_URL}/relay/set`, {
+                // Use correct API endpoint: /api/relay/{id}/on or /api/relay/{id}/off
+                const endpoint = newState ? 'on' : 'off';
+                const res = await fetch(`${API_URL}/relay/${relay}/${endpoint}`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ relay: relay, state: newState ? 'ON' : 'OFF' })
+                    headers: { 'Content-Type': 'application/json' }
                 });
                 
-                relayStates[relay - 1] = newState;
-                updateRelayUI(relay, newState);
+                if (res.ok) {
+                    relayStates[relay - 1] = newState;
+                    updateRelayUI(relay, newState);
+                } else {
+                    console.error('Relay toggle failed:', res.status);
+                }
             } catch (e) {
                 console.error('Toggle error:', e);
             }
