@@ -241,10 +241,32 @@
     
     <div class="desktop-link">
         <a href="index.html">Switch to Desktop View →</a>
+        <br><a href="#" onclick="changeApiUrl(); return false;" style="font-size:12px;color:rgba(255,255,255,0.5);">⚙️ Change API URL</a>
     </div>
 
     <script>
-        const API_URL = 'https://adventures-around-trains-launched.trycloudflare.com/api';
+        // Smart API URL - check localStorage first, then try to detect
+        function getApiUrl() {
+            const saved = localStorage.getItem('siboltech_api_url');
+            if (saved) return saved;
+            
+            // If on localhost or RPi IP, use same origin
+            const host = window.location.hostname;
+            if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('172.')) {
+                return window.location.origin + '/api';
+            }
+            
+            // On Vercel/static hosting, prompt for tunnel URL
+            const tunnel = prompt('Enter your tunnel URL (e.g., https://xxx.trycloudflare.com):', 
+                                  'https://adventures-around-trains-launched.trycloudflare.com');
+            if (tunnel) {
+                localStorage.setItem('siboltech_api_url', tunnel + '/api');
+                return tunnel + '/api';
+            }
+            return 'https://adventures-around-trains-launched.trycloudflare.com/api';
+        }
+        
+        const API_URL = getApiUrl();
         
         const relayNames = [
             'Pump 1', 'Pump 2', 'Light 1', 
@@ -349,6 +371,16 @@
         // Auto-refresh every 3 seconds
         setInterval(fetchSensors, 3000);
         setInterval(fetchRelayStates, 3000);
+        
+        // Change API URL function
+        function changeApiUrl() {
+            const current = localStorage.getItem('siboltech_api_url') || API_URL;
+            const newUrl = prompt('Enter new API URL:', current.replace('/api', ''));
+            if (newUrl) {
+                localStorage.setItem('siboltech_api_url', newUrl + '/api');
+                location.reload();
+            }
+        }
     </script>
 </body>
 </html>
