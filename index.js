@@ -4573,8 +4573,9 @@ function updateMiniCharts(){
         tds: { voltage: null, points: [], history: [] }
     };
     
-    // Voltage smoothing - keeps last 10 readings and averages
-    const VOLTAGE_HISTORY_SIZE = 10;
+    // Voltage smoothing - keeps last 15 readings and averages
+    const VOLTAGE_HISTORY_SIZE = 15;
+    const STABILITY_THRESHOLD = 5; // mV - readings must be within this range to be "stable"
     
     function smoothVoltage(sensor, newValue) {
         const state = calState[sensor];
@@ -4585,6 +4586,33 @@ function updateMiniCharts(){
         // Return average of history
         const sum = state.history.reduce((a, b) => a + b, 0);
         return sum / state.history.length;
+    }
+    
+    // Check if voltage is stable (low variance)
+    function isVoltageStable(sensor) {
+        const history = calState[sensor].history;
+        if (history.length < VOLTAGE_HISTORY_SIZE) return false;
+        
+        const min = Math.min(...history);
+        const max = Math.max(...history);
+        const rangeInMv = (max - min) * 1000;
+        
+        return rangeInMv <= STABILITY_THRESHOLD;
+    }
+    
+    // Get stability percentage (0-100)
+    function getStabilityPercent(sensor) {
+        const history = calState[sensor].history;
+        if (history.length < 3) return 0;
+        
+        const min = Math.min(...history);
+        const max = Math.max(...history);
+        const rangeInMv = (max - min) * 1000;
+        
+        // Convert range to percentage (smaller range = more stable)
+        // 0mV = 100%, 20mV+ = 0%
+        const stability = Math.max(0, 100 - (rangeInMv * 5));
+        return Math.round(stability);
     }
     
     // Load current calibration from API
@@ -4620,11 +4648,31 @@ function updateMiniCharts(){
             
             for (const sensor of ['ph', 'do', 'tds']) {
                 const el = document.getElementById(`${sensor}LiveVoltage`);
+                const stabilityEl = document.getElementById(`${sensor}Stability`);
+                
                 if (data[sensor]?.voltage !== undefined) {
                     // Apply smoothing for stable display
                     const smoothed = smoothVoltage(sensor, data[sensor].voltage);
                     calState[sensor].voltage = smoothed;
                     if (el) el.textContent = `${(smoothed * 1000).toFixed(1)} mV`;
+                    
+                    // Update stability indicator
+                    const stable = isVoltageStable(sensor);
+                    const stabilityPct = getStabilityPercent(sensor);
+                    
+                    if (stabilityEl) {
+                        if (stable) {
+                            stabilityEl.innerHTML = `<span style="color:#22c55e;font-weight:bold;">✓ STABLE - Ready to capture!</span>`;
+                        } else {
+                            const barWidth = stabilityPct;
+                            const barColor = stabilityPct > 70 ? '#eab308' : '#ef4444';
+                            stabilityEl.innerHTML = `
+                                <span style="color:#888;">Stabilizing... ${stabilityPct}%</span>
+                                <div style="width:100px;height:6px;background:#333;border-radius:3px;margin-top:4px;">
+                                    <div style="width:${barWidth}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.3s;"></div>
+                                </div>`;
+                        }
+                    }
                 }
             }
         } catch (e) {

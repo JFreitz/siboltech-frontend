@@ -32,9 +32,16 @@ cloudflared tunnel --url http://localhost:5000 2>&1 | tee logs/tunnel.log &
 TUNNEL_PID=$!
 echo $TUNNEL_PID > logs/tunnel.pid
 
-# Wait for URL to appear
-sleep 8
-TUNNEL_URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' logs/tunnel.log | head -1)
+# Wait for URL to appear (retry up to 30 seconds)
+echo "⏳ Waiting for tunnel URL..."
+TUNNEL_URL=""
+for i in {1..30}; do
+    TUNNEL_URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' logs/tunnel.log | tail -1)
+    if [ -n "$TUNNEL_URL" ]; then
+        break
+    fi
+    sleep 1
+done
 
 if [ -n "$TUNNEL_URL" ]; then
     echo "$TUNNEL_URL" > logs/tunnel_url.txt
@@ -66,6 +73,18 @@ if [ -n "$TUNNEL_URL" ]; then
 else
     echo "❌ Could not get tunnel URL. Check logs/tunnel.log"
 fi
+
+# Background URL monitor - updates file when tunnel reconnects
+(
+    while true; do
+        sleep 60
+        NEW_URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' logs/tunnel.log | tail -1)
+        if [ -n "$NEW_URL" ] && [ "$NEW_URL" != "$(cat logs/tunnel_url.txt 2>/dev/null)" ]; then
+            echo "$NEW_URL" > logs/tunnel_url.txt
+            echo "🔄 Tunnel URL updated: $NEW_URL"
+        fi
+    done
+) &
 
 echo "Press Ctrl+C to stop..."
 wait $TUNNEL_PID

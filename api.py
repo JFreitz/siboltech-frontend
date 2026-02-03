@@ -10,6 +10,7 @@ This module avoids Postgres-specific SQL so it can run on both.
 import os
 import json
 import ssl
+import threading
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -19,6 +20,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 import paho.mqtt.publish as mqtt_publish
+import serial
 
 from db import Base, SensorReading, PlantReading, ActuatorEvent
 
@@ -38,6 +40,71 @@ Base.metadata.create_all(bind=engine)
 
 
 DISPLAY_TZ = ZoneInfo(os.getenv("DISPLAY_TIMEZONE", "Asia/Manila"))
+
+# ==================== Serial Configuration ====================
+SERIAL_PORT = os.getenv("SERIAL_PORT", "/dev/ttyUSB0")
+SERIAL_BAUD = 115200
+_serial_lock = threading.Lock()
+_serial_conn = None
+
+
+def _get_serial():
+    """Get or create serial connection to ESP32."""
+    global _serial_conn
+    try:
+        if _serial_conn is None or not _serial_conn.is_open:
+            _serial_conn = serial.Serial(SERIAL_PORT, SERIAL_BAUD, timeout=1)
+            import time
+            time.sleep(0.3)  # Wait for connection to stabilize
+            _serial_conn.reset_input_buffer()
+        return _serial_conn
+    except Exception as e:
+        print(f"Serial connection error: {e}")
+        return None
+
+
+def _send_serial_command(cmd: str) -> dict:
+    """Send command to ESP32 via serial and return response."""
+    import time
+    with _serial_lock:
+        try:
+            ser = _get_serial()
+            if not ser:
+                return {"success": False, "error": "Serial not available"}
+            
+            # Clear buffers - discard any pending sensor data
+            ser.reset_input_buffer()
+            ser.reset_output_buffer()
+            time.sleep(0.02)  # Small delay to ensure buffer is cleared
+            ser.reset_input_buffer()  # Clear again after any queued data arrives
+            
+            # Send command
+            ser.write((cmd + "\n").encode())
+            ser.flush()
+            
+            # Wait for ESP32 to process
+            time.sleep(0.1)
+            
+            # Read response - only look for relay-related JSON
+            response_lines = []
+            start = time.time()
+            while (time.time() - start) < 0.5:
+                if ser.in_waiting:
+                    line = ser.readline().decode('utf-8', errors='ignore').strip()
+                    if line:
+                        # Only capture relay-related responses
+                        if '"relay"' in line or '"relay_status"' in line or '"all_relays"' in line:
+                            response_lines.append(line)
+                            break  # Got our response
+                else:
+                    time.sleep(0.01)
+            
+            print(f"[Serial] Sent: {cmd} | Response: {response_lines}")
+            return {"success": True, "response": response_lines}
+        except Exception as e:
+            print(f"Serial command error: {e}")
+            return {"success": False, "error": str(e)}
+
 
 # ==================== MQTT Configuration ====================
 # HiveMQ Cloud (free tier) credentials
@@ -827,16 +894,11 @@ def relay_on(relay_id):
     RELAY_STATES[relay_id] = True
     _save_relay_state(relay_id, True)
     
-    # Publish to MQTT for instant ESP32 response
-    # mqtt_sent = _publish_mqtt({"relay": relay_id, "state": "ON"})
-    mqtt_sent = True  # Assume sent for compatibility
-    
     return jsonify({
         "success": True,
         "relay": relay_id,
         "label": RELAY_LABELS.get(relay_id),
-        "state": True,
-        "mqtt_sent": mqtt_sent
+        "state": True
     })
 
 
@@ -849,16 +911,11 @@ def relay_off(relay_id):
     RELAY_STATES[relay_id] = False
     _save_relay_state(relay_id, False)
     
-    # Publish to MQTT for instant ESP32 response
-    # mqtt_sent = _publish_mqtt({"relay": relay_id, "state": "OFF"})
-    mqtt_sent = True  # Assume sent for compatibility
-    
     return jsonify({
         "success": True,
         "relay": relay_id,
         "label": RELAY_LABELS.get(relay_id),
-        "state": False,
-        "mqtt_sent": mqtt_sent
+        "state": False
     })
 
 
@@ -868,11 +925,7 @@ def relay_all_on():
     for i in range(1, 9):
         RELAY_STATES[i] = True
         _save_relay_state(i, True)
-    
-    # Publish to MQTT
-    mqtt_sent = _publish_mqtt({"relay": "all", "state": "ON"})
-    
-    return jsonify({"success": True, "message": "All relays ON", "mqtt_sent": mqtt_sent})
+    return jsonify({"success": True, "message": "All relays ON"})
 
 
 @app.route("/api/relay/all/off", methods=["POST"])
@@ -881,11 +934,7 @@ def relay_all_off():
     for i in range(1, 9):
         RELAY_STATES[i] = False
         _save_relay_state(i, False)
-    
-    # Publish to MQTT
-    mqtt_sent = _publish_mqtt({"relay": "all", "state": "OFF"})
-    
-    return jsonify({"success": True, "message": "All relays OFF", "mqtt_sent": mqtt_sent})
+    return jsonify({"success": True, "message": "All relays OFF"})
 
 
 def _save_relay_state(relay_id, state):
