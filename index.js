@@ -4568,10 +4568,24 @@ function updateMiniCharts(){
     
     // Calibration state
     const calState = {
-        ph: { voltage: null, points: [] },
-        do: { voltage: null, points: [] },
-        tds: { voltage: null, points: [] }
+        ph: { voltage: null, points: [], history: [] },
+        do: { voltage: null, points: [], history: [] },
+        tds: { voltage: null, points: [], history: [] }
     };
+    
+    // Voltage smoothing - keeps last 10 readings and averages
+    const VOLTAGE_HISTORY_SIZE = 10;
+    
+    function smoothVoltage(sensor, newValue) {
+        const state = calState[sensor];
+        state.history.push(newValue);
+        if (state.history.length > VOLTAGE_HISTORY_SIZE) {
+            state.history.shift();
+        }
+        // Return average of history
+        const sum = state.history.reduce((a, b) => a + b, 0);
+        return sum / state.history.length;
+    }
     
     // Load current calibration from API
     async function loadCalibration() {
@@ -4607,8 +4621,10 @@ function updateMiniCharts(){
             for (const sensor of ['ph', 'do', 'tds']) {
                 const el = document.getElementById(`${sensor}LiveVoltage`);
                 if (data[sensor]?.voltage !== undefined) {
-                    calState[sensor].voltage = data[sensor].voltage;
-                    if (el) el.textContent = `${(data[sensor].voltage * 1000).toFixed(1)} mV`;
+                    // Apply smoothing for stable display
+                    const smoothed = smoothVoltage(sensor, data[sensor].voltage);
+                    calState[sensor].voltage = smoothed;
+                    if (el) el.textContent = `${(smoothed * 1000).toFixed(1)} mV`;
                 }
             }
         } catch (e) {
