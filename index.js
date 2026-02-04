@@ -2067,6 +2067,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				}
 			}
 			
+			// Sync with backend automation controller
+			try {
+				await fetch(`${API_BASE_URL}/override-mode`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ enabled: actuatorOverride })
+				});
+				console.log(`[API] Override mode synced: ${actuatorOverride}`);
+			} catch (e) {
+				console.warn('[API] Failed to sync override mode:', e);
+			}
+			
 			// When switching from MANUAL to AUTO, turn all actuators OFF for fresh start
 			if (!isInitial && wasOverride && !actuatorOverride) {
 				console.log('Switching to AUTO mode - turning all actuators OFF for fresh start');

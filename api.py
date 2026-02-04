@@ -23,6 +23,7 @@ import paho.mqtt.publish as mqtt_publish
 import serial
 
 from db import Base, SensorReading, PlantReading, ActuatorEvent
+from automation import init_controller, get_controller
 
 
 app = Flask(__name__)
@@ -340,6 +341,14 @@ def ingest():
         session.add_all(to_insert)
         session.commit()
 
+    # Feed sensor data to automation controller
+    try:
+        controller = get_controller()
+        if controller:
+            controller.update_sensors(computed_readings)
+    except Exception as e:
+        print(f"[AUTOMATION] Failed to update sensors: {e}")
+
     return {"ok": True, "inserted": len(to_insert)}
 
 @app.route("/")
@@ -634,6 +643,19 @@ def get_history():
 # In-memory relay states (persisted in DB for reliability)
 RELAY_STATES = {i: False for i in range(1, 10)}  # 9 relays
 CALIBRATION_MODE_ENABLED = False  # When True, disables all actuator triggers
+OVERRIDE_MODE_ENABLED = False  # When True, disables automation (manual control)
+
+# ==================== AUTOMATION CONTROLLER ====================
+def _automation_relay_callback(relay_id: int, state: bool):
+    """Callback for automation controller to set relay states."""
+    global RELAY_STATES
+    if OVERRIDE_MODE_ENABLED or CALIBRATION_MODE_ENABLED:
+        return  # Don't change relays in override or calibration mode
+    RELAY_STATES[relay_id] = state
+    _save_relay_state(relay_id, state)
+
+# Initialize automation controller (starts background thread)
+_automation_controller = init_controller(_automation_relay_callback)
 
 RELAY_LABELS = {
     1: "Misting Pump",
@@ -842,11 +864,56 @@ def relay_status():
     """Get status of all relays."""
     return jsonify({
         "success": True,
+        "override_mode": OVERRIDE_MODE_ENABLED,
         "relays": [
             {"id": i, "label": RELAY_LABELS.get(i, f"Relay {i}"), "state": RELAY_STATES[i]}
             for i in range(1, 10)  # 9 relays
         ]
     })
+
+
+# ==================== OVERRIDE MODE (Manual Control) ====================
+@app.route("/api/override-mode", methods=["GET"])
+def get_override_mode():
+    """Get current override mode status."""
+    controller = get_controller()
+    return jsonify({
+        "success": True,
+        "enabled": OVERRIDE_MODE_ENABLED,
+        "automation_status": controller.get_status() if controller else None
+    })
+
+
+@app.route("/api/override-mode", methods=["POST"])
+def set_override_mode():
+    """Enable/disable override mode (disables automation for manual control)."""
+    global OVERRIDE_MODE_ENABLED
+    data = request.get_json() or {}
+    enabled = data.get("enabled", False)
+    
+    OVERRIDE_MODE_ENABLED = bool(enabled)
+    
+    # Sync with automation controller
+    controller = get_controller()
+    if controller:
+        controller.set_override(OVERRIDE_MODE_ENABLED)
+    
+    print(f"[OVERRIDE MODE] {'ENABLED' if OVERRIDE_MODE_ENABLED else 'DISABLED'} - Automation {'suspended' if OVERRIDE_MODE_ENABLED else 'active'}")
+    
+    return jsonify({
+        "success": True,
+        "enabled": OVERRIDE_MODE_ENABLED,
+        "message": "Manual control enabled - automation suspended" if OVERRIDE_MODE_ENABLED else "Automation enabled"
+    })
+
+
+@app.route("/api/automation/status")
+def automation_status():
+    """Get detailed automation status including filtered values and thresholds."""
+    controller = get_controller()
+    if not controller:
+        return jsonify({"success": False, "error": "Automation controller not initialized"})
+    return jsonify({"success": True, **controller.get_status()})
 
 
 # ==================== CALIBRATION MODE ====================
@@ -1164,5 +1231,10 @@ def get_voltage():
 
 
 if __name__ == "__main__":
+    # Start automation controller background thread
+    if _automation_controller:
+        _automation_controller.start()
+        print("[API] Automation controller started")
+    
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)

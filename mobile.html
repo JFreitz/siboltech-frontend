@@ -257,13 +257,13 @@
             }
             
             // On Vercel/static hosting, prompt for tunnel URL
-            const tunnel = prompt('Enter your tunnel URL (e.g., https://xxx.trycloudflare.com):', 
-                                  'https://adventures-around-trains-launched.trycloudflare.com');
+            const tunnel = prompt('Enter your tunnel URL (e.g., https://fold-utility-southern-cakes.trycloudflare.com):', 
+                                  'https://fold-utility-southern-cakes.trycloudflare.com');
             if (tunnel) {
                 localStorage.setItem('siboltech_api_url', tunnel + '/api');
                 return tunnel + '/api';
             }
-            return 'https://adventures-around-trains-launched.trycloudflare.com/api';
+            return 'https://fold-utility-southern-cakes.trycloudflare.com/api';
         }
         
         const API_URL = getApiUrl();
