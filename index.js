@@ -1,166 +1,32 @@
-// === SIBOLTECH API Configuration ===
-// Smart API URL detection: tunnel origin > localStorage > prompt user
-let RELAY_API_URL = '';
-let apiUrlInitialized = false;
+// === SIBOLTECH Firebase Configuration ===
+// Using Firebase Firestore for real-time sensor data
+let RELAY_API_URL = window.location.origin + '/api';  // Fallback for local/tunnel access
 
-// Check if we're on Vercel or similar static hosting
-function isStaticHosting() {
+// Check if we're on localhost/tunnel for API fallback
+function isLocalAccess() {
     const host = window.location.hostname;
-    return host.includes('vercel.app') || 
-           host.includes('netlify.app') || 
-           host.includes('github.io') ||
-           host.includes('pages.dev');
+    return host.includes('trycloudflare.com') || 
+           host === 'localhost' ||
+           host === '127.0.0.1' ||
+           host.startsWith('192.168.');
 }
 
-// Initialize API URL - smart detection
+// Initialize - Firebase will handle data via the module in index.html
 async function initializeAPIUrl() {
-    // If on tunnel (trycloudflare) or localhost, use same origin
-    if (window.location.hostname.includes('trycloudflare.com') || 
-        window.location.hostname === 'localhost' ||
-        window.location.hostname === '127.0.0.1') {
+    if (isLocalAccess()) {
         RELAY_API_URL = window.location.origin + '/api';
-        console.log('API URL auto-detected (tunnel/local):', RELAY_API_URL);
-        apiUrlInitialized = true;
-        updateApiSettingsButton(true);
-        return;
-    }
-    
-    // Check localStorage for saved API URL
-    const savedUrl = localStorage.getItem('siboltech_api_url');
-    if (savedUrl) {
-        RELAY_API_URL = savedUrl;
-        console.log('API URL loaded from storage:', RELAY_API_URL);
-        // Test the connection
-        try {
-            const res = await fetch(`${RELAY_API_URL}/latest`, { 
-                method: 'GET',
-                mode: 'cors',
-                signal: AbortSignal.timeout(5000)
-            });
-            if (res.ok) {
-                apiUrlInitialized = true;
-                updateApiSettingsButton(true);
-                return;
-            }
-        } catch (e) {
-            console.warn('Saved API URL not reachable:', e.message);
-        }
-    }
-    
-    // On static hosting without valid saved URL - show settings
-    if (isStaticHosting()) {
-        console.log('Static hosting detected, need API URL configuration');
-        updateApiSettingsButton(false);
-        setTimeout(() => openApiSettings(), 1000);
-        return;
-    }
-    
-    // Fallback: use origin
-    RELAY_API_URL = window.location.origin + '/api';
-    apiUrlInitialized = true;
-}
-
-function updateApiSettingsButton(connected) {
-    const btn = document.getElementById('apiSettingsBtn');
-    if (btn) {
-        btn.classList.toggle('error', !connected);
-        btn.title = connected ? 'API Connected ✓' : 'API Not Connected - Click to configure';
+        console.log('Local access detected, API URL:', RELAY_API_URL);
+    } else {
+        console.log('Using Firebase for sensor data (no API URL needed)');
     }
 }
 
-function openApiSettings() {
-    const modal = document.getElementById('apiSettingsModal');
-    const input = document.getElementById('apiUrlInput');
-    if (modal) modal.style.display = 'flex';
-    if (input && RELAY_API_URL) {
-        input.value = RELAY_API_URL.replace('/api', '');
-    }
-}
+// Firebase handles all data - no API settings needed
 
-function closeApiSettings() {
-    const modal = document.getElementById('apiSettingsModal');
-    if (modal) modal.style.display = 'none';
-}
-
-async function testApiConnection() {
-    const input = document.getElementById('apiUrlInput');
-    const result = document.getElementById('apiTestResult');
-    let url = input.value.trim();
-    
-    // Clean URL
-    url = url.replace(/\/+$/, ''); // Remove trailing slashes
-    if (!url.startsWith('http')) url = 'https://' + url;
-    
-    result.style.display = 'block';
-    result.style.background = '#fff3cd';
-    result.style.color = '#856404';
-    result.innerHTML = '⏳ Testing connection...';
-    
-    try {
-        const res = await fetch(`${url}/api/latest`, {
-            method: 'GET',
-            mode: 'cors',
-            signal: AbortSignal.timeout(10000)
-        });
-        
-        if (res.ok) {
-            const data = await res.json();
-            result.style.background = '#d4edda';
-            result.style.color = '#155724';
-            result.innerHTML = '✅ Connected! Found sensors: ' + Object.keys(data).join(', ');
-            input.value = url;
-        } else {
-            throw new Error(`HTTP ${res.status}`);
-        }
-    } catch (e) {
-        result.style.background = '#f8d7da';
-        result.style.color = '#721c24';
-        result.innerHTML = '❌ Connection failed: ' + e.message + '<br><small>Make sure the RPi tunnel is running</small>';
-    }
-}
-
-async function saveApiUrl() {
-    const input = document.getElementById('apiUrlInput');
-    let url = input.value.trim();
-    
-    url = url.replace(/\/+$/, '');
-    if (!url.startsWith('http')) url = 'https://' + url;
-    
-    RELAY_API_URL = url + '/api';
-    localStorage.setItem('siboltech_api_url', RELAY_API_URL);
-    apiUrlInitialized = true;
-    
-    console.log('API URL saved:', RELAY_API_URL);
-    updateApiSettingsButton(true);
-    closeApiSettings();
-    
-    // Refresh data
-    if (typeof fetchLatestData === 'function') fetchLatestData();
-    if (typeof fetchRelayStatus === 'function') fetchRelayStatus();
-}
-
-// Wait for API URL to be ready
+// Stub function for backward compatibility (does nothing now)
 async function waitForAPIUrl() {
-    if (apiUrlInitialized) return;
-    
-    // Try to initialize if not already done
-    await initializeAPIUrl();
-    
-    // If still not initialized after 2 seconds, proceed anyway (use fallback)
-    return new Promise((resolve) => {
-        const checkInterval = setInterval(() => {
-            if (apiUrlInitialized) {
-                clearInterval(checkInterval);
-                resolve();
-            }
-        }, 50);
-        
-        setTimeout(() => {
-            clearInterval(checkInterval);
-            apiUrlInitialized = true;
-            resolve();
-        }, 2000);
-    });
+    // Firebase handles data, no waiting needed
+    return Promise.resolve();
 }
 
 // Initialize on page load
@@ -284,9 +150,6 @@ function updateSensorDisplayFromData(data) {
     document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => {
         if (el) el.textContent = tdsVal;
     });
-    
-    // Update connection indicator
-    updateApiSettingsButton(true);
 }
 
 function showSensorError() {
@@ -321,7 +184,6 @@ function initFirebaseListener() {
         });
         
         console.log('✅ Firebase real-time listener active');
-        updateApiSettingsButton(true);
         return true;
     } catch (e) {
         console.error('Failed to init Firebase listener:', e);
