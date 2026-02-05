@@ -120,9 +120,10 @@ class RelayState:
     
     def set(self, state: bool, force: bool = False) -> bool:
         """Set state if allowed. Returns True if state was changed."""
-        if state == self.state and not force:
+        # Always allow if state is unknown (None) or different from target
+        if self.state is not None and state == self.state and not force:
             return False
-        if not force and not self.can_change():
+        if not force and self.state is not None and not self.can_change():
             return False
         self.state = state
         self.last_change = time.time()
@@ -189,8 +190,12 @@ class AutomationController:
         
         # When override is turned OFF, immediately run automation to restore proper states
         if was_override and not override:
-            print("[AUTOMATION] Override disabled - running immediate automation cycle", flush=True)
+            print("[AUTOMATION] Override disabled - forcing relay state resync", flush=True)
             try:
+                # Reset internal relay states to force callback execution
+                for relay in self.relays.values():
+                    relay.state = None  # Force state to unknown so next set() will trigger callback
+                    relay.last_change = 0  # Reset debounce timer
                 self._process_automation()
             except Exception as e:
                 print(f"[AUTOMATION] Error during immediate cycle: {e}", flush=True)

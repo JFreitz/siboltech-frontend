@@ -720,10 +720,13 @@ OVERRIDE_MODE_ENABLED = False  # When True, disables automation (manual control)
 def _automation_relay_callback(relay_id: int, state: bool):
     """Callback for automation controller to set relay states."""
     global RELAY_STATES
+    print(f"[CALLBACK] relay {relay_id} -> {state}, override={OVERRIDE_MODE_ENABLED}, calib={CALIBRATION_MODE_ENABLED}", flush=True)
     if OVERRIDE_MODE_ENABLED or CALIBRATION_MODE_ENABLED:
+        print(f"[CALLBACK] BLOCKED - relay {relay_id} change ignored", flush=True)
         return  # Don't change relays in override or calibration mode
     RELAY_STATES[relay_id] = state
     _save_relay_state(relay_id, state)
+    print(f"[CALLBACK] Set RELAY_STATES[{relay_id}] = {state}", flush=True)
 
 # Initialize automation controller (starts background thread)
 _automation_controller = init_controller(_automation_relay_callback)

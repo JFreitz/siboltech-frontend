@@ -1106,24 +1106,48 @@ document.addEventListener('DOMContentLoaded', ()=>{
 					// Fetch plant readings from Firebase
 					if (plantTableWrap) {
 						const readings = await window.loadPlantHistory(farmingSystem, 100);
-						// Transform Firebase data to match API format
-						const plantData = {
-							readings: readings.map(r => ({
-								timestamp: r.created_at?.toDate?.() || new Date(r.created_at),
-								plant_id: r.plant_id,
-								leaves: r.leaves,
-								branches: r.branches,
-								height: r.height,
-								weight: r.weight,
-								length: r.length,
-								// Sensor data from latest readings if available
-								ph: window.latestSensorData?.ph?.value,
-								do: window.latestSensorData?.do_mg_l?.value,
-								tds: window.latestSensorData?.tds_ppm?.value,
-								temperature: window.latestSensorData?.temperature_c?.value,
-								humidity: window.latestSensorData?.humidity?.value
-							}))
-						};
+						
+						let plantData;
+						if (readings && readings.length > 0) {
+							// Transform Firebase plant data to match API format
+							plantData = {
+								readings: readings.map(r => ({
+									timestamp: r.created_at?.toDate?.() || new Date(r.created_at),
+									plant_id: r.plant_id,
+									leaves: r.leaves,
+									branches: r.branches,
+									height: r.height,
+									weight: r.weight,
+									length: r.length,
+									// Sensor data from latest readings if available
+									ph: window.latestSensorData?.ph?.value,
+									do: window.latestSensorData?.do_mg_l?.value,
+									tds: window.latestSensorData?.tds_ppm?.value,
+									temperature: window.latestSensorData?.temperature_c?.value,
+									humidity: window.latestSensorData?.humidity?.value
+								}))
+							};
+						} else if (window.loadSensorHistory) {
+							// If no plant readings, fetch sensor-only history from Firebase
+							const sensorReadings = await window.loadSensorHistory(100);
+							plantData = {
+								readings: (sensorReadings || []).map(r => ({
+									timestamp: r.timestamp?.toDate?.() || new Date(r.timestamp),
+									ph: r.ph?.value,
+									do: r.do_mg_l?.value,
+									tds: r.tds_ppm?.value,
+									temperature: r.temperature_c?.value,
+									humidity: r.humidity?.value,
+									leaves: null,
+									branches: null,
+									weight: null,
+									length: null,
+									height: null
+								}))
+							};
+						} else {
+							plantData = { readings: [] };
+						}
 						populatePlantHistoryTable(plantTableWrap, plantData);
 					}
 					
@@ -1147,11 +1171,34 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			try {
 				// Fetch plant/sensor readings
 				if (plantTableWrap) {
+					// First try to get plant readings with sensor snapshots
 					const plantRes = await fetch(`${RELAY_API_URL}/history?type=plant&plant_id=${plant}&interval=${interval}&farming_system=${farmingSystem}`);
-					if (plantRes.ok) {
-						const plantData = await plantRes.json();
-						populatePlantHistoryTable(plantTableWrap, plantData);
+					let plantData = plantRes.ok ? await plantRes.json() : { readings: [] };
+					
+					// If no plant readings, fetch sensor-only history instead
+					if (!plantData.readings || plantData.readings.length === 0) {
+						const sensorRes = await fetch(`${RELAY_API_URL}/history?type=sensor&interval=${interval}&limit=100`);
+						if (sensorRes.ok) {
+							const sensorData = await sensorRes.json();
+							// Transform sensor data to plant table format (plant columns will be empty)
+							plantData = {
+								readings: (sensorData.readings || []).map(r => ({
+									timestamp: r.timestamp,
+									ph: r.ph,
+									do: r.do,
+									tds: r.tds,
+									temperature: r.temperature,
+									humidity: r.humidity,
+									leaves: null,
+									branches: null,
+									weight: null,
+									length: null,
+									height: null
+								}))
+							};
+						}
 					}
+					populatePlantHistoryTable(plantTableWrap, plantData);
 				}
 				
 				// Fetch actuator events
