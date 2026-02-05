@@ -1129,18 +1129,19 @@
 		<div id="apiSettingsModal" class="api-settings-modal" style="display:none;">
 			<div class="api-settings-content">
 				<div class="api-settings-header">
-					<h3>⚙️ API Connection Settings</h3>
+					<h3>🔥 Connection Info</h3>
 					<button class="api-settings-close" onclick="closeApiSettings()">&times;</button>
 				</div>
 				<div class="api-settings-body">
-					<p>Enter your Raspberry Pi tunnel URL:</p>
-					<input type="text" id="apiUrlInput" placeholder="https://influences-fence-remedies-britannica.trycloudflare.com" style="width:100%;padding:12px;font-size:16px;border:2px solid #4CAF50;border-radius:8px;margin:10px 0;">
-					<p style="font-size:12px;color:#666;">Find this URL on your RPi: <code>cat ~/Despro/logs/tunnel_url.txt</code></p>
-					<div id="apiTestResult" style="margin:10px 0;padding:10px;border-radius:5px;display:none;"></div>
+					<p style="font-size:16px;margin-bottom:15px;"><strong>Cloud Access:</strong> Firebase Firestore</p>
+					<p style="color:#4CAF50;">✓ Real-time sync enabled via Firebase</p>
+					<p style="color:#4CAF50;">✓ No tunnel configuration required</p>
+					<hr style="margin:15px 0;border:none;border-top:1px solid #ddd;">
+					<p><strong>Local LAN Access:</strong></p>
+					<p style="font-size:12px;color:#666;"><code>http://192.168.100.72:5000</code></p>
 				</div>
 				<div class="api-settings-footer">
-					<button onclick="testApiConnection()" style="padding:10px 20px;background:#2196F3;color:white;border:none;border-radius:5px;cursor:pointer;margin-right:10px;">Test Connection</button>
-					<button onclick="saveApiUrl()" style="padding:10px 20px;background:#4CAF50;color:white;border:none;border-radius:5px;cursor:pointer;">Save & Connect</button>
+					<button onclick="closeApiSettings()" style="padding:10px 20px;background:#4CAF50;color:white;border:none;border-radius:5px;cursor:pointer;">OK</button>
 				</div>
 			</div>
 		</div>

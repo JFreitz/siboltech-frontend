@@ -89,8 +89,8 @@ HELP               # Show commands
 
 ### Cloud Synchronization
 
+- **Firebase sync**: Real-time data sync to Firestore for Vercel dashboard
 - **HTTP-based sync** (`sync.py`): Copies new rows from local DB to Railway via HTTP API
-- **Fallback**: If Railway internal URL fails, tries via ngrok/Cloudflare tunnel
 - **Timestamp tracking**: `.last_http_sync_ts` file prevents re-syncing same rows
 - Railway URL stored in `CLOUD_DATABASE_URL` env var
 
@@ -114,7 +114,7 @@ MQTT_BROKER            # HiveMQ Cloud endpoint (optional, for future MQTT relay 
 ### Libraries
 - **ESP32**: Arduino, Adafruit_BME280, ArduinoJson, HTTPClient, WiFi
 - **RPi**: SQLAlchemy (ORM), Flask, pyserial, adafruit-circuitpython (BME280, ADS1115)
-- **Cloud**: Railway (Postgres), HiveMQ (MQTT optional), Cloudflare Tunnel (free ingress)
+- **Cloud**: Railway (Postgres), Firebase Firestore (real-time sync), HiveMQ (MQTT optional)
 
 ### API Endpoints
 
@@ -131,7 +131,7 @@ POST /api/relay/set                 # Set relay state
 1. **Relay response lag**: Check ESP32 loop priority (serial commands must process before sensor reads). See `main.cpp::loop()`.
 2. **Calibration drift**: Manual two-point calibration required; stored in JSON, applied in `sensors.py::read_analog()`.
 3. **WiFi dropouts**: ESP32 reconnects every 10s if disconnected; check SSID/password in `main.cpp` config.
-4. **Cloud sync failures**: Verify `CLOUD_DATABASE_URL` and railway tunnel connectivity; check `.last_http_sync_ts` state file.
+4. **Cloud sync failures**: Verify `CLOUD_DATABASE_URL` and Firebase config; check `.last_http_sync_ts` state file.
 5. **Mock sensor data**: If hardware unavailable, `sensors.py` returns test values; disable with `if not ads: return {}` check.
 
 ## Key Files to Reference

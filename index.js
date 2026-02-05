@@ -1,15 +1,16 @@
 // === SIBOLTECH Firebase Configuration ===
 // Using Firebase Firestore for real-time sensor data
-let RELAY_API_URL = window.location.origin + '/api';  // Fallback for local/tunnel access
+let RELAY_API_URL = window.location.origin + '/api';  // For local LAN access
 let API_BASE_URL = window.location.origin + '/api';   // Alias for compatibility
 
-// Check if we're on localhost/tunnel for API fallback
+// Check if we're on local network (RPi LAN)
 function isLocalAccess() {
     const host = window.location.hostname;
-    return host.includes('trycloudflare.com') || 
-           host === 'localhost' ||
+    return host === 'localhost' ||
            host === '127.0.0.1' ||
-           host.startsWith('192.168.');
+           host.startsWith('192.168.') ||
+           host.startsWith('10.') ||
+           host.startsWith('172.');
 }
 
 // Check if we're on static hosting (Vercel, etc.) - API not available

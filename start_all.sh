@@ -1,77 +1,62 @@
 #!/bin/bash
-# SIBOLTECH System Startup Script
-# Run: ./start_all.sh
+# SIBOLTECH Complete System Startup Script
+# Starts API + Firebase Sync (no tunnel needed - Firebase handles cloud access)
 
-cd ~/Despro
-
-echo "=========================================="
-echo "  SIBOLTECH System Startup"
-echo "=========================================="
-
-# Activate virtual environment
-source ~/sensor-venv/bin/activate 2>/dev/null || {
-    echo "⚠️  Virtual environment not found, using system Python"
-}
-
-# Kill existing processes
-echo "🔄 Stopping existing services..."
-pkill -f "python api.py" 2>/dev/null
-pkill -f "python3 api.py" 2>/dev/null
-pkill -f cloudflared 2>/dev/null
-sleep 1
-
-# Create logs directory
+cd "$(dirname "$0")"
 mkdir -p logs
 
-# Start API server
-echo "🚀 Starting API server..."
-python api.py > logs/api.log 2>&1 &
-API_PID=$!
-echo $API_PID > logs/api.pid
+echo "=========================================="
+echo "  SIBOLTECH Sensor System Startup"
+echo "=========================================="
+echo ""
+
+# Kill existing processes
+echo "🔄 Stopping existing processes..."
+pkill -f "python api.py" 2>/dev/null
+pkill -f "firebase_sync.py" 2>/dev/null
 sleep 2
 
-# Check if API started
-if curl -s http://127.0.0.1:5000/api/latest > /dev/null 2>&1; then
-    echo "✅ API server running on port 5000 (PID: $API_PID)"
+# Activate virtual environment
+source ~/sensor-venv/bin/activate
+
+# Start Flask API
+echo "🚀 Starting Flask API..."
+nohup python api.py > logs/api.log 2>&1 &
+echo $! > logs/api.pid
+sleep 2
+
+# Check API
+if curl -s http://localhost:5000 > /dev/null; then
+    echo "✅ API running on http://localhost:5000"
 else
-    echo "❌ API failed to start! Check logs/api.log"
+    echo "❌ API failed to start!"
+    cat logs/api.log
     exit 1
 fi
 
-# Start Cloudflare tunnel
-echo "🌐 Starting Cloudflare tunnel..."
-cloudflared tunnel --url http://127.0.0.1:5000 > logs/tunnel.log 2>&1 &
-TUNNEL_PID=$!
-echo $TUNNEL_PID > logs/tunnel.pid
+# Start Firebase Sync
+echo "🔥 Starting Firebase Sync..."
+nohup python firebase_sync.py > logs/firebase_sync.log 2>&1 &
+echo $! > logs/firebase_sync.pid
+sleep 2
 
-# Wait for tunnel URL
-echo "⏳ Waiting for tunnel URL..."
-sleep 5
-
-# Extract and save tunnel URL
-TUNNEL_URL=$(grep -o 'https://[^"]*trycloudflare.com' logs/tunnel.log | head -1)
-if [ -n "$TUNNEL_URL" ]; then
-    echo "$TUNNEL_URL" > logs/tunnel_url.txt
-    echo "✅ Tunnel running: $TUNNEL_URL"
+if pgrep -f "firebase_sync.py" > /dev/null; then
+    echo "✅ Firebase Sync running"
 else
-    echo "⚠️  Tunnel URL not found yet. Check logs/tunnel.log"
-    echo "   Run: grep -o 'https://.*trycloudflare.com' logs/tunnel.log"
+    echo "❌ Firebase Sync failed to start!"
 fi
 
 echo ""
 echo "=========================================="
-echo "  System Ready!"
+echo "  SIBOLTECH System Running!"
 echo "=========================================="
 echo ""
-echo "📡 Local API:    http://127.0.0.1:5000"
-echo "🌐 Tunnel URL:   $TUNNEL_URL"
-echo "📱 Mobile:       ${TUNNEL_URL}/mobile.html"
+echo "Local Access:"
+echo "  Dashboard: http://192.168.100.72:5000"
+echo "  Mobile:    http://192.168.100.72:5000/mobile.html"
 echo ""
-echo "⚠️  IMPORTANT: Update the tunnel URL in:"
-echo "   1. Vercel dashboard settings (gear icon)"
-echo "   2. Mobile page settings (gear icon)"
+echo "Cloud Access (via Firebase):"
+echo "  Vercel:    https://siboltech-frontend.vercel.app"
 echo ""
-echo "📋 Logs:"
-echo "   - API:    logs/api.log"
-echo "   - Tunnel: logs/tunnel.log"
+echo "To stop: pkill -f 'python api.py'; pkill -f 'firebase_sync.py'"
 echo ""

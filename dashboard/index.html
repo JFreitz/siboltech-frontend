@@ -35,22 +35,19 @@
     <tbody></tbody>
   </table>
   <script>
-    // Use Cloudflare tunnel URL or localhost for dev
-    let API_URL = 'http://localhost:5000'; // Default fallback
+    // Use local API for LAN access, Firebase for remote
+    const isLocalNetwork = window.location.hostname.match(/^(localhost|192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/);
+    let API_URL = isLocalNetwork ? 'http://192.168.100.72:5000' : '';
 
-    // Fetch the current tunnel URL on page load
+    // Initialize - use Firebase for remote access
     async function initAPI() {
-      try {
-        // Try to get tunnel URL from server endpoint
-        const res = await fetch('/api/tunnel-url', { cache: 'no-store' });
-        if (res.ok) {
-          const data = await res.json();
-          API_URL = data.url || API_URL;
-        }
-      } catch (e) {
-        console.log('Tunnel URL not available, using fallback');
+      if (!isLocalNetwork) {
+        console.log('Remote access - using Firebase');
+        initFirebase();
+        return;
       }
-      // Start fetching data
+      
+      // LAN access - use direct API
       fetchData();
       fetchRelayStatus();
       setInterval(fetchData, 5000);
@@ -525,9 +522,11 @@
     </div>
     
     <script>
-        // API URLs - Using Cloudflare Tunnel to self-hosted RPi
-        const SENSOR_API = 'https://fold-utility-southern-cakes.trycloudflare.com/api/latest';
-        const RELAY_API = 'https://fold-utility-southern-cakes.trycloudflare.com';  // Same API handles relays
+        // API URLs - Use local API on LAN
+        const isLocal = window.location.hostname.match(/^(localhost|192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.)/);
+        const API_BASE = isLocal ? 'http://192.168.100.72:5000' : '';
+        const SENSOR_API = API_BASE + '/api/latest';
+        const RELAY_API = API_BASE;
         
         const ACTUATOR_ICONS = {
             "Aerator Pump": "🫧", "Water Pump": "💧", "Heater": "🔥", "Cooler": "❄️",

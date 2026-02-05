@@ -5,386 +5,170 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>SIBOLTECH Mobile</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #1a4d2e 0%, #2d6a4f 50%, #1a4d2e 100%);
-            min-height: 100vh;
-            color: #fff;
-            padding: 16px;
-            padding-bottom: 80px;
+            min-height: 100vh; color: #fff; padding: 16px; padding-bottom: 80px;
         }
-        
-        .header {
-            text-align: center;
-            padding: 12px 0 20px;
-        }
-        
-        .header h1 {
-            font-size: 22px;
-            font-weight: 700;
-            color: #fff;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        }
-        
-        .header .subtitle {
-            font-size: 12px;
-            color: rgba(255,255,255,0.7);
-            margin-top: 4px;
-        }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-            margin-top: 8px;
-        }
-        
-        .status-badge.online {
-            background: #22c55e;
-            color: #fff;
-        }
-        
-        .status-badge.offline {
-            background: #ef4444;
-            color: #fff;
-        }
-        
-        .section-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: rgba(255,255,255,0.8);
-            margin: 20px 0 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        
-        /* Sensor Cards */
-        .sensors-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-        }
-        
-        .sensor-card {
-            background: rgba(255,255,255,0.15);
-            backdrop-filter: blur(10px);
-            border-radius: 16px;
-            padding: 16px;
-            text-align: center;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-        
-        .sensor-card.wide {
-            grid-column: span 2;
-        }
-        
-        .sensor-icon {
-            font-size: 28px;
-            margin-bottom: 8px;
-        }
-        
-        .sensor-value {
-            font-size: 32px;
-            font-weight: 700;
-            color: #fff;
-            line-height: 1;
-        }
-        
-        .sensor-unit {
-            font-size: 14px;
-            color: rgba(255,255,255,0.7);
-            margin-left: 4px;
-        }
-        
-        .sensor-label {
-            font-size: 12px;
-            color: rgba(255,255,255,0.6);
-            margin-top: 6px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        /* Relay Controls */
-        .relays-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-        }
-        
-        .relay-btn {
-            background: rgba(255,255,255,0.1);
-            border: 2px solid rgba(255,255,255,0.2);
-            border-radius: 12px;
-            padding: 14px 8px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            -webkit-tap-highlight-color: transparent;
-        }
-        
-        .relay-btn.on {
-            background: rgba(34, 197, 94, 0.3);
-            border-color: #22c55e;
-        }
-        
-        .relay-btn.on .relay-status {
-            color: #22c55e;
-        }
-        
-        .relay-btn:active {
-            transform: scale(0.95);
-        }
-        
-        .relay-name {
-            font-size: 13px;
-            font-weight: 600;
-            color: #fff;
-        }
-        
-        .relay-status {
-            font-size: 11px;
-            color: rgba(255,255,255,0.5);
-            margin-top: 4px;
-            text-transform: uppercase;
-        }
-        
-        /* Last Update */
-        .last-update {
-            text-align: center;
-            font-size: 11px;
-            color: rgba(255,255,255,0.5);
-            margin-top: 20px;
-        }
-        
-        /* Desktop link */
-        .desktop-link {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(0,0,0,0.8);
-            padding: 16px;
-            text-align: center;
-        }
-        
-        .desktop-link a {
-            color: rgba(255,255,255,0.7);
-            text-decoration: none;
-            font-size: 13px;
-        }
-        
-        /* Loading spinner */
-        .loading {
-            opacity: 0.5;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        .updating {
-            animation: pulse 1s infinite;
-        }
+        .header { text-align: center; padding: 12px 0 20px; }
+        .header h1 { font-size: 22px; font-weight: 700; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .header .subtitle { font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 4px; }
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-top: 8px; }
+        .status-badge.online { background: #22c55e; color: #fff; }
+        .status-badge.offline { background: #ef4444; color: #fff; }
+        .section-title { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.8); margin: 20px 0 12px; text-transform: uppercase; letter-spacing: 1px; }
+        .sensors-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .sensor-card { background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); border-radius: 16px; padding: 16px; text-align: center; border: 1px solid rgba(255,255,255,0.2); }
+        .sensor-card.wide { grid-column: span 2; }
+        .sensor-icon { font-size: 28px; margin-bottom: 8px; }
+        .sensor-value { font-size: 32px; font-weight: 700; color: #fff; line-height: 1; }
+        .sensor-unit { font-size: 14px; color: rgba(255,255,255,0.7); margin-left: 4px; }
+        .sensor-label { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .relays-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .relay-btn { background: rgba(0,0,0,0.3); border-radius: 12px; padding: 16px 8px; text-align: center; cursor: pointer; transition: all 0.2s; border: 2px solid rgba(255,255,255,0.2); }
+        .relay-btn.on { background: #22c55e; border-color: #22c55e; }
+        .relay-btn.updating { opacity: 0.6; }
+        .relay-name { font-size: 11px; color: rgba(255,255,255,0.8); margin-bottom: 4px; }
+        .relay-status { font-size: 16px; font-weight: 700; }
+        .last-update { text-align: center; font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 20px; }
+        .desktop-link { text-align: center; margin-top: 20px; }
+        .desktop-link a { color: rgba(255,255,255,0.7); font-size: 13px; text-decoration: none; }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>🌱 SIBOLTECH</h1>
-        <div class="subtitle">Sensor Monitoring System</div>
-        <span id="connectionStatus" class="status-badge online">● ONLINE</span>
-    </div>
-    
-    <div class="section-title">📊 Sensors</div>
-    <div class="sensors-grid">
-        <div class="sensor-card">
-            <div class="sensor-icon">🌡️</div>
-            <div class="sensor-value"><span id="temp">--</span><span class="sensor-unit">°C</span></div>
-            <div class="sensor-label">Temperature</div>
-        </div>
-        <div class="sensor-card">
-            <div class="sensor-icon">💧</div>
-            <div class="sensor-value"><span id="humidity">--</span><span class="sensor-unit">%</span></div>
-            <div class="sensor-label">Humidity</div>
-        </div>
-        <div class="sensor-card">
-            <div class="sensor-icon">⚗️</div>
-            <div class="sensor-value"><span id="ph">--</span></div>
-            <div class="sensor-label">pH Level</div>
-        </div>
-        <div class="sensor-card">
-            <div class="sensor-icon">🫧</div>
-            <div class="sensor-value"><span id="do">--</span><span class="sensor-unit">mg/L</span></div>
-            <div class="sensor-label">Dissolved O₂</div>
-        </div>
-        <div class="sensor-card wide">
-            <div class="sensor-icon">🧪</div>
-            <div class="sensor-value"><span id="tds">--</span><span class="sensor-unit">ppm</span></div>
-            <div class="sensor-label">TDS (Total Dissolved Solids)</div>
-        </div>
-    </div>
-    
-    <div class="section-title">⚡ Relay Controls</div>
-    <div class="relays-grid" id="relaysGrid">
-        <!-- Relays will be generated by JS -->
-    </div>
-    
-    <div class="last-update">Last update: <span id="lastUpdate">--</span></div>
-    
-    <div class="desktop-link">
-        <a href="index.html">Switch to Desktop View →</a>
-        <br><a href="#" onclick="changeApiUrl(); return false;" style="font-size:12px;color:rgba(255,255,255,0.5);">⚙️ Change API URL</a>
+        <div class="subtitle">Hydroponics Monitor</div>
+        <div id="connectionStatus" class="status-badge offline">● CONNECTING...</div>
     </div>
 
-    <script>
-        // Smart API URL - check localStorage first, then try to detect
-        function getApiUrl() {
-            const saved = localStorage.getItem('siboltech_api_url');
-            if (saved) return saved;
-            
-            // If on localhost or RPi IP, use same origin
+    <div class="section-title">📊 Sensors</div>
+    <div class="sensors-grid">
+        <div class="sensor-card"><div class="sensor-icon">🌡️</div><div class="sensor-value"><span id="temp">--</span><span class="sensor-unit">°C</span></div><div class="sensor-label">Temperature</div></div>
+        <div class="sensor-card"><div class="sensor-icon">💧</div><div class="sensor-value"><span id="humidity">--</span><span class="sensor-unit">%</span></div><div class="sensor-label">Humidity</div></div>
+        <div class="sensor-card"><div class="sensor-icon">⚗️</div><div class="sensor-value"><span id="ph">--</span></div><div class="sensor-label">pH Level</div></div>
+        <div class="sensor-card"><div class="sensor-icon">🫧</div><div class="sensor-value"><span id="do">--</span><span class="sensor-unit">mg/L</span></div><div class="sensor-label">Dissolved O₂</div></div>
+        <div class="sensor-card wide"><div class="sensor-icon">🧪</div><div class="sensor-value"><span id="tds">--</span><span class="sensor-unit">ppm</span></div><div class="sensor-label">TDS</div></div>
+    </div>
+
+    <div class="section-title">⚡ Relays</div>
+    <div class="relays-grid" id="relaysGrid"></div>
+
+    <div class="last-update">Last update: <span id="lastUpdate">--</span></div>
+    <div class="desktop-link"><a href="index.html">Switch to Desktop View →</a></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, onSnapshot, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyCSuJ4kVaxq7uKllRnrt-EaCxIGmMTNI30",
+            authDomain: "siboltech.firebaseapp.com",
+            projectId: "siboltech",
+            storageBucket: "siboltech.firebasestorage.app",
+            messagingSenderId: "101056247860",
+            appId: "1:101056247860:web:d5aa77df309a650ba07261"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        function isLocalAccess() {
             const host = window.location.hostname;
-            if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('172.')) {
-                return window.location.origin + '/api';
-            }
-            
-            // On Vercel/static hosting, prompt for tunnel URL
-            const tunnel = prompt('Enter your tunnel URL (e.g., https://fold-utility-southern-cakes.trycloudflare.com):', 
-                                  'https://fold-utility-southern-cakes.trycloudflare.com');
-            if (tunnel) {
-                localStorage.setItem('siboltech_api_url', tunnel + '/api');
-                return tunnel + '/api';
-            }
-            return 'https://fold-utility-southern-cakes.trycloudflare.com/api';
+            return host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.') || host.startsWith('172.');
         }
         
-        const API_URL = getApiUrl();
-        
-        const relayNames = [
-            'Pump 1', 'Pump 2', 'Light 1', 
-            'Light 2', 'Fan 1', 'Fan 2',
-            'Heater', 'Cooler', 'Aux'
-        ];
-        
+        const relayNames = ['Pump 1', 'Pump 2', 'Light 1', 'Light 2', 'Fan 1', 'Fan 2', 'Heater', 'Cooler', 'Aux'];
         let relayStates = [false, false, false, false, false, false, false, false, false];
         
-        // Initialize relay buttons
         function initRelays() {
             const grid = document.getElementById('relaysGrid');
             grid.innerHTML = '';
             for (let i = 0; i < 9; i++) {
                 const btn = document.createElement('div');
                 btn.className = 'relay-btn';
-                btn.id = `relay${i + 1}`;
-                btn.innerHTML = `
-                    <div class="relay-name">${relayNames[i]}</div>
-                    <div class="relay-status">OFF</div>
-                `;
+                btn.id = 'relay' + (i + 1);
+                btn.innerHTML = '<div class="relay-name">' + relayNames[i] + '</div><div class="relay-status">OFF</div>';
                 btn.onclick = () => toggleRelay(i + 1);
                 grid.appendChild(btn);
             }
         }
         
-        // Fetch sensor data
-        async function fetchSensors() {
-            try {
-                const res = await fetch(`${API_URL}/latest`);
-                const data = await res.json();
-                
-                document.getElementById('temp').textContent = (data.temperature_c?.value ?? '--').toFixed?.(1) ?? '--';
-                document.getElementById('humidity').textContent = (data.humidity?.value ?? '--').toFixed?.(1) ?? '--';
-                document.getElementById('ph').textContent = (data.ph?.value ?? '--').toFixed?.(2) ?? '--';
-                document.getElementById('do').textContent = (data.do_mg_l?.value ?? '--').toFixed?.(2) ?? '--';
-                document.getElementById('tds').textContent = (data.tds_ppm?.value ?? '--').toFixed?.(0) ?? '--';
-                
-                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
-                document.getElementById('connectionStatus').className = 'status-badge online';
-                document.getElementById('connectionStatus').textContent = '● ONLINE';
-            } catch (e) {
-                console.error('Fetch error:', e);
-                document.getElementById('connectionStatus').className = 'status-badge offline';
-                document.getElementById('connectionStatus').textContent = '● OFFLINE';
-            }
+        function updateSensorDisplay(data) {
+            document.getElementById('temp').textContent = (data.temperature_c?.value ?? '--').toFixed?.(1) ?? '--';
+            document.getElementById('humidity').textContent = (data.humidity?.value ?? '--').toFixed?.(1) ?? '--';
+            document.getElementById('ph').textContent = (data.ph?.value ?? '--').toFixed?.(2) ?? '--';
+            document.getElementById('do').textContent = (data.do_mg_l?.value ?? '--').toFixed?.(2) ?? '--';
+            document.getElementById('tds').textContent = (data.tds_ppm?.value ?? '--').toFixed?.(0) ?? '--';
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+            document.getElementById('connectionStatus').className = 'status-badge online';
+            document.getElementById('connectionStatus').textContent = '● ONLINE';
         }
         
-        // Fetch relay states
-        async function fetchRelayStates() {
-            try {
-                const res = await fetch(`${API_URL}/relay/pending`);
-                const data = await res.json();
-                
-                if (data.states) {
-                    for (let i = 0; i < data.states.length && i < 9; i++) {
-                        relayStates[i] = data.states[i] === '1';
-                        updateRelayUI(i + 1, relayStates[i]);
-                    }
-                }
-            } catch (e) {
-                console.error('Relay fetch error:', e);
-            }
-        }
-        
-        // Update relay button UI
         function updateRelayUI(relay, isOn) {
-            const btn = document.getElementById(`relay${relay}`);
+            const btn = document.getElementById('relay' + relay);
             if (btn) {
                 btn.className = isOn ? 'relay-btn on' : 'relay-btn';
                 btn.querySelector('.relay-status').textContent = isOn ? 'ON' : 'OFF';
             }
         }
         
-        // Toggle relay
         async function toggleRelay(relay) {
             const newState = !relayStates[relay - 1];
-            const btn = document.getElementById(`relay${relay}`);
+            const btn = document.getElementById('relay' + relay);
             btn.classList.add('updating');
             
             try {
-                // Use correct API endpoint: /api/relay/{id}/on or /api/relay/{id}/off
-                const endpoint = newState ? 'on' : 'off';
-                const res = await fetch(`${API_URL}/relay/${relay}/${endpoint}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                if (res.ok) {
-                    relayStates[relay - 1] = newState;
-                    updateRelayUI(relay, newState);
+                if (isLocalAccess()) {
+                    const endpoint = newState ? 'on' : 'off';
+                    const res = await fetch(window.location.origin + '/api/relay/' + relay + '/' + endpoint, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }
+                    });
+                    if (res.ok) { relayStates[relay - 1] = newState; updateRelayUI(relay, newState); }
                 } else {
-                    console.error('Relay toggle failed:', res.status);
+                    const commandsRef = collection(db, 'relay_commands');
+                    await addDoc(commandsRef, { relay: 'R' + relay, action: newState ? 'ON' : 'OFF', status: 'pending', created_at: serverTimestamp() });
+                    relayStates[relay - 1] = newState; updateRelayUI(relay, newState);
                 }
-            } catch (e) {
-                console.error('Toggle error:', e);
-            }
-            
+            } catch (e) { console.error('Toggle error:', e); }
             btn.classList.remove('updating');
         }
         
-        // Initialize
         initRelays();
-        fetchSensors();
-        fetchRelayStates();
         
-        // Auto-refresh every 3 seconds
-        setInterval(fetchSensors, 3000);
-        setInterval(fetchRelayStates, 3000);
-        
-        // Change API URL function
-        function changeApiUrl() {
-            const current = localStorage.getItem('siboltech_api_url') || API_URL;
-            const newUrl = prompt('Enter new API URL:', current.replace('/api', ''));
-            if (newUrl) {
-                localStorage.setItem('siboltech_api_url', newUrl + '/api');
-                location.reload();
+        if (isLocalAccess()) {
+            async function fetchSensors() {
+                try {
+                    const res = await fetch(window.location.origin + '/api/latest');
+                    const data = await res.json();
+                    updateSensorDisplay(data);
+                } catch (e) {
+                    document.getElementById('connectionStatus').className = 'status-badge offline';
+                    document.getElementById('connectionStatus').textContent = '● OFFLINE';
+                }
             }
+            fetchSensors();
+            setInterval(fetchSensors, 3000);
+        } else {
+            const sensorDocRef = doc(db, 'sensors', 'latest');
+            onSnapshot(sensorDocRef, (docSnap) => {
+                if (docSnap.exists()) { updateSensorDisplay(docSnap.data()); }
+            }, (error) => {
+                document.getElementById('connectionStatus').className = 'status-badge offline';
+                document.getElementById('connectionStatus').textContent = '● OFFLINE';
+            });
+            
+            const relayDocRef = doc(db, 'actuators', 'relays');
+            onSnapshot(relayDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    for (let i = 1; i <= 9; i++) {
+                        const state = data['relay_' + i];
+                        if (state !== undefined) { relayStates[i - 1] = state === 'ON' || state === true; updateRelayUI(i, relayStates[i - 1]); }
+                    }
+                }
+            });
         }
     </script>
 </body>

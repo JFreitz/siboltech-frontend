@@ -363,19 +363,6 @@ def home():
     </ul>
     """
 
-@app.route("/api/tunnel-url")
-def get_tunnel_url():
-    """Get the current Cloudflare tunnel URL."""
-    tunnel_file = os.path.join(os.path.dirname(__file__), "logs", "tunnel_url.txt")
-    try:
-        with open(tunnel_file, "r") as f:
-            url = f.read().strip()
-        if url:
-            return jsonify({"url": url})
-    except Exception:
-        pass
-    return jsonify({"url": None})
-
 @app.route("/api/db_status")
 def db_status():
     try:
