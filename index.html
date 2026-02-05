@@ -1166,6 +1166,92 @@
 		<!-- Chart.js CDN for growth parameters chart -->
 		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 		<script src="index.js"></script>
+
+		
+		<script type="module">
+			import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+			import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+			
+			const firebaseConfig = {
+				apiKey: "AIzaSyCSuJ4kVaxq7uKllRnrt-EaCxIGmMTNI30",
+				authDomain: "siboltech.firebaseapp.com",
+				projectId: "siboltech",
+				storageBucket: "siboltech.firebasestorage.app",
+				messagingSenderId: "101056247860",
+				appId: "1:101056247860:web:d5aa77df309a650ba07261"
+			};
+			
+			const app = initializeApp(firebaseConfig);
+			const db = getFirestore(app);
+			console.log("Firebase initialized");
+			
+			const docRef = doc(db, "sensors", "latest");
+			onSnapshot(docRef, (docSnap) => {
+				if (docSnap.exists()) {
+					const data = docSnap.data();
+					
+					const phVal = (data.ph && data.ph.value !== undefined) ? parseFloat(data.ph.value).toFixed(2) : "--";
+					const doVal = (data.do_mg_l && data.do_mg_l.value !== undefined) ? parseFloat(data.do_mg_l.value).toFixed(2) + " mg/L" : "-- mg/L";
+					const tempVal = (data.temperature_c && data.temperature_c.value !== undefined) ? parseFloat(data.temperature_c.value).toFixed(1) + " C" : "-- C";
+					const humVal = (data.humidity && data.humidity.value !== undefined) ? parseFloat(data.humidity.value).toFixed(1) + " %" : "-- %";
+					const tdsVal = (data.tds_ppm && data.tds_ppm.value !== undefined) ? parseFloat(data.tds_ppm.value).toFixed(0) + " ppm" : "-- ppm";
+
+					document.querySelectorAll("#val-ph, [data-sensor='ph'] .value").forEach(el => { if (el) el.textContent = phVal; });
+					document.querySelectorAll("#val-do, [data-sensor='do'] .value").forEach(el => { if (el) el.textContent = doVal; });
+					document.querySelectorAll("#val-temp, [data-sensor='temp'] .value").forEach(el => { if (el) el.textContent = tempVal; });
+					document.querySelectorAll("#val-hum, [data-sensor='hum'] .value").forEach(el => { if (el) el.textContent = humVal; });
+					document.querySelectorAll("#val-tds, [data-sensor='tds'] .value").forEach(el => { if (el) el.textContent = tdsVal; });
+					
+					window.firebaseListenerActive = true;
+				}
+			}, (error) => {
+				console.error("Firebase error:", error);
+			});
+		</script>
+
+		
+		<!-- Firebase SDK for real-time sensor data -->
+		<script type="module">
+			import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+			import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+			
+			const firebaseConfig = {
+				apiKey: "AIzaSyCSuJ4kVaxq7uKllRnrt-EaCxIGmMTNI30",
+				authDomain: "siboltech.firebaseapp.com",
+				projectId: "siboltech",
+				storageBucket: "siboltech.firebasestorage.app",
+				messagingSenderId: "101056247860",
+				appId: "1:101056247860:web:d5aa77df309a650ba07261"
+			};
+			
+			const app = initializeApp(firebaseConfig);
+			const db = getFirestore(app);
+			console.log("Firebase initialized");
+			
+			const docRef = doc(db, "sensors", "latest");
+			onSnapshot(docRef, (docSnap) => {
+				if (docSnap.exists()) {
+					const data = docSnap.data();
+					console.log("Firebase update:", Object.keys(data).filter(k => !k.startsWith("_")).join(", "));
+					
+					const phVal = (data.ph && data.ph.value !== undefined) ? parseFloat(data.ph.value).toFixed(2) : "--";
+					const doVal = (data.do_mg_l && data.do_mg_l.value !== undefined) ? parseFloat(data.do_mg_l.value).toFixed(2) + " mg/L" : "-- mg/L";
+					const tempVal = (data.temperature_c && data.temperature_c.value !== undefined) ? parseFloat(data.temperature_c.value).toFixed(1) + " C" : "-- C";
+					const humVal = (data.humidity && data.humidity.value !== undefined) ? parseFloat(data.humidity.value).toFixed(1) + " %" : "-- %";
+					const tdsVal = (data.tds_ppm && data.tds_ppm.value !== undefined) ? parseFloat(data.tds_ppm.value).toFixed(0) + " ppm" : "-- ppm";
+
+					document.querySelectorAll("#val-ph, [data-sensor='ph'] .value").forEach(el => { if (el) el.textContent = phVal; });
+					document.querySelectorAll("#val-do, [data-sensor='do'] .value").forEach(el => { if (el) el.textContent = doVal; });
+					document.querySelectorAll("#val-temp, [data-sensor='temp'] .value").forEach(el => { if (el) el.textContent = tempVal; });
+					document.querySelectorAll("#val-hum, [data-sensor='hum'] .value").forEach(el => { if (el) el.textContent = humVal; });
+					document.querySelectorAll("#val-tds, [data-sensor='tds'] .value").forEach(el => { if (el) el.textContent = tdsVal; });
+					
+					window.firebaseListenerActive = true;
+				}
+			}, (error) => {
+				console.error("Firebase error:", error);
+			});
+		</script>
 </body>
 
 </html>
