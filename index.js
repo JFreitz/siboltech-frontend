@@ -1087,19 +1087,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 		// Fetch and populate history data
 		const fetchHistoryData = async () => {
-			// Skip on static hosting (Vercel) - API not available
-			if (isStaticHosting()) {
-				console.log('History data not available on static hosting');
-				return;
-			}
-			
-			await waitForAPIUrl();
-			
 			const method = historyState.method; // 'aero', 'dwc', 'trad'
 			const plant = historyState.plant;
-			// Normalize interval: "Daily" -> "daily", "15-min" -> "15min"
-			let interval = historyState.interval.toLowerCase();
-			if (interval === '15-min') interval = '15min';
 			
 			// Convert method code to farming system name
 			let farmingSystem;
@@ -1107,16 +1096,55 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			else if (method === 'dwc') farmingSystem = 'dwc';
 			else farmingSystem = 'traditional';
 			
+			const plantTableWrap = historyBoard.querySelector('[data-history-view="plant"]');
+			const actuatorTableWrap = historyBoard.querySelector('[data-history-view="actuator"]');
+			
+			// Use Firebase on static hosting (Vercel)
+			if (isStaticHosting() && window.loadPlantHistory) {
+				try {
+					// Fetch plant readings from Firebase
+					if (plantTableWrap) {
+						const readings = await window.loadPlantHistory(farmingSystem, 100);
+						// Transform Firebase data to match API format
+						const plantData = {
+							readings: readings.map(r => ({
+								timestamp: r.created_at?.toDate?.() || new Date(r.created_at),
+								plant_id: r.plant_id,
+								leaves: r.leaves,
+								branches: r.branches,
+								height: r.height,
+								weight: r.weight,
+								length: r.length,
+								// Sensor data from latest readings if available
+								ph: window.latestSensorData?.ph?.value,
+								do: window.latestSensorData?.do_mg_l?.value,
+								tds: window.latestSensorData?.tds_ppm?.value,
+								temperature: window.latestSensorData?.temperature_c?.value,
+								humidity: window.latestSensorData?.humidity?.value
+							}))
+						};
+						populatePlantHistoryTable(plantTableWrap, plantData);
+					}
+					
+					// Actuator history not yet in Firebase - show empty
+					if (actuatorTableWrap) {
+						populateActuatorHistoryTable(actuatorTableWrap, { readings: [] });
+					}
+				} catch (error) {
+					console.error('Error fetching history from Firebase:', error);
+				}
+				return;
+			}
+			
+			// Use API when available (local)
+			await waitForAPIUrl();
+			
+			// Normalize interval: "Daily" -> "daily", "15-min" -> "15min"
+			let interval = historyState.interval.toLowerCase();
+			if (interval === '15-min') interval = '15min';
+			
 			try {
-				// For ALL systems, fetch plant readings (which includes sensor data joined in)
-				// The API intelligently fetches:
-				// - For trad: plant data from PlantReading table
-				// - For aero/dwc: would be sensor data, but we use plant table which has the structure
-				const plantTableWrap = historyBoard.querySelector('[data-history-view="plant"]');
-				const actuatorTableWrap = historyBoard.querySelector('[data-history-view="actuator"]');
-				
-				// Fetch plant/sensor readings (always use type=plant for the combined table)
-				// IMPORTANT: Pass farming_system to filter by farming system
+				// Fetch plant/sensor readings
 				if (plantTableWrap) {
 					const plantRes = await fetch(`${RELAY_API_URL}/history?type=plant&plant_id=${plant}&interval=${interval}&farming_system=${farmingSystem}`);
 					if (plantRes.ok) {
