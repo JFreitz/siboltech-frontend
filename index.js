@@ -2749,7 +2749,7 @@ setTimeout(() => {
 			return;
 		}
 
-		// Submit each plant's data to the API
+		// Submit each plant's data to Firebase or API
 		try {
 			for (const plant of data) {
 				const payload = {
@@ -2764,18 +2764,29 @@ setTimeout(() => {
 
 				console.log(`[Training Submit] Submitting plant ${plant.no}:`, payload);
 
-				const res = await fetch(`${RELAY_API_URL}/plant-reading`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(payload)
-				});
-
-				if (!res.ok) {
-					const errText = await res.text();
-					console.error(`[Training Submit] Failed to submit plant ${plant.no}:`, res.status, errText);
+				// Use Firebase on static hosting (Vercel)
+				if (isStaticHosting() && window.savePlantReadingFirebase) {
+					const success = await window.savePlantReadingFirebase(payload);
+					if (!success) {
+						console.error(`[Training Submit] Failed to submit plant ${plant.no} to Firebase`);
+					} else {
+						console.log(`[Training Submit] Plant ${plant.no} submitted to Firebase`);
+					}
 				} else {
-					const resData = await res.json();
-					console.log(`[Training Submit] Plant ${plant.no} submitted successfully:`, resData);
+					// Use API when available
+					const res = await fetch(`${RELAY_API_URL}/plant-reading`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify(payload)
+					});
+
+					if (!res.ok) {
+						const errText = await res.text();
+						console.error(`[Training Submit] Failed to submit plant ${plant.no}:`, res.status, errText);
+					} else {
+						const resData = await res.json();
+						console.log(`[Training Submit] Plant ${plant.no} submitted successfully:`, resData);
+					}
 				}
 			}
 

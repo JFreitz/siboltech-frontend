@@ -1353,6 +1353,43 @@
 				}
 			};
 			
+			// ===== SAVE PLANT READING (training data) =====
+			window.savePlantReadingFirebase = async function(plantData) {
+				try {
+					const readingsRef = collection(db, 'plant_readings');
+					await addDoc(readingsRef, {
+						...plantData,
+						created_at: serverTimestamp()
+					});
+					console.log('🌱 Plant reading saved:', plantData.plant_id);
+					return true;
+				} catch (error) {
+					console.error('Failed to save plant reading:', error);
+					return false;
+				}
+			};
+			
+			// ===== LOAD PLANT HISTORY =====
+			window.loadPlantHistory = async function(farmingSystem, limitCount = 100) {
+				try {
+					const readingsRef = collection(db, 'plant_readings');
+					const q = query(readingsRef, orderBy('created_at', 'desc'), limit(limitCount));
+					const snapshot = await getDocs(q);
+					const readings = [];
+					snapshot.forEach(doc => {
+						const data = doc.data();
+						if (!farmingSystem || data.farming_system === farmingSystem) {
+							readings.push({ id: doc.id, ...data });
+						}
+					});
+					console.log('🌱 Loaded ' + readings.length + ' plant readings');
+					return readings.reverse();
+				} catch (error) {
+					console.error('Failed to load plant history:', error);
+					return [];
+				}
+			};
+			
 			// Dispatch event when Firebase is ready
 			window.dispatchEvent(new Event('firebaseReady'));
 		</script>
