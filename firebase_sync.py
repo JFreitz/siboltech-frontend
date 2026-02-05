@@ -151,7 +151,9 @@ def sync_latest_to_firebase(db: firestore.Client, session):
 
 
 def process_relay_commands(db: firestore.Client):
-    """Check for pending relay commands and execute them."""
+    """Check for pending relay commands and execute them via API."""
+    import requests
+    
     commands_ref = db.collection("relay_commands")
     
     # Get pending commands (not yet executed)
@@ -159,53 +161,49 @@ def process_relay_commands(db: firestore.Client):
     
     for doc in pending:
         cmd_data = doc.to_dict()
-        relay = cmd_data.get("relay", "")
-        action = cmd_data.get("action", "")
-        cmd = f"{relay} {action}".strip().upper()
+        relay = cmd_data.get("relay", "").upper()  # e.g., "R1"
+        action = cmd_data.get("action", "").lower()  # "on" or "off"
         
-        print(f"  🔌 Executing relay command: {cmd}")
-        response = send_relay_command(cmd)
+        # Extract relay number (R1 -> 1)
+        try:
+            relay_num = int(relay.replace("R", ""))
+        except:
+            doc.reference.update({"status": "error", "response": f"Invalid relay: {relay}"})
+            continue
+        
+        print(f"  🔌 Relay command: R{relay_num} {action.upper()}")
+        
+        # Use API to update relay state (ESP32 polls this)
+        try:
+            api_url = f"http://localhost:5000/api/relay/{relay_num}/{action}"
+            resp = requests.post(api_url, timeout=2)
+            response = resp.json() if resp.ok else f"API error: {resp.status_code}"
+        except Exception as e:
+            response = f"API error: {e}"
         
         # Update command status
         doc.reference.update({
             "status": "executed",
-            "response": response,
+            "response": str(response),
             "executed_at": firestore.SERVER_TIMESTAMP
         })
         print(f"    → {response}")
 
 
 def get_relay_status() -> dict:
-    """Get current relay status from ESP32."""
-    with serial_lock:
-        ser = get_serial()
-        if not ser:
-            return {}
-        
-        try:
-            ser.write(b"STATUS\n")
-            ser.flush()
-            time.sleep(0.1)
-            
-            response = ""
-            start = time.time()
-            while (time.time() - start) < 0.5:
-                if ser.in_waiting:
-                    response += ser.readline().decode('utf-8', errors='ignore')
-                else:
-                    time.sleep(0.01)
-            
-            # Parse JSON response
-            for line in response.split('\n'):
-                line = line.strip()
-                if line.startswith('{') and 'relay_status' in line:
-                    data = json.loads(line)
-                    status = {}
-                    for item in data.get('relay_status', []):
-                        status[f"R{item['relay']}"] = item['state']
-                    return status
-        except Exception as e:
-            print(f"  ⚠️ Error getting relay status: {e}")
+    """Get current relay status from API."""
+    import requests
+    try:
+        resp = requests.get("http://localhost:5000/api/relay/pending", timeout=2)
+        if resp.ok:
+            data = resp.json()
+            states_str = data.get("states", "")
+            status = {}
+            for i, c in enumerate(states_str):
+                status[f"R{i+1}"] = "ON" if c == "1" else "OFF"
+            return status
+    except Exception as e:
+        print(f"  ⚠️ Error getting relay status: {e}")
     return {}
 
 
