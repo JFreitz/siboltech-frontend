@@ -745,8 +745,12 @@ RELAY_LABELS = {
 
 
 def _init_relay_states():
-    """Load relay states from DB on startup."""
+    """Load relay states from DB on startup (only if no automation controller)."""
     global RELAY_STATES
+    # Skip if automation controller is running - it will set the correct states
+    if _automation_controller:
+        print("[API] Skipping DB relay state load - automation controller is active", flush=True)
+        return
     try:
         with Session() as session:
             for i in range(1, 10):  # 9 relays

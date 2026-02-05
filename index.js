@@ -1981,7 +1981,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	setInterval(loadRelayStatus, 3000);
 
 	// Check sensor thresholds for auto-activation (only when override is OFF)
+	// DISABLED: Automation is handled by Raspberry Pi, not the frontend
 	function checkNutrientAutoActivation(phValue, tdsValue) {
+		// Frontend automation is disabled - RPi handles all automation
+		// This prevents conflicts between frontend and backend automation
+		return;
+		
 		if (actuatorOverride) return; // Skip auto-control in manual mode
 		
 		const now = Date.now();
