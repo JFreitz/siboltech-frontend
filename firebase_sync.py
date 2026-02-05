@@ -35,7 +35,7 @@ SERVICE_ACCOUNT_FILE = os.getenv(
     "FIREBASE_SERVICE_ACCOUNT", 
     str(Path(__file__).parent / "firebase-service-account.json")
 )
-SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "5"))  # seconds
+SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "2"))  # seconds (faster for relay response)
 BATCH_SIZE = 10  # Max readings per sync
 SERIAL_PORT = os.getenv("SERIAL_PORT", "/dev/ttyUSB0")
 BAUD_RATE = 115200
@@ -153,11 +153,12 @@ def sync_latest_to_firebase(db: firestore.Client, session):
 def process_relay_commands(db: firestore.Client):
     """Check for pending relay commands and execute them via API."""
     import requests
+    from google.cloud.firestore_v1.base_query import FieldFilter
     
     commands_ref = db.collection("relay_commands")
     
-    # Get pending commands (not yet executed)
-    pending = commands_ref.where("status", "==", "pending").order_by("created_at").limit(5).stream()
+    # Get pending commands (without ordering to avoid index requirement)
+    pending = commands_ref.where(filter=FieldFilter("status", "==", "pending")).limit(10).stream()
     
     for doc in pending:
         cmd_data = doc.to_dict()
@@ -386,30 +387,32 @@ def main():
     print("✅ Calibration synced to Firebase")
     
     sync_count = 0
-    relay_check_interval = 2  # Check relay commands every 2 syncs
     
     while True:
         try:
             sync_count += 1
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Sync #{sync_count}...")
             
+            # Check for relay commands FIRST (priority for fast response)
+            try:
+                process_relay_commands(db)
+                sync_relay_status_to_firebase(db)
+            except Exception as e:
+                print(f"  ⚠️ Relay error: {e}")
+            
             # Sync latest readings (for real-time dashboard)
             if sync_latest_to_firebase(db, session):
                 print("  ✅ Latest readings synced")
             
-            # Sync history (for charts)
-            new_ts = sync_history_to_firebase(db, session, last_sync_ts)
-            if new_ts > last_sync_ts:
-                last_sync_ts = new_ts
-                save_last_sync_ts(last_sync_ts)
+            # Sync history (for charts) - every 5 syncs
+            if sync_count % 5 == 0:
+                new_ts = sync_history_to_firebase(db, session, last_sync_ts)
+                if new_ts > last_sync_ts:
+                    last_sync_ts = new_ts
+                    save_last_sync_ts(last_sync_ts)
             
-            # Check for relay commands (every 2 syncs = ~10s)
-            if sync_count % relay_check_interval == 0:
-                process_relay_commands(db)
-                sync_relay_status_to_firebase(db)
-            
-            # Check for calibration updates (every 6 syncs = ~30s)
-            if sync_count % 6 == 0:
+            # Check for calibration updates (every 15 syncs = ~30s)
+            if sync_count % 15 == 0:
                 last_cal_check = check_calibration_updates(db, last_cal_check)
             
             time.sleep(SYNC_INTERVAL)
