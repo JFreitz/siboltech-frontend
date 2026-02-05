@@ -1,6 +1,7 @@
 // === SIBOLTECH Firebase Configuration ===
 // Using Firebase Firestore for real-time sensor data
 let RELAY_API_URL = window.location.origin + '/api';  // Fallback for local/tunnel access
+let API_BASE_URL = window.location.origin + '/api';   // Alias for compatibility
 
 // Check if we're on localhost/tunnel for API fallback
 function isLocalAccess() {
@@ -11,13 +12,24 @@ function isLocalAccess() {
            host.startsWith('192.168.');
 }
 
+// Check if we're on static hosting (Vercel, etc.) - API not available
+function isStaticHosting() {
+    const host = window.location.hostname;
+    return host.includes('vercel.app') || 
+           host.includes('netlify.app') || 
+           host.includes('github.io') ||
+           host.includes('pages.dev');
+}
+
 // Initialize - Firebase will handle data via the module in index.html
 async function initializeAPIUrl() {
     if (isLocalAccess()) {
         RELAY_API_URL = window.location.origin + '/api';
+        API_BASE_URL = RELAY_API_URL;
         console.log('Local access detected, API URL:', RELAY_API_URL);
     } else {
         console.log('Using Firebase for sensor data (no API URL needed)');
+        // API calls will be skipped on static hosting
     }
 }
 
@@ -87,6 +99,9 @@ function updateCalibrationModeUI() {
 }
 
 async function fetchCalibrationMode() {
+    // Skip API calls on static hosting (Vercel)
+    if (isStaticHosting()) return;
+    
     try {
         const res = await fetch(`${RELAY_API_URL}/calibration-mode`);
         if (res.ok) {
@@ -113,6 +128,9 @@ document.addEventListener('DOMContentLoaded', () => {
 async function fetchSensorData() {
     // Skip if using Firebase real-time (Firebase will push updates)
     if (window.firebaseListenerActive) return;
+    
+    // Skip API calls on static hosting - Firebase will handle it
+    if (isStaticHosting()) return;
     
     try {
         const res = await fetch(`${RELAY_API_URL}/latest`);
@@ -1069,6 +1087,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 		// Fetch and populate history data
 		const fetchHistoryData = async () => {
+			// Skip on static hosting (Vercel) - API not available
+			if (isStaticHosting()) {
+				console.log('History data not available on static hosting');
+				return;
+			}
+			
 			await waitForAPIUrl();
 			
 			const method = historyState.method; // 'aero', 'dwc', 'trad'
@@ -1804,6 +1828,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	// Fetch relay status from API and sync all actuator UIs
 	async function loadRelayStatus() {
+		// Skip on static hosting (Vercel) - API not available
+		if (isStaticHosting()) return;
+		
 		try {
 			const response = await fetch(`${RELAY_API_URL}/relay/status`);
 			if (response.ok) {
@@ -1985,16 +2012,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				}
 			}
 			
-			// Sync with backend automation controller
-			try {
-				await fetch(`${API_BASE_URL}/override-mode`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ enabled: actuatorOverride })
-				});
-				console.log(`[API] Override mode synced: ${actuatorOverride}`);
-			} catch (e) {
-				console.warn('[API] Failed to sync override mode:', e);
+			// Sync with backend automation controller (skip on static hosting)
+			if (!isStaticHosting()) {
+				try {
+					await fetch(`${API_BASE_URL}/override-mode`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ enabled: actuatorOverride })
+					});
+					console.log(`[API] Override mode synced: ${actuatorOverride}`);
+				} catch (e) {
+					console.warn('[API] Failed to sync override mode:', e);
+				}
 			}
 			
 			// When switching from MANUAL to AUTO, turn all actuators OFF for fresh start
@@ -4547,6 +4576,9 @@ function updateMiniCharts(){
     
     // Load current calibration from API
     async function loadCalibration() {
+        // Skip on static hosting (Vercel) - API not available
+        if (isStaticHosting()) return;
+        
         try {
             const res = await fetch(`${getApiUrl()}/calibration`);
             const data = await res.json();
@@ -4572,6 +4604,9 @@ function updateMiniCharts(){
     
     // Fetch live voltage readings
     async function fetchVoltage() {
+        // Skip on static hosting (Vercel) - API not available
+        if (isStaticHosting()) return;
+        
         try {
             const res = await fetch(`${getApiUrl()}/voltage`);
             const data = await res.json();
