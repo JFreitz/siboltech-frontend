@@ -2841,13 +2841,15 @@ setTimeout(() => {
 
 	// Success modal closes automatically - no click handlers needed
 
-	// Calibration apply
+	// Calibration apply (only if element exists)
 	const applyCal = document.getElementById('applyCal');
-	applyCal.addEventListener('click', ()=>{
-		const sensor = document.getElementById('calSensor').value;
-		const offset = parseFloat(document.getElementById('calOffset').value) || 0;
-		alert(`Applied calibration offset ${offset} to ${sensor}`);
-	});
+	if (applyCal) {
+		applyCal.addEventListener('click', ()=>{
+			const sensor = document.getElementById('calSensor').value;
+			const offset = parseFloat(document.getElementById('calOffset').value) || 0;
+			alert(`Applied calibration offset ${offset} to ${sensor}`);
+		});
+	}
 
 
 
