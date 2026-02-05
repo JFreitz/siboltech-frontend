@@ -183,8 +183,17 @@ class AutomationController:
     
     def set_override(self, override: bool):
         """Enable/disable override mode (manual control)."""
+        was_override = self.override_mode
         self.override_mode = override
-        print(f"[AUTOMATION] Override mode: {'ON' if override else 'OFF'}")
+        print(f"[AUTOMATION] Override mode: {'ON' if override else 'OFF'}", flush=True)
+        
+        # When override is turned OFF, immediately run automation to restore proper states
+        if was_override and not override:
+            print("[AUTOMATION] Override disabled - running immediate automation cycle", flush=True)
+            try:
+                self._process_automation()
+            except Exception as e:
+                print(f"[AUTOMATION] Error during immediate cycle: {e}", flush=True)
     
     def update_sensors(self, readings: Dict[str, float]):
         """Update sensor readings (call this whenever new data arrives)."""
@@ -247,39 +256,36 @@ class AutomationController:
                 self._set_relay("AIR_PUMP", False)
         
         # ===== 3 & 4. EXHAUST IN/OUT (Relays 3 & 4) - Temp & Humidity =====
-        if self.filters["temperature"].ready() or self.filters["humidity"].ready():
-            exhaust_needed = False
+        # Only change exhaust state if we have valid sensor readings
+        temp_ready = self.filters["temperature"].ready()
+        humidity_ready = self.filters["humidity"].ready()
+        
+        if temp_ready or humidity_ready:
+            # Start with current state (preserve if no clear decision)
+            exhaust_needed = self.relays["EXHAUST_IN"].state
             
-            # Temperature-based control
-            if self.filters["temperature"].ready():
+            # Temperature-based control (only if temp filter ready)
+            if temp_ready:
                 if self._is_daytime():
                     # Daytime: 26°C ON, 23°C OFF
                     if temp > TEMP_DAY_HIGH:
                         exhaust_needed = True
                     elif temp <= TEMP_DAY_LOW:
                         exhaust_needed = False
-                    else:
-                        # In hysteresis band - keep current state
-                        exhaust_needed = self.relays["EXHAUST_IN"].state
+                    # else: stay in current state (hysteresis band)
                 else:
                     # Nighttime: 22°C ON, 19°C OFF
                     if temp > TEMP_NIGHT_HIGH:
                         exhaust_needed = True
                     elif temp <= TEMP_NIGHT_LOW:
                         exhaust_needed = False
-                    else:
-                        exhaust_needed = self.relays["EXHAUST_IN"].state
+                    # else: stay in current state (hysteresis band)
             
-            # Humidity override (if humidity high, force exhaust ON)
-            if self.filters["humidity"].ready():
+            # Humidity override (if humidity high, force exhaust ON regardless of temp)
+            if humidity_ready:
                 if humidity > HUMIDITY_HIGH:
                     exhaust_needed = True
-                elif humidity <= HUMIDITY_LOW and not (
-                    (self._is_daytime() and temp > TEMP_DAY_LOW) or
-                    (not self._is_daytime() and temp > TEMP_NIGHT_LOW)
-                ):
-                    # Only turn off for humidity if temp is also OK
-                    pass  # Keep exhaust_needed from temp logic
+                # Note: don't turn OFF based on humidity alone - let temp control that
             
             self._set_relay("EXHAUST_IN", exhaust_needed)
             self._set_relay("EXHAUST_OUT", exhaust_needed)

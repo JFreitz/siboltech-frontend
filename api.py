@@ -483,21 +483,105 @@ def get_history():
         return jsonify({'success': True, 'type': 'plant', 'count': len(data), 'readings': data})
     
     elif history_type == 'actuator':
-        # Get actuator events
+        # Get actuator events - bucket by interval (daily or 15min)
         with Session() as session:
-            rows = session.query(ActuatorEvent).filter(ActuatorEvent.timestamp >= cutoff).order_by(ActuatorEvent.timestamp.desc()).limit(limit).all()
+            rows = session.query(ActuatorEvent).filter(
+                ActuatorEvent.timestamp >= cutoff
+            ).order_by(ActuatorEvent.timestamp.desc()).limit(limit * 10).all()
         
-        data = []
+        # Also get sensor readings for the same time period
+        sensor_rows = []
+        with Session() as session:
+            sensor_rows = session.execute(
+                text("""
+                    SELECT timestamp, sensor, value
+                    FROM sensor_readings
+                    WHERE timestamp >= :cutoff
+                      AND sensor IN ('temperature_c', 'humidity', 'tds_ppm', 'ph', 'do_mg_l')
+                    ORDER BY timestamp DESC
+                """),
+                {"cutoff": cutoff}
+            ).fetchall()
+        
+        # Bucket actuator events
+        buckets = {}  # key: bucket_start_time str, value: {relay_events: [...], sensors: {...}}
+        
         for r in rows:
-            relay_label = RELAY_LABELS.get(r.relay_id, f'Relay {r.relay_id}')
+            ts = r.timestamp
+            if isinstance(ts, str):
+                try:
+                    ts = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                except:
+                    continue
+            
+            if interval == '15min':
+                bucket_minute = (ts.minute // 15) * 15
+                bucket_ts = ts.replace(minute=bucket_minute, second=0, microsecond=0)
+            else:
+                bucket_ts = ts.replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            bucket_key = bucket_ts.isoformat()
+            
+            if bucket_key not in buckets:
+                buckets[bucket_key] = {
+                    'timestamp': bucket_ts,
+                    'relay_events': [],
+                    'ph': [], 'do': [], 'tds': [], 'temperature': [], 'humidity': []
+                }
+            
+            # Add relay event (dedupe by relay_id - keep latest state)
+            existing = [e for e in buckets[bucket_key]['relay_events'] if e['relay_id'] == r.relay_id]
+            if not existing:
+                buckets[bucket_key]['relay_events'].append({
+                    'relay_id': r.relay_id,
+                    'state': r.state
+                })
+        
+        # Add sensor data to buckets
+        for sr in sensor_rows:
+            ts = sr[0]
+            if isinstance(ts, str):
+                try:
+                    ts = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                except:
+                    continue
+            
+            if interval == '15min':
+                bucket_minute = (ts.minute // 15) * 15
+                bucket_ts = ts.replace(minute=bucket_minute, second=0, microsecond=0)
+            else:
+                bucket_ts = ts.replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            bucket_key = bucket_ts.isoformat()
+            if bucket_key in buckets:
+                sensor = sr[1]
+                value = sr[2]
+                if sensor == 'ph':
+                    buckets[bucket_key]['ph'].append(value)
+                elif sensor == 'do_mg_l':
+                    buckets[bucket_key]['do'].append(value)
+                elif sensor == 'tds_ppm':
+                    buckets[bucket_key]['tds'].append(value)
+                elif sensor == 'temperature_c':
+                    buckets[bucket_key]['temperature'].append(value)
+                elif sensor == 'humidity':
+                    buckets[bucket_key]['humidity'].append(value)
+        
+        # Build final data
+        data = []
+        for bucket_key in sorted(buckets.keys(), reverse=True)[:limit]:
+            bucket = buckets[bucket_key]
             data.append({
-                'timestamp': _format_ts_for_display(r.timestamp),
-                'relay_id': r.relay_id,
-                'relay_label': relay_label,
-                'state': 'ON' if r.state == 1 else 'OFF',
-                'state_code': r.state
+                'timestamp': _format_ts_for_display(bucket['timestamp']),
+                'relay_events': bucket['relay_events'],
+                'ph': round(sum(bucket['ph']) / len(bucket['ph']), 2) if bucket['ph'] else None,
+                'do': round(sum(bucket['do']) / len(bucket['do']), 2) if bucket['do'] else None,
+                'tds': round(sum(bucket['tds']) / len(bucket['tds']), 1) if bucket['tds'] else None,
+                'temperature': round(sum(bucket['temperature']) / len(bucket['temperature']), 1) if bucket['temperature'] else None,
+                'humidity': round(sum(bucket['humidity']) / len(bucket['humidity']), 1) if bucket['humidity'] else None
             })
-        return jsonify({'success': True, 'type': 'actuator', 'count': len(data), 'events': data})
+        
+        return jsonify({'success': True, 'type': 'actuator', 'interval': interval, 'count': len(data), 'readings': data})
     
     elif history_type == 'sensor' or history_type not in ['plant', 'actuator']:
         # Default: Sensor readings (daily/15min) for aero/dwc systems
@@ -586,7 +670,7 @@ def get_history():
                     'ph': round(sum(bucket['ph']) / len(bucket['ph']), 2) if bucket['ph'] else None,
                     'do': round(sum(bucket['do_mg_l']) / len(bucket['do_mg_l']), 2) if bucket['do_mg_l'] else None,
                     'tds': round(sum(bucket['tds_ppm']) / len(bucket['tds_ppm']), 1) if bucket['tds_ppm'] else None,
-                    'temp': round(sum(bucket['temperature_c']) / len(bucket['temperature_c']), 1) if bucket['temperature_c'] else None,
+                    'temperature': round(sum(bucket['temperature_c']) / len(bucket['temperature_c']), 1) if bucket['temperature_c'] else None,
                     'humidity': round(sum(bucket['humidity']) / len(bucket['humidity']), 1) if bucket['humidity'] else None
                 }
                 data.append(reading)
@@ -601,7 +685,7 @@ def get_history():
                         'ph': None,
                         'do': None,
                         'tds': None,
-                        'temp': None,
+                        'temperature': None,
                         'humidity': None
                     }
                 sensor = r[1]
@@ -613,7 +697,7 @@ def get_history():
                 elif sensor == 'tds_ppm':
                     readings_by_day[day]['tds'] = round(value, 1) if value else None
                 elif sensor == 'temperature_c':
-                    readings_by_day[day]['temp'] = round(value, 1) if value else None
+                    readings_by_day[day]['temperature'] = round(value, 1) if value else None
                 elif sensor == 'humidity':
                     readings_by_day[day]['humidity'] = round(value, 1) if value else None
             
@@ -992,9 +1076,10 @@ def relay_all_off():
 
 
 def _save_relay_state(relay_id, state):
-    """Save relay state to DB for persistence."""
+    """Save relay state to DB for persistence and history."""
     try:
         with Session() as session:
+            # Save to sensor_readings for legacy compatibility
             session.add(SensorReading(
                 timestamp=_utcnow(),
                 sensor=f"relay_{relay_id}",
@@ -1002,9 +1087,16 @@ def _save_relay_state(relay_id, state):
                 unit="state",
                 meta={"label": RELAY_LABELS.get(relay_id)}
             ))
+            # Also save to actuator_events for proper history tracking
+            session.add(ActuatorEvent(
+                timestamp=_utcnow(),
+                relay_id=relay_id,
+                state=1 if state else 0,
+                meta={"label": RELAY_LABELS.get(relay_id), "source": "api"}
+            ))
             session.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[DB] Error saving relay state: {e}")
 
 
 # ==================== Calibration Endpoints ====================
