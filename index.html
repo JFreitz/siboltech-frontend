@@ -1210,10 +1210,10 @@
 		</script>
 
 		
-		<!-- Firebase SDK for real-time sensor data -->
+				<!-- Firebase SDK - load after index.js so listeners are ready -->
 		<script type="module">
 			import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-			import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+			import { getFirestore, doc, onSnapshot, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 			
 			const firebaseConfig = {
 				apiKey: "AIzaSyCSuJ4kVaxq7uKllRnrt-EaCxIGmMTNI30",
@@ -1226,33 +1226,136 @@
 			
 			const app = initializeApp(firebaseConfig);
 			const db = getFirestore(app);
-			console.log("Firebase initialized");
 			
-			const docRef = doc(db, "sensors", "latest");
-			onSnapshot(docRef, (docSnap) => {
+			// Make Firebase available globally for index.js
+			window.firebaseDB = db;
+			window.firebaseDoc = doc;
+			window.firebaseOnSnapshot = onSnapshot;
+			window.firebaseCollection = collection;
+			window.firebaseAddDoc = addDoc;
+			window.firebaseGetDocs = getDocs;
+			window.firebaseQuery = query;
+			window.firebaseOrderBy = orderBy;
+			window.firebaseLimit = limit;
+			window.firebaseServerTimestamp = serverTimestamp;
+			window.firebaseReady = true;
+			
+			console.log('✅ Firebase initialized');
+			
+			// ===== SENSOR READINGS (real-time) =====
+			const sensorDocRef = doc(db, 'sensors', 'latest');
+			onSnapshot(sensorDocRef, (docSnap) => {
 				if (docSnap.exists()) {
 					const data = docSnap.data();
-					console.log("Firebase update:", Object.keys(data).filter(k => !k.startsWith("_")).join(", "));
+					console.log('📡 Sensors:', Object.keys(data).filter(k => !k.startsWith('_')).join(', '));
 					
-					const phVal = (data.ph && data.ph.value !== undefined) ? parseFloat(data.ph.value).toFixed(2) : "--";
-					const doVal = (data.do_mg_l && data.do_mg_l.value !== undefined) ? parseFloat(data.do_mg_l.value).toFixed(2) + " mg/L" : "-- mg/L";
-					const tempVal = (data.temperature_c && data.temperature_c.value !== undefined) ? parseFloat(data.temperature_c.value).toFixed(1) + " C" : "-- C";
-					const humVal = (data.humidity && data.humidity.value !== undefined) ? parseFloat(data.humidity.value).toFixed(1) + " %" : "-- %";
-					const tdsVal = (data.tds_ppm && data.tds_ppm.value !== undefined) ? parseFloat(data.tds_ppm.value).toFixed(0) + " ppm" : "-- ppm";
+					const phVal = (data.ph && data.ph.value !== undefined) ? parseFloat(data.ph.value).toFixed(2) : '--';
+					const doVal = (data.do_mg_l && data.do_mg_l.value !== undefined) ? parseFloat(data.do_mg_l.value).toFixed(2) + ' mg/L' : '-- mg/L';
+					const tempVal = (data.temperature_c && data.temperature_c.value !== undefined) ? parseFloat(data.temperature_c.value).toFixed(1) + ' °C' : '-- °C';
+					const humVal = (data.humidity && data.humidity.value !== undefined) ? parseFloat(data.humidity.value).toFixed(1) + ' %' : '-- %';
+					const tdsVal = (data.tds_ppm && data.tds_ppm.value !== undefined) ? parseFloat(data.tds_ppm.value).toFixed(0) + ' ppm' : '-- ppm';
 
-					document.querySelectorAll("#val-ph, [data-sensor='ph'] .value").forEach(el => { if (el) el.textContent = phVal; });
-					document.querySelectorAll("#val-do, [data-sensor='do'] .value").forEach(el => { if (el) el.textContent = doVal; });
-					document.querySelectorAll("#val-temp, [data-sensor='temp'] .value").forEach(el => { if (el) el.textContent = tempVal; });
-					document.querySelectorAll("#val-hum, [data-sensor='hum'] .value").forEach(el => { if (el) el.textContent = humVal; });
-					document.querySelectorAll("#val-tds, [data-sensor='tds'] .value").forEach(el => { if (el) el.textContent = tdsVal; });
+					document.querySelectorAll('#val-ph, [data-sensor="ph"] .value').forEach(el => { if (el) el.textContent = phVal; });
+					document.querySelectorAll('#val-do, [data-sensor="do"] .value').forEach(el => { if (el) el.textContent = doVal; });
+					document.querySelectorAll('#val-temp, [data-sensor="temp"] .value').forEach(el => { if (el) el.textContent = tempVal; });
+					document.querySelectorAll('#val-hum, [data-sensor="hum"] .value').forEach(el => { if (el) el.textContent = humVal; });
+					document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => { if (el) el.textContent = tdsVal; });
 					
+					window.latestSensorData = data;
 					window.firebaseListenerActive = true;
 				}
 			}, (error) => {
-				console.error("Firebase error:", error);
+				console.error('Firebase sensor error:', error.message);
 			});
+			
+			// ===== ACTUATOR/RELAY STATUS (real-time) =====
+			const relayDocRef = doc(db, 'actuators', 'relays');
+			onSnapshot(relayDocRef, (docSnap) => {
+				if (docSnap.exists()) {
+					const data = docSnap.data();
+					const status = data.status || {};
+					console.log('🔌 Relays:', Object.entries(status).map(([k,v]) => `${k}:${v}`).join(', '));
+					
+					// Map relay numbers to actuator IDs
+					const RELAY_TO_ACTUATOR = {
+						4: 'act-water',
+						7: 'act-air',
+						9: 'act-fan-in',
+						5: 'act-fan-out',
+						6: 'act-lights-aerponics',
+						8: 'act-lights-dwc'
+					};
+					
+					for (const [relay, state] of Object.entries(status)) {
+						const relayNum = parseInt(relay.replace('R', ''));
+						const actId = RELAY_TO_ACTUATOR[relayNum];
+						if (actId) {
+							const checkbox = document.getElementById(actId);
+							if (checkbox) {
+								const isOn = state === 'ON';
+								checkbox.checked = isOn;
+								const textEl = checkbox.closest('.toggle-switch')?.querySelector('.toggle-text');
+								if (textEl) textEl.textContent = isOn ? 'ON' : 'OFF';
+							}
+						}
+					}
+					window.relayStatus = status;
+				}
+			}, (error) => {
+				console.error('Firebase relay error:', error.message);
+			});
+			
+			// ===== SEND RELAY COMMAND (via Firebase) =====
+			window.sendRelayCommandFirebase = async function(relay, action) {
+				try {
+					const commandsRef = collection(db, 'relay_commands');
+					await addDoc(commandsRef, {
+						relay: relay,
+						action: action,
+						status: 'pending',
+						created_at: serverTimestamp()
+					});
+					console.log(`📤 Command sent: ${relay} ${action}`);
+					return true;
+				} catch (error) {
+					console.error('Failed to send command:', error);
+					return false;
+				}
+			};
+			
+			// ===== LOAD CALIBRATION =====
+			const calDocRef = doc(db, 'settings', 'calibration');
+			onSnapshot(calDocRef, (docSnap) => {
+				if (docSnap.exists()) {
+					const data = docSnap.data();
+					window.firebaseCalibration = data.sensors || {};
+					console.log('📐 Calibration loaded:', Object.keys(window.firebaseCalibration).join(', '));
+				}
+			}, (error) => {
+				console.error('Firebase calibration error:', error.message);
+			});
+			
+			// ===== LOAD HISTORY (for charts) =====
+			window.loadSensorHistory = async function(limitCount = 100) {
+				try {
+					const historyRef = collection(db, 'sensors', 'history', 'readings');
+					const q = query(historyRef, orderBy('timestamp', 'desc'), limit(limitCount));
+					const snapshot = await getDocs(q);
+					const history = [];
+					snapshot.forEach(doc => {
+						history.push({ id: doc.id, ...doc.data() });
+					});
+					console.log(`📊 Loaded ${history.length} history records`);
+					return history.reverse(); // Oldest first
+				} catch (error) {
+					console.error('Failed to load history:', error);
+					return [];
+				}
+			};
+			
+			// Dispatch event when Firebase is ready
+			window.dispatchEvent(new Event('firebaseReady'));
 		</script>
 </body>
 
 </html>
-

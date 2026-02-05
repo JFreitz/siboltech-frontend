@@ -1795,11 +1795,24 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		return history.reduce((a, b) => a + b, 0) / history.length;
 	}
 
-	// Toggle relay via API
+	// Toggle relay via API or Firebase
 	async function toggleRelay(relayNum, newState, stateEl) {
+		const action = newState ? 'ON' : 'OFF';
+		
+		// Use Firebase on static hosting (Vercel)
+		if (isStaticHosting() && window.sendRelayCommandFirebase) {
+			const success = await window.sendRelayCommandFirebase(`R${relayNum}`, action);
+			if (success && stateEl) {
+				stateEl.classList.remove('state-off', 'state-on');
+				stateEl.classList.add(newState ? 'state-on' : 'state-off');
+				stateEl.textContent = action;
+			}
+			return;
+		}
+		
+		// Use direct API when available
 		try {
-			const action = newState ? 'on' : 'off';
-			const response = await fetch(`${RELAY_API_URL}/relay/${relayNum}/${action}`, {
+			const response = await fetch(`${RELAY_API_URL}/relay/${relayNum}/${action.toLowerCase()}`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' }
 			});
