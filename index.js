@@ -245,45 +245,101 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Fetch real sensor data from API
 async function fetchSensorData() {
+    // Skip if using Firebase real-time (Firebase will push updates)
+    if (window.firebaseListenerActive) return;
+    
     try {
         const res = await fetch(`${RELAY_API_URL}/latest`);
         const data = await res.json();
-        
-        // API returns: { "ph": {"value": 6.5, "unit": "pH"}, "temperature_c": {...}, ... }
-        // Update dashboard sensor values (default to 0 if no data)
-        const phVal = (data.ph && data.ph.value !== undefined) ? data.ph.value.toFixed(2) : '0.00';
-        const doVal = (data.do_mg_l && data.do_mg_l.value !== undefined) ? data.do_mg_l.value.toFixed(2) + ' mg/L' : '0.00 mg/L';
-        const tempVal = (data.temperature_c && data.temperature_c.value !== undefined) ? data.temperature_c.value.toFixed(1) + ' °C' : '0.0 °C';
-        const humVal = (data.humidity && data.humidity.value !== undefined) ? data.humidity.value.toFixed(1) + ' %' : '0.0 %';
-        const tdsVal = (data.tds_ppm && data.tds_ppm.value !== undefined) ? data.tds_ppm.value.toFixed(0) + ' ppm' : '0 ppm';
-
-        document.querySelectorAll('#val-ph, [data-sensor="ph"] .value').forEach(el => {
-            if (el) el.textContent = phVal;
-        });
-        document.querySelectorAll('#val-do, [data-sensor="do"] .value').forEach(el => {
-            if (el) el.textContent = doVal;
-        });
-        document.querySelectorAll('#val-temp, [data-sensor="temp"] .value').forEach(el => {
-            if (el) el.textContent = tempVal;
-        });
-        document.querySelectorAll('#val-hum, [data-sensor="hum"] .value').forEach(el => {
-            if (el) el.textContent = humVal;
-        });
-        document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => {
-            if (el) el.textContent = tdsVal;
-        });
+        updateSensorDisplayFromData(data);
     } catch (e) {
         console.log('API fetch error:', e);
         // On error, show zeros
-        document.querySelectorAll('#val-ph, [data-sensor="ph"] .value').forEach(el => { if (el) el.textContent = '0.00'; });
-        document.querySelectorAll('#val-do, [data-sensor="do"] .value').forEach(el => { if (el) el.textContent = '0.00 mg/L'; });
-        document.querySelectorAll('#val-temp, [data-sensor="temp"] .value').forEach(el => { if (el) el.textContent = '0.0 °C'; });
-        document.querySelectorAll('#val-hum, [data-sensor="hum"] .value').forEach(el => { if (el) el.textContent = '0.0 %'; });
-        document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => { if (el) el.textContent = '0 ppm'; });
+        showSensorError();
     }
 }
 
-// Start fetching sensor data
+// Update sensor display from data object (used by both API and Firebase)
+function updateSensorDisplayFromData(data) {
+    // API returns: { "ph": {"value": 6.5, "unit": "pH"}, "temperature_c": {...}, ... }
+    // Update dashboard sensor values (default to 0 if no data)
+    const phVal = (data.ph && data.ph.value !== undefined) ? parseFloat(data.ph.value).toFixed(2) : '0.00';
+    const doVal = (data.do_mg_l && data.do_mg_l.value !== undefined) ? parseFloat(data.do_mg_l.value).toFixed(2) + ' mg/L' : '0.00 mg/L';
+    const tempVal = (data.temperature_c && data.temperature_c.value !== undefined) ? parseFloat(data.temperature_c.value).toFixed(1) + ' °C' : '0.0 °C';
+    const humVal = (data.humidity && data.humidity.value !== undefined) ? parseFloat(data.humidity.value).toFixed(1) + ' %' : '0.0 %';
+    const tdsVal = (data.tds_ppm && data.tds_ppm.value !== undefined) ? parseFloat(data.tds_ppm.value).toFixed(0) + ' ppm' : '0 ppm';
+
+    document.querySelectorAll('#val-ph, [data-sensor="ph"] .value').forEach(el => {
+        if (el) el.textContent = phVal;
+    });
+    document.querySelectorAll('#val-do, [data-sensor="do"] .value').forEach(el => {
+        if (el) el.textContent = doVal;
+    });
+    document.querySelectorAll('#val-temp, [data-sensor="temp"] .value').forEach(el => {
+        if (el) el.textContent = tempVal;
+    });
+    document.querySelectorAll('#val-hum, [data-sensor="hum"] .value').forEach(el => {
+        if (el) el.textContent = humVal;
+    });
+    document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => {
+        if (el) el.textContent = tdsVal;
+    });
+    
+    // Update connection indicator
+    updateApiSettingsButton(true);
+}
+
+function showSensorError() {
+    document.querySelectorAll('#val-ph, [data-sensor="ph"] .value').forEach(el => { if (el) el.textContent = '0.00'; });
+    document.querySelectorAll('#val-do, [data-sensor="do"] .value').forEach(el => { if (el) el.textContent = '0.00 mg/L'; });
+    document.querySelectorAll('#val-temp, [data-sensor="temp"] .value').forEach(el => { if (el) el.textContent = '0.0 °C'; });
+    document.querySelectorAll('#val-hum, [data-sensor="hum"] .value').forEach(el => { if (el) el.textContent = '0.0 %'; });
+    document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => { if (el) el.textContent = '0 ppm'; });
+}
+
+// Initialize Firebase real-time listener
+function initFirebaseListener() {
+    if (!window.firebaseReady || !window.firebaseDB) {
+        console.log('Firebase not ready, will retry...');
+        return false;
+    }
+    
+    try {
+        const db = window.firebaseDB;
+        const docRef = window.firebaseDoc(db, 'sensors', 'latest');
+        
+        window.firebaseOnSnapshot(docRef, (doc) => {
+            if (doc.exists()) {
+                const data = doc.data();
+                console.log('📡 Firebase update received:', Object.keys(data).filter(k => !k.startsWith('_')).join(', '));
+                updateSensorDisplayFromData(data);
+                window.firebaseListenerActive = true;
+            }
+        }, (error) => {
+            console.error('Firebase listener error:', error);
+            window.firebaseListenerActive = false;
+        });
+        
+        console.log('✅ Firebase real-time listener active');
+        updateApiSettingsButton(true);
+        return true;
+    } catch (e) {
+        console.error('Failed to init Firebase listener:', e);
+        return false;
+    }
+}
+
+// Start Firebase listener when ready, fallback to polling
+window.addEventListener('firebaseReady', () => {
+    console.log('🔥 Firebase ready event received');
+    setTimeout(() => {
+        if (initFirebaseListener()) {
+            console.log('Using Firebase real-time updates (no polling needed)');
+        }
+    }, 500);
+});
+
+// Start fetching sensor data (polling fallback)
 setInterval(fetchSensorData, 1000);
 setTimeout(fetchSensorData, 200);
 

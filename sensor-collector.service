@@ -1,0 +1,18 @@
+[Unit]
+Description=SIBOLTECH Sensor Collector (ESP32 Serial Ingestion)
+After=network.target siboltech.service
+BindsTo=dev-ttyUSB0.device
+After=dev-ttyUSB0.device
+
+[Service]
+Type=simple
+User=username
+WorkingDirectory=/home/username/Despro
+Environment=PATH=/home/username/sensor-venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=DATABASE_URL=sqlite:////home/username/Despro/sensors.db
+ExecStart=/home/username/sensor-venv/bin/python /home/username/Despro/ingest_serial.py --port /dev/ttyUSB0
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=dev-ttyUSB0.device

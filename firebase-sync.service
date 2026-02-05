@@ -1,0 +1,16 @@
+[Unit]
+Description=SIBOLTECH Firebase Sync Service
+After=network-online.target sensor-collector.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=username
+WorkingDirectory=/home/username/Despro
+Environment=PATH=/home/username/sensor-venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/username/sensor-venv/bin/python /home/username/Despro/firebase_sync.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

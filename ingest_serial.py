@@ -94,9 +94,25 @@ def readings_to_rows(payload: dict[str, Any]) -> list[SensorReading]:
     if not isinstance(readings, dict):
         return []
 
+    # Normalize sensor names from ESP32 format to our standard format
+    # ESP32 sends: temp, humidity, tds, ph_v, do_v, tds_v
+    # We store:    temperature_c, humidity, tds_ppm, ph, do_mg_l
+    name_map = {
+        "temp": "temperature_c",
+        "temperature": "temperature_c",
+        "tds": "tds_ppm",
+        "ph_v": "ph_voltage_v",
+        "do_v": "do_voltage_v",
+        "tds_v": "tds_voltage_v",
+    }
+    normalized_readings = {}
+    for k, v in readings.items():
+        new_key = name_map.get(k, k)
+        normalized_readings[new_key] = v
+
     # If the ESP32 sends only raw voltages (e.g. ph_voltage_v) we can compute
     # the calibrated value on the Pi using calibration.json.
-    computed_readings = dict(readings)
+    computed_readings = dict(normalized_readings)
     if "ph" not in computed_readings and "ph_voltage_v" in computed_readings:
         try:
             from calibration import calibrate_ph
@@ -123,12 +139,15 @@ def readings_to_rows(payload: dict[str, Any]) -> list[SensorReading]:
 
     # Default sensors stored.
     # Override by setting ALLOWED_SENSORS="sensor1,sensor2".
-    allowed = os.getenv("ALLOWED_SENSORS", "temperature_c,humidity")
+    allowed = os.getenv("ALLOWED_SENSORS", "temperature_c,humidity,tds_ppm,ph,do_mg_l")
     allowed_sensors = {s.strip() for s in allowed.split(",") if s.strip()}
 
     units = {
         "temperature_c": "C",
         "humidity": "%",
+        "tds_ppm": "ppm",
+        "ph": "pH",
+        "do_mg_l": "mg/L",
     }
 
     tds_voltage_v = None
