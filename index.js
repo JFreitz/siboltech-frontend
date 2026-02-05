@@ -1892,6 +1892,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	// Turn all actuators/relays OFF
 	async function turnAllActuatorsOff() {
+		// Use Firebase on static hosting (Vercel)
+		if (isStaticHosting() && window.sendRelayCommandFirebase) {
+			// Send OFF command for all 9 relays via Firebase
+			for (let i = 1; i <= 9; i++) {
+				await window.sendRelayCommandFirebase(`R${i}`, 'OFF');
+			}
+			// Update all actuator UIs to OFF
+			Object.keys(ACTUATOR_TO_RELAY).forEach(actuatorId => {
+				syncActuatorUI(actuatorId, false);
+			});
+			console.log('All actuators turned OFF via Firebase');
+			return;
+		}
+		
+		// Use direct API when available
 		try {
 			await fetch(`${RELAY_API_URL}/relay/all/off`, { method: 'POST' });
 			// Update all actuator UIs to OFF
