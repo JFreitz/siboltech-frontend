@@ -4791,44 +4791,52 @@ function updateMiniCharts(){
         }
     }
     
-    // Save calibration to API
+    // Save calibration to API or Firebase
     async function saveCalibration(sensor) {
         const cal = calculateCalibration(sensor);
         if (!cal) return;
         
-        try {
-            const res = await fetch(`${getApiUrl()}/calibration`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sensor, slope: cal.slope, offset: cal.offset })
-            });
-            
-            if (res.ok) {
-                // Update current values display
-                const slopeEl = document.getElementById(`${sensor}CurrentSlope`);
-                const offsetEl = document.getElementById(`${sensor}CurrentOffset`);
-                if (slopeEl) slopeEl.textContent = cal.slope.toFixed(4);
-                if (offsetEl) offsetEl.textContent = cal.offset.toFixed(4);
-                
-                const badge = document.getElementById(`${sensor}CalStatus`);
-                if (badge) {
-                    badge.textContent = 'Calibrated';
-                    badge.classList.add('calibrated');
-                }
-                
-                // Show success modal
-                const modal = document.getElementById('calSuccessModal');
-                const msg = document.getElementById('calSuccessMsg');
-                if (msg) msg.textContent = `${sensor.toUpperCase()} calibration saved!\nSlope: ${cal.slope.toFixed(4)}\nOffset: ${cal.offset.toFixed(4)}`;
-                if (modal) modal.style.display = 'flex';
-                
-                clearCalibration(sensor);
-            } else {
-                alert('Failed to save calibration');
+        let success = false;
+        
+        // Use Firebase on static hosting (Vercel)
+        if (isStaticHosting() && window.saveCalibrationFirebase) {
+            success = await window.saveCalibrationFirebase(sensor, cal.slope, cal.offset);
+        } else {
+            // Use API when available (local)
+            try {
+                const res = await fetch(`${getApiUrl()}/calibration`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sensor, slope: cal.slope, offset: cal.offset })
+                });
+                success = res.ok;
+            } catch (e) {
+                console.error('Failed to save calibration:', e);
             }
-        } catch (e) {
-            console.error('Failed to save calibration:', e);
-            alert('Failed to save calibration. Check console.');
+        }
+        
+        if (success) {
+            // Update current values display
+            const slopeEl = document.getElementById(`${sensor}CurrentSlope`);
+            const offsetEl = document.getElementById(`${sensor}CurrentOffset`);
+            if (slopeEl) slopeEl.textContent = cal.slope.toFixed(4);
+            if (offsetEl) offsetEl.textContent = cal.offset.toFixed(4);
+            
+            const badge = document.getElementById(`${sensor}CalStatus`);
+            if (badge) {
+                badge.textContent = 'Calibrated';
+                badge.classList.add('calibrated');
+            }
+            
+            // Show success modal
+            const modal = document.getElementById('calSuccessModal');
+            const msg = document.getElementById('calSuccessMsg');
+            if (msg) msg.textContent = `${sensor.toUpperCase()} calibration saved!\nSlope: ${cal.slope.toFixed(4)}\nOffset: ${cal.offset.toFixed(4)}`;
+            if (modal) modal.style.display = 'flex';
+            
+            clearCalibration(sensor);
+        } else {
+            alert('Failed to save calibration');
         }
     }
     

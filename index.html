@@ -1213,7 +1213,7 @@
 				<!-- Firebase SDK - load after index.js so listeners are ready -->
 		<script type="module">
 			import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-			import { getFirestore, doc, onSnapshot, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+			import { getFirestore, doc, onSnapshot, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 			
 			const firebaseConfig = {
 				apiKey: "AIzaSyCSuJ4kVaxq7uKllRnrt-EaCxIGmMTNI30",
@@ -1335,6 +1335,26 @@
 				console.error('Firebase calibration error:', error.message);
 			});
 			
+
+			// ===== SAVE CALIBRATION TO FIREBASE =====
+			window.saveCalibrationFirebase = async function(sensor, slope, offset) {
+				try {
+					const calDocRef = doc(db, 'settings', 'calibration');
+					const docSnap = await getDoc(calDocRef);
+					let sensors = {};
+					if (docSnap.exists()) {
+						sensors = docSnap.data().sensors || {};
+					}
+					sensors[sensor] = { slope, offset, updated_at: new Date().toISOString() };
+					await setDoc(calDocRef, { sensors }, { merge: true });
+					console.log('Calibration saved for ' + sensor);
+					return true;
+				} catch (error) {
+					console.error('Failed to save calibration:', error);
+					return false;
+				}
+			};
+
 			// ===== LOAD HISTORY (for charts) =====
 			window.loadSensorHistory = async function(limitCount = 100) {
 				try {
