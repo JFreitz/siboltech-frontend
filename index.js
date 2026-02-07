@@ -2143,17 +2143,24 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				}
 			}
 			
-			// When switching from MANUAL to AUTO, turn all actuators OFF for fresh start
+			// When switching from MANUAL to AUTO mode:
+			// DON'T send relay OFF commands - the RPi automation controller will set
+			// the correct states based on sensor readings. Sending OFF commands here
+			// would fight with automation (race condition via Firebase relay_commands).
 			if (!isInitial && wasOverride && !actuatorOverride) {
-				console.log('Switching to AUTO mode - turning all actuators OFF for fresh start');
-				await turnAllActuatorsOff();
+				console.log('Switching to AUTO mode - RPi automation will control relays');
+				// Just reset local UI state, automation will push real states via Firebase
+				Object.keys(ACTUATOR_TO_RELAY).forEach(actuatorId => {
+					syncActuatorUI(actuatorId, false);
+				});
 				// Reset the auto-control state
 				Object.keys(nutrientActiveState).forEach(k => nutrientActiveState[k] = false);
 				Object.keys(consecutiveBreaches).forEach(k => consecutiveBreaches[k] = 0);
 				Object.keys(sensorHistory).forEach(k => sensorHistory[k] = []);
 			}
 			
-			// When switching to MANUAL (override ON), turn all actuators OFF immediately
+			// When switching to MANUAL (override ON), send all-OFF via Firebase
+			// so the RPi actually turns relays off on the hardware
 			if (!isInitial && !wasOverride && actuatorOverride) {
 				console.log('Switching to MANUAL mode - turning all actuators OFF');
 				await turnAllActuatorsOff();
