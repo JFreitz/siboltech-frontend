@@ -3,3 +3,15 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# Runtime files
+__pycache__/
+*.pyc
+*.db
+logs/
+.firebase_last_sync_ts
+firebase-service-account.json
+calibration_backup_*.json
+*.pid
+sensor-venv/
+models/
