@@ -60,22 +60,34 @@ async function toggleCalibrationMode() {
     const newMode = !calibrationModeActive;
     
     try {
-        const res = await fetch(`${RELAY_API_URL}/calibration-mode`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ enabled: newMode })
-        });
-        
-        if (res.ok) {
+        if (isStaticHosting() && window.firebaseDB) {
+            // Use Firebase on Vercel
+            const calModeRef = window.firebaseDoc(window.firebaseDB, 'settings', 'calibration_mode');
+            await window.firebaseSetDoc(calModeRef, {
+                enabled: newMode,
+                source: 'dashboard',
+                updated_at: new Date().toISOString()
+            });
             calibrationModeActive = newMode;
             updateCalibrationModeUI();
-            console.log('Calibration mode:', calibrationModeActive ? 'ENABLED' : 'DISABLED');
+            console.log('Calibration mode (Firebase):', calibrationModeActive ? 'ENABLED' : 'DISABLED');
         } else {
-            console.error('Failed to set calibration mode');
+            const res = await fetch(`${RELAY_API_URL}/calibration-mode`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: newMode })
+            });
+            
+            if (res.ok) {
+                calibrationModeActive = newMode;
+                updateCalibrationModeUI();
+                console.log('Calibration mode:', calibrationModeActive ? 'ENABLED' : 'DISABLED');
+            } else {
+                console.error('Failed to set calibration mode');
+            }
         }
     } catch (e) {
         console.error('Error toggling calibration mode:', e);
-        // Still update UI locally if API fails
         calibrationModeActive = newMode;
         updateCalibrationModeUI();
     }
@@ -100,8 +112,24 @@ function updateCalibrationModeUI() {
 }
 
 async function fetchCalibrationMode() {
-    // Skip API calls on static hosting (Vercel)
-    if (isStaticHosting()) return;
+    if (isStaticHosting()) {
+        // Listen for calibration mode from Firebase
+        const waitForFirebase = () => {
+            if (window.firebaseDB && window.firebaseDoc && window.firebaseOnSnapshot) {
+                const calModeRef = window.firebaseDoc(window.firebaseDB, 'settings', 'calibration_mode');
+                window.firebaseOnSnapshot(calModeRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        calibrationModeActive = docSnap.data().enabled || false;
+                        updateCalibrationModeUI();
+                    }
+                });
+            } else {
+                setTimeout(waitForFirebase, 500);
+            }
+        };
+        waitForFirebase();
+        return;
+    }
     
     try {
         const res = await fetch(`${RELAY_API_URL}/calibration-mode`);
@@ -4781,10 +4809,35 @@ function updateMiniCharts(){
         return Math.round(stability);
     }
     
-    // Load current calibration from API
+    // Load current calibration from API or Firebase
     async function loadCalibration() {
-        // Skip on static hosting (Vercel) - API not available
-        if (isStaticHosting()) return;
+        if (isStaticHosting()) {
+            // Read from Firebase calibration data (set by onSnapshot listener)
+            const apply = () => {
+                const cal = window.firebaseCalibration;
+                if (!cal) return;
+                for (const sensor of ['ph', 'do', 'tds']) {
+                    if (cal[sensor]) {
+                        const slopeEl = document.getElementById(`${sensor}CurrentSlope`);
+                        const offsetEl = document.getElementById(`${sensor}CurrentOffset`);
+                        const badge = document.getElementById(`${sensor}CalStatus`);
+                        if (slopeEl) slopeEl.textContent = cal[sensor].slope?.toFixed(4) || '--';
+                        if (offsetEl) offsetEl.textContent = cal[sensor].offset?.toFixed(4) || '--';
+                        if (badge && cal[sensor].slope !== 1) {
+                            badge.textContent = 'Calibrated';
+                            badge.classList.add('calibrated');
+                        }
+                    }
+                }
+            };
+            // Try immediately, then poll until Firebase data arrives
+            if (window.firebaseCalibration) { apply(); return; }
+            const poll = setInterval(() => {
+                if (window.firebaseCalibration) { apply(); clearInterval(poll); }
+            }, 1000);
+            setTimeout(() => clearInterval(poll), 30000);
+            return;
+        }
         
         try {
             const res = await fetch(`${getApiUrl()}/calibration`);
@@ -4811,44 +4864,63 @@ function updateMiniCharts(){
     
     // Fetch live voltage readings
     async function fetchVoltage() {
-        // Skip on static hosting (Vercel) - API not available
-        if (isStaticHosting()) return;
+        let data = {};
         
-        try {
-            const res = await fetch(`${getApiUrl()}/voltage`);
-            const data = await res.json();
+        if (isStaticHosting()) {
+            // Read voltage from Firebase latest sensor data
+            const sensorData = window.latestSensorData;
+            if (!sensorData) return;
+            
+            // Map Firebase sensor keys to calibration sensor names
+            const voltageMap = {
+                ph: sensorData.ph?.raw_voltage,
+                do: sensorData.do_mg_l?.raw_voltage,
+                tds: sensorData.tds_ppm?.raw_voltage
+            };
             
             for (const sensor of ['ph', 'do', 'tds']) {
-                const el = document.getElementById(`${sensor}LiveVoltage`);
-                const stabilityEl = document.getElementById(`${sensor}Stability`);
+                if (voltageMap[sensor] !== undefined && voltageMap[sensor] !== null) {
+                    data[sensor] = { voltage: voltageMap[sensor] };
+                }
+            }
+        } else {
+            try {
+                const res = await fetch(`${getApiUrl()}/voltage`);
+                data = await res.json();
+            } catch (e) {
+                console.error('Failed to fetch voltage:', e);
+                return;
+            }
+        }
+        
+        for (const sensor of ['ph', 'do', 'tds']) {
+            const el = document.getElementById(`${sensor}LiveVoltage`);
+            const stabilityEl = document.getElementById(`${sensor}Stability`);
+            
+            if (data[sensor]?.voltage !== undefined) {
+                // Apply smoothing for stable display
+                const smoothed = smoothVoltage(sensor, data[sensor].voltage);
+                calState[sensor].voltage = smoothed;
+                if (el) el.textContent = `${(smoothed * 1000).toFixed(1)} mV`;
                 
-                if (data[sensor]?.voltage !== undefined) {
-                    // Apply smoothing for stable display
-                    const smoothed = smoothVoltage(sensor, data[sensor].voltage);
-                    calState[sensor].voltage = smoothed;
-                    if (el) el.textContent = `${(smoothed * 1000).toFixed(1)} mV`;
-                    
-                    // Update stability indicator
-                    const stable = isVoltageStable(sensor);
-                    const stabilityPct = getStabilityPercent(sensor);
-                    
-                    if (stabilityEl) {
-                        if (stable) {
-                            stabilityEl.innerHTML = `<span style="color:#22c55e;font-weight:bold;">✓ STABLE - Ready to capture!</span>`;
-                        } else {
-                            const barWidth = stabilityPct;
-                            const barColor = stabilityPct > 70 ? '#eab308' : '#ef4444';
-                            stabilityEl.innerHTML = `
-                                <span style="color:#888;">Stabilizing... ${stabilityPct}%</span>
-                                <div style="width:100px;height:6px;background:#333;border-radius:3px;margin-top:4px;">
-                                    <div style="width:${barWidth}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.3s;"></div>
-                                </div>`;
-                        }
+                // Update stability indicator
+                const stable = isVoltageStable(sensor);
+                const stabilityPct = getStabilityPercent(sensor);
+                
+                if (stabilityEl) {
+                    if (stable) {
+                        stabilityEl.innerHTML = `<span style="color:#22c55e;font-weight:bold;">✓ STABLE - Ready to capture!</span>`;
+                    } else {
+                        const barWidth = stabilityPct;
+                        const barColor = stabilityPct > 70 ? '#eab308' : '#ef4444';
+                        stabilityEl.innerHTML = `
+                            <span style="color:#888;">Stabilizing... ${stabilityPct}%</span>
+                            <div style="width:100px;height:6px;background:#333;border-radius:3px;margin-top:4px;">
+                                <div style="width:${barWidth}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.3s;"></div>
+                            </div>`;
                     }
                 }
             }
-        } catch (e) {
-            console.error('Failed to fetch voltage:', e);
         }
     }
     

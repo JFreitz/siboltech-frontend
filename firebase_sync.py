@@ -124,11 +124,19 @@ def get_latest_readings(session) -> dict:
     
     result = {}
     for r in latest:
-        result[r.sensor] = {
+        entry = {
             "value": r.value,
             "unit": r.unit,
             "timestamp": r.timestamp.isoformat() if r.timestamp else None,
         }
+        # Include raw voltage from meta for calibration (pH, DO, TDS)
+        if r.meta:
+            meta = r.meta if isinstance(r.meta, dict) else json.loads(r.meta) if isinstance(r.meta, str) else {}
+            voltage_keys = {"ph": "ph_voltage_v", "do_mg_l": "do_voltage_v", "tds_ppm": "tds_voltage_v"}
+            vk = voltage_keys.get(r.sensor)
+            if vk and vk in meta:
+                entry["raw_voltage"] = meta[vk]
+        result[r.sensor] = entry
     return result
 
 
@@ -283,6 +291,43 @@ def check_override_mode(db: firestore.Client, last_override_state: bool) -> bool
     except Exception as e:
         print(f"  ⚠️ Override check error: {e}")
         return last_override_state
+
+
+def check_calibration_mode(db: firestore.Client, last_cal_mode_state: bool) -> bool:
+    """Check if calibration mode was changed from dashboard via Firebase.
+    Returns the current calibration mode state."""
+    import requests
+
+    try:
+        doc_ref = db.collection("settings").document("calibration_mode")
+        doc = doc_ref.get()
+
+        if doc.exists:
+            data = doc.to_dict()
+            enabled = data.get("enabled", False)
+            source = data.get("source", "")
+
+            if source == "dashboard" and enabled != last_cal_mode_state:
+                print(f"  🔧 Calibration mode changed from dashboard: {'ON' if enabled else 'OFF'}")
+                try:
+                    resp = requests.post(
+                        "http://localhost:5000/api/calibration-mode",
+                        json={"enabled": enabled},
+                        timeout=2
+                    )
+                    if resp.ok:
+                        print(f"    → API synced: calibration_mode={'ON' if enabled else 'OFF'}")
+                        doc_ref.update({"source": "rpi-synced"})
+                    else:
+                        print(f"    → API error: {resp.status_code}")
+                except Exception as e:
+                    print(f"    → API error: {e}")
+                return enabled
+
+        return last_cal_mode_state
+    except Exception as e:
+        print(f"  ⚠️ Calibration mode check error: {e}")
+        return last_cal_mode_state
 
 
 def check_calibration_updates(db: firestore.Client, last_cal_check: datetime) -> datetime:
@@ -476,6 +521,7 @@ def main():
     last_actuator_sync_ts = load_last_sync_ts()  # reuse same ts file logic
     last_cal_check = datetime.now(timezone.utc) - timedelta(hours=1)
     last_override_state = False  # Track override mode from dashboard
+    last_cal_mode_state = False  # Track calibration mode from dashboard
     print(f"Last sync: {last_sync_ts.isoformat()}")
     print(f"Sync interval: {SYNC_INTERVAL}s")
     print("-" * 50)
@@ -503,6 +549,12 @@ def main():
                 last_override_state = check_override_mode(db, last_override_state)
             except Exception as e:
                 print(f"  ⚠️ Override check error: {e}")
+            
+            # Check calibration mode from dashboard
+            try:
+                last_cal_mode_state = check_calibration_mode(db, last_cal_mode_state)
+            except Exception as e:
+                print(f"  ⚠️ Cal mode check error: {e}")
             
             # Sync latest readings (for real-time dashboard)
             if sync_latest_to_firebase(db, session):
