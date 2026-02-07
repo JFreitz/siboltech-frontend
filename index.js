@@ -1415,6 +1415,118 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		}
 	}
 
+	// ── Download Training Data CSV button ───────────────────────
+	(function initDownloadTrainingData(){
+		const btn = document.getElementById('downloadTrainingData');
+		if (!btn) return;
+
+		btn.addEventListener('click', async () => {
+			btn.disabled = true;
+			btn.textContent = '⏳ Preparing…';
+
+			try {
+				// On Vercel (static hosting), build CSV from Firebase data
+				if (isStaticHosting() && window.loadSensorHistory && window.loadPlantHistory) {
+					// Fetch all history from Firebase
+					const sensorData = await window.loadSensorHistory(5000);
+					const plantAero = await window.loadPlantHistory('aeroponics', 5000);
+					const plantDwc = await window.loadPlantHistory('dwc', 5000);
+					const plantTrad = await window.loadPlantHistory('traditional', 5000);
+					const allPlant = [...(plantAero || []), ...(plantDwc || []), ...(plantTrad || [])];
+
+					if (!allPlant.length) {
+						showToast('No plant data to export. Enter measurements in the Training tab first.', 'warning');
+						return;
+					}
+
+					// Build CSV headers
+					const headers = [
+						'day', 'day_num', 'plant_id', 'farming_system',
+						'height', 'length', 'width', 'leaf_count', 'branch_count',
+						'avg_temperature', 'avg_humidity', 'avg_ph', 'avg_tds', 'avg_do',
+						'relay_4_hours', 'relay_5_hours', 'relay_6_hours',
+						'relay_7_hours', 'relay_8_hours', 'relay_9_hours'
+					];
+
+					// Build sensor lookup by date
+					const sensorByDate = {};
+					if (sensorData && sensorData.length) {
+						sensorData.forEach(s => {
+							const dayKey = (s.timestamp || '').substring(0, 10);
+							if (!dayKey) return;
+							if (!sensorByDate[dayKey]) sensorByDate[dayKey] = {};
+							if (s.ph !== undefined) sensorByDate[dayKey].avg_ph = s.ph;
+							if (s.do !== undefined) sensorByDate[dayKey].avg_do = s.do;
+							if (s.tds !== undefined) sensorByDate[dayKey].avg_tds = s.tds;
+							if (s.temperature !== undefined) sensorByDate[dayKey].avg_temperature = s.temperature;
+							if (s.humidity !== undefined) sensorByDate[dayKey].avg_humidity = s.humidity;
+						});
+					}
+
+					// Collect unique dates for day_num
+					const allDates = [...new Set(allPlant.map(p => (p.timestamp || '').substring(0, 10)))].sort();
+					const dayNumMap = {};
+					allDates.forEach((d, i) => { dayNumMap[d] = i + 1; });
+
+					// Default relay schedule
+					const defaultRelay = {
+						relay_4_hours: 0.33, relay_5_hours: 8, relay_6_hours: 12,
+						relay_7_hours: 24, relay_8_hours: 12, relay_9_hours: 8
+					};
+
+					// Build rows
+					let csvContent = headers.join(',') + '\n';
+					allPlant.forEach(p => {
+						const dayKey = (p.timestamp || '').substring(0, 10);
+						const sensors = sensorByDate[dayKey] || {};
+						const sys = p.farming_system || 'aeroponics';
+						const row = [
+							dayKey,
+							dayNumMap[dayKey] || 0,
+							p.plant_id || '',
+							sys,
+							p.height || '', p.length || '', p.width || p.weight || '',
+							p.leaves || p.leaf_count || '', p.branches || p.branch_count || '',
+							sensors.avg_temperature || '', sensors.avg_humidity || '',
+							sensors.avg_ph || '', sensors.avg_tds || '', sensors.avg_do || '',
+							sys === 'aeroponics' ? defaultRelay.relay_4_hours : 0,
+							defaultRelay.relay_5_hours, defaultRelay.relay_6_hours,
+							defaultRelay.relay_7_hours, defaultRelay.relay_8_hours,
+							defaultRelay.relay_9_hours
+						];
+						csvContent += row.join(',') + '\n';
+					});
+
+					// Trigger download
+					const blob = new Blob([csvContent], { type: 'text/csv' });
+					const url = URL.createObjectURL(blob);
+					const a = document.createElement('a');
+					a.href = url;
+					a.download = `siboltech_training_data_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.csv`;
+					a.click();
+					URL.revokeObjectURL(url);
+					showToast(`Exported ${allPlant.length} plant records to CSV`, 'success');
+
+				} else {
+					// On RPi with API available
+					await waitForAPIUrl();
+					const url = `${RELAY_API_URL}/export-training-data`;
+					const a = document.createElement('a');
+					a.href = url;
+					a.download = '';
+					a.click();
+					showToast('Downloading training data CSV…', 'success');
+				}
+			} catch (err) {
+				console.error('[Download] Error:', err);
+				showToast('Failed to export training data: ' + err.message, 'error');
+			} finally {
+				btn.disabled = false;
+				btn.innerHTML = '<span style="font-size:16px;">📥</span> Download Training Data (CSV)';
+			}
+		});
+	})();
+
 	// Prediction dropdown option click handlers
 	document.querySelectorAll('.prediction-option').forEach(option => {
 		option.addEventListener('click', (e) => {

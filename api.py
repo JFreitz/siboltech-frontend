@@ -1315,6 +1315,151 @@ def set_calibration():
     
     return jsonify({"success": True, "sensor": sensor, "slope": slope, "offset": offset})
 
+# ==================== TRAINING DATA EXPORT ====================
+@app.route("/api/export-training-data", methods=["GET"])
+def export_training_data():
+    """Export merged training dataset (plant + sensor + actuator) as CSV download.
+    
+    Query params:
+    - days: number of days to include (default: all)
+    - format: 'csv' (default) or 'json'
+    """
+    import io
+    import csv as csv_mod
+    
+    days_param = request.args.get('days', 'all')
+    fmt = request.args.get('format', 'csv')
+    
+    # Build cutoff
+    if days_param.lower() == 'all':
+        cutoff = datetime(2000, 1, 1, tzinfo=timezone.utc)
+    else:
+        try:
+            days_val = int(days_param)
+        except:
+            days_val = 365
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days_val)
+    
+    with Session() as session:
+        # -- Plant readings (daily avg per plant/system) --
+        plant_rows = session.execute(text("""
+            SELECT
+                DATE(timestamp) AS day,
+                plant_id,
+                farming_system,
+                AVG(height) AS height,
+                AVG(length) AS length,
+                AVG(weight) AS width,
+                AVG(leaves) AS leaf_count,
+                AVG(branches) AS branch_count
+            FROM plant_readings
+            WHERE timestamp >= :cutoff
+            GROUP BY DATE(timestamp), plant_id, farming_system
+            ORDER BY day
+        """), {"cutoff": cutoff}).fetchall()
+        
+        if not plant_rows:
+            return jsonify({"error": "No plant data found"}), 404
+        
+        # -- Sensor daily averages --
+        sensor_rows = session.execute(text("""
+            SELECT DATE(timestamp) AS day, sensor, AVG(value) AS avg_value
+            FROM sensor_readings
+            WHERE sensor IN ('temperature_c','humidity','ph','tds_ppm','do_mg_l')
+              AND timestamp >= :cutoff
+            GROUP BY DATE(timestamp), sensor
+        """), {"cutoff": cutoff}).fetchall()
+        
+        # -- Actuator daily ON-hours --
+        act_rows = session.execute(text("""
+            SELECT DATE(timestamp) AS day, relay_id, state, timestamp
+            FROM actuator_events
+            WHERE timestamp >= :cutoff
+            ORDER BY relay_id, timestamp
+        """), {"cutoff": cutoff}).fetchall()
+    
+    # Build sensor lookup: {day: {sensor: value}}
+    sensor_map_rename = {
+        'temperature_c': 'avg_temperature', 'humidity': 'avg_humidity',
+        'ph': 'avg_ph', 'tds_ppm': 'avg_tds', 'do_mg_l': 'avg_do'
+    }
+    sensor_lookup = {}
+    for row in sensor_rows:
+        day_key = str(row[0])
+        if day_key not in sensor_lookup:
+            sensor_lookup[day_key] = {}
+        col_name = sensor_map_rename.get(row[1], row[1])
+        sensor_lookup[day_key][col_name] = round(float(row[2]), 2) if row[2] else None
+    
+    # Build CSV rows
+    sensor_cols = ['avg_temperature', 'avg_humidity', 'avg_ph', 'avg_tds', 'avg_do']
+    relay_cols = [f'relay_{i}_hours' for i in range(1, 10)]
+    
+    headers = ['day', 'day_num', 'plant_id', 'farming_system',
+               'height', 'length', 'width', 'leaf_count', 'branch_count'] + sensor_cols + relay_cols
+    
+    # Calculate day numbers
+    all_days = sorted(set(str(r[0]) for r in plant_rows))
+    day_num_map = {d: i + 1 for i, d in enumerate(all_days)}
+    
+    # Default relay hours (known schedule)
+    default_relay = {
+        'relay_1_hours': 0, 'relay_2_hours': 0, 'relay_3_hours': 0,
+        'relay_4_hours': 0.33,  # misting for aero
+        'relay_5_hours': 8,     # exhaust
+        'relay_6_hours': 12,    # grow lights aero
+        'relay_7_hours': 24,    # air pump
+        'relay_8_hours': 12,    # grow lights dwc
+        'relay_9_hours': 8,     # exhaust in
+    }
+    
+    csv_rows = []
+    for row in plant_rows:
+        day_str = str(row[0])
+        day_sensors = sensor_lookup.get(day_str, {})
+        farming_sys = row[2]
+        
+        csv_row = {
+            'day': day_str,
+            'day_num': day_num_map.get(day_str, 0),
+            'plant_id': row[1],
+            'farming_system': farming_sys,
+            'height': round(float(row[3]), 2) if row[3] else '',
+            'length': round(float(row[4]), 2) if row[4] else '',
+            'width': round(float(row[5]), 2) if row[5] else '',
+            'leaf_count': round(float(row[6]), 2) if row[6] else '',
+            'branch_count': round(float(row[7]), 2) if row[7] else '',
+        }
+        
+        for sc in sensor_cols:
+            csv_row[sc] = day_sensors.get(sc, '')
+        
+        for rc in relay_cols:
+            # Use default schedule values
+            csv_row[rc] = default_relay.get(rc, 0)
+        
+        # Adjust misting for non-aero systems
+        if farming_sys != 'aeroponics':
+            csv_row['relay_4_hours'] = 0
+        
+        csv_rows.append(csv_row)
+    
+    if fmt == 'json':
+        return jsonify({"headers": headers, "rows": csv_rows, "count": len(csv_rows)})
+    
+    # Return as CSV file download
+    output = io.StringIO()
+    writer = csv_mod.DictWriter(output, fieldnames=headers)
+    writer.writeheader()
+    writer.writerows(csv_rows)
+    
+    response = app.response_class(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename=siboltech_training_data_{datetime.now().strftime("%Y%m%d")}.csv'}
+    )
+    return response
+
 @app.route("/api/predict", methods=["GET", "POST"])
 def predict_growth():
     """Predict plant growth using trained ML models.
