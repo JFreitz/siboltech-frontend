@@ -3147,11 +3147,14 @@ body.sidebar-collapsed .brand{
 }
 
 .sensor .value{
-    font-size:45px;
+    font-size:clamp(18px, 2.8vw, 36px);
     font-weight:700;
     margin-top:-5px;
 	text-align: center;
 	width: 100%;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 	
 }
 .alert{

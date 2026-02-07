@@ -1883,8 +1883,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			alertEl.className = `alert ${statusClass}`;
 		});
 
-		// Only show notifications for warning (normal) and critical (dangerous), not optimal (neutral)
-		if(statusClass !== 'neutral'){
+		// Only show notifications for critical (dangerous) values, not warning or optimal
+		if(statusClass === 'dangerous'){
 			showNotification(sensorType, value, status, statusClass);
 		}
 	}
