@@ -1280,8 +1280,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			
 			// Relay names mapping
 			const relayNames = {
-				1: 'Misting', 2: 'Air Pump', 3: 'Exhaust IN', 4: 'Exhaust OUT',
-				5: 'Lights Aero', 6: 'Lights DWC', 7: 'pH Up', 8: 'pH Down', 9: 'Leafy Green'
+				1: 'Leafy Green', 2: 'pH Down', 3: 'pH Up', 4: 'Misting',
+				5: 'Exhaust OUT', 6: 'Lights Aero', 7: 'Air Pump', 8: 'Lights DWC', 9: 'Exhaust IN'
 			};
 			
 			const rows = readings.map(row => {
@@ -2121,7 +2121,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				}
 			}
 			
-			// Sync with backend automation controller (skip on static hosting)
+			// Sync with backend automation controller
 			if (!isStaticHosting()) {
 				try {
 					await fetch(`${API_BASE_URL}/override-mode`, {
@@ -2133,6 +2133,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				} catch (e) {
 					console.warn('[API] Failed to sync override mode:', e);
 				}
+			} else if (window.sendOverrideModeFirebase) {
+				// On Vercel: sync override via Firebase -> RPi picks it up
+				const ok = await window.sendOverrideModeFirebase(actuatorOverride);
+				if (ok) {
+					console.log(`[Firebase] Override mode synced: ${actuatorOverride}`);
+				} else {
+					console.warn('[Firebase] Failed to sync override mode');
+				}
 			}
 			
 			// When switching from MANUAL to AUTO, turn all actuators OFF for fresh start
@@ -2143,6 +2151,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				Object.keys(nutrientActiveState).forEach(k => nutrientActiveState[k] = false);
 				Object.keys(consecutiveBreaches).forEach(k => consecutiveBreaches[k] = 0);
 				Object.keys(sensorHistory).forEach(k => sensorHistory[k] = []);
+			}
+			
+			// When switching to MANUAL (override ON), turn all actuators OFF immediately
+			if (!isInitial && !wasOverride && actuatorOverride) {
+				console.log('Switching to MANUAL mode - turning all actuators OFF');
+				await turnAllActuatorsOff();
 			}
 			
 			console.log(`Override mode: ${actuatorOverride ? 'MANUAL (user controls actuators)' : 'AUTO (sensors control actuators)'}`);

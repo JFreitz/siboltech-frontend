@@ -246,6 +246,45 @@ def sync_calibration_to_firebase(db: firestore.Client):
         }, merge=True)
 
 
+def check_override_mode(db: firestore.Client, last_override_state: bool) -> bool:
+    """Check if override mode was changed from dashboard via Firebase.
+    Returns the current override state."""
+    import requests
+    
+    try:
+        doc_ref = db.collection("settings").document("override_mode")
+        doc = doc_ref.get()
+        
+        if doc.exists:
+            data = doc.to_dict()
+            enabled = data.get("enabled", False)
+            source = data.get("source", "")
+            
+            # Only act on dashboard-originated changes
+            if source == "dashboard" and enabled != last_override_state:
+                print(f"  🔒 Override mode changed from dashboard: {'ON' if enabled else 'OFF'}")
+                try:
+                    resp = requests.post(
+                        "http://localhost:5000/api/override-mode",
+                        json={"enabled": enabled},
+                        timeout=2
+                    )
+                    if resp.ok:
+                        print(f"    → API synced: override={'ON' if enabled else 'OFF'}")
+                        # Mark as processed so we don't re-apply
+                        doc_ref.update({"source": "rpi-synced"})
+                    else:
+                        print(f"    → API error: {resp.status_code}")
+                except Exception as e:
+                    print(f"    → API error: {e}")
+                return enabled
+        
+        return last_override_state
+    except Exception as e:
+        print(f"  ⚠️ Override check error: {e}")
+        return last_override_state
+
+
 def check_calibration_updates(db: firestore.Client, last_cal_check: datetime) -> datetime:
     """Check if calibration was updated from dashboard."""
     doc_ref = db.collection("settings").document("calibration")
@@ -378,6 +417,7 @@ def main():
     
     last_sync_ts = load_last_sync_ts()
     last_cal_check = datetime.now(timezone.utc) - timedelta(hours=1)
+    last_override_state = False  # Track override mode from dashboard
     print(f"Last sync: {last_sync_ts.isoformat()}")
     print(f"Sync interval: {SYNC_INTERVAL}s")
     print("-" * 50)
@@ -399,6 +439,12 @@ def main():
                 sync_relay_status_to_firebase(db)
             except Exception as e:
                 print(f"  ⚠️ Relay error: {e}")
+            
+            # Check override mode from dashboard (every sync for fast response)
+            try:
+                last_override_state = check_override_mode(db, last_override_state)
+            except Exception as e:
+                print(f"  ⚠️ Override check error: {e}")
             
             # Sync latest readings (for real-time dashboard)
             if sync_latest_to_firebase(db, session):

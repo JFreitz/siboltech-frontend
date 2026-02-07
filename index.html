@@ -1323,6 +1323,23 @@
 					return false;
 				}
 			};
+
+					// ===== SEND OVERRIDE MODE (via Firebase) =====
+					window.sendOverrideModeFirebase = async function(enabled) {
+						try {
+							const overrideRef = doc(db, 'settings', 'override_mode');
+							await setDoc(overrideRef, {
+								enabled: enabled,
+								source: 'dashboard',
+								updated_at: serverTimestamp()
+							});
+							console.log(`🔒 Override mode: ${enabled ? 'ON (manual)' : 'OFF (auto)'}`); 
+							return true;
+						} catch (error) {
+							console.error('Failed to send override mode:', error);
+							return false;
+						}
+					};
 			
 			// ===== LOAD CALIBRATION =====
 			const calDocRef = doc(db, 'settings', 'calibration');
