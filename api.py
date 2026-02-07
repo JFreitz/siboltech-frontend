@@ -49,6 +49,48 @@ _serial_lock = threading.Lock()
 _serial_conn = None
 
 
+# ==================== Serial Log Ring Buffer ====================
+from collections import deque
+import time as _time
+
+_serial_log = deque(maxlen=200)  # Keep last 200 lines
+_serial_log_lock = threading.Lock()
+
+
+def _serial_log_append(line: str):
+    """Thread-safe append to serial log."""
+    ts = datetime.now(DISPLAY_TZ).strftime('%H:%M:%S')
+    with _serial_log_lock:
+        _serial_log.append(f"[{ts}] {line}")
+
+
+def _serial_reader_thread():
+    """Background thread that reads ESP32 serial output into the log buffer.
+    Only reads when the serial port is not busy with other services."""
+    import time
+    print("[SERIAL-LOG] Reader thread started", flush=True)
+    while True:
+        try:
+            acquired = _serial_lock.acquire(timeout=0.1)
+            if not acquired:
+                time.sleep(0.1)
+                continue
+            try:
+                ser = _get_serial()
+                if ser and ser.in_waiting:
+                    raw = ser.readline()
+                    if raw:
+                        line = raw.decode('utf-8', errors='ignore').strip()
+                        # Filter out binary garbage (non-printable characters)
+                        if line and all(c == '\n' or c == '\r' or (32 <= ord(c) < 127) for c in line):
+                            _serial_log_append(line)
+            finally:
+                _serial_lock.release()
+            time.sleep(0.05)
+        except Exception:
+            time.sleep(3)
+
+
 def _get_serial():
     """Get or create serial connection to ESP32."""
     global _serial_conn
@@ -207,6 +249,12 @@ def ingest():
     
     # DEBUG: Log raw ESP32 payload
     print(f"[INGEST] Raw payload: {json.dumps(payload, default=str)[:500]}")
+    
+    # Also log to serial console for visibility
+    readings_summary = payload.get("readings", {})
+    if isinstance(readings_summary, dict) and readings_summary:
+        parts = [f"{k}={v:.2f}" if isinstance(v, float) else f"{k}={v}" for k, v in readings_summary.items()]
+        _serial_log_append(f"[INGEST] {payload.get('device','?')}: {', '.join(parts[:6])}")
 
     rows = payload.get("rows")
     if isinstance(rows, list):
@@ -345,6 +393,7 @@ def ingest():
     try:
         controller = get_controller()
         if controller:
+            print(f"[DEBUG] Feeding to automation: do_mg_l={computed_readings.get('do_mg_l')}, ph={computed_readings.get('ph')}", flush=True)
             controller.update_sensors(computed_readings)
     except Exception as e:
         print(f"[AUTOMATION] Failed to update sensors: {e}")
@@ -720,12 +769,15 @@ OVERRIDE_MODE_ENABLED = False  # When True, disables automation (manual control)
 def _automation_relay_callback(relay_id: int, state: bool):
     """Callback for automation controller to set relay states."""
     global RELAY_STATES
+    label = RELAY_LABELS.get(relay_id, f"Relay {relay_id}")
     print(f"[CALLBACK] relay {relay_id} -> {state}, override={OVERRIDE_MODE_ENABLED}, calib={CALIBRATION_MODE_ENABLED}", flush=True)
     if OVERRIDE_MODE_ENABLED or CALIBRATION_MODE_ENABLED:
         print(f"[CALLBACK] BLOCKED - relay {relay_id} change ignored", flush=True)
+        _serial_log_append(f"[AUTO] {label} -> {'ON' if state else 'OFF'} (BLOCKED - {'override' if OVERRIDE_MODE_ENABLED else 'calibration'} mode)")
         return  # Don't change relays in override or calibration mode
     RELAY_STATES[relay_id] = state
     _save_relay_state(relay_id, state)
+    _serial_log_append(f"[AUTO] {label} -> {'ON' if state else 'OFF'}")
     print(f"[CALLBACK] Set RELAY_STATES[{relay_id}] = {state}", flush=True)
 
 # Initialize automation controller (starts background thread)
@@ -1316,7 +1368,34 @@ def get_voltage():
         return jsonify(result)
 
 
+@app.route("/api/serial-log")
+def serial_log():
+    """Return recent ESP32 serial output lines."""
+    limit = request.args.get('limit', 100, type=int)
+    with _serial_log_lock:
+        lines = list(_serial_log)[-limit:]
+    return jsonify({"lines": lines, "count": len(lines)})
+
+
+@app.route("/api/serial-cmd", methods=["POST"])
+def serial_cmd():
+    """Send a command to ESP32 via serial and return response."""
+    data = request.get_json(silent=True) or {}
+    cmd = data.get("cmd", "").strip()
+    if not cmd:
+        return jsonify({"success": False, "error": "No command provided"}), 400
+    _serial_log_append(f">>> {cmd}")
+    result = _send_serial_command(cmd)
+    for line in result.get("response", []):
+        _serial_log_append(line)
+    return jsonify(result)
+
+
 if __name__ == "__main__":
+    # Start serial reader thread
+    _serial_reader = threading.Thread(target=_serial_reader_thread, daemon=True)
+    _serial_reader.start()
+
     # Start automation controller background thread
     if _automation_controller:
         _automation_controller.start()

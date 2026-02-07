@@ -102,6 +102,10 @@ class SensorFilter:
     def ready(self) -> bool:
         """Check if filter has enough samples for reliable output."""
         return len(self.values) >= self.window_size // 2
+    
+    def fast_ready(self) -> bool:
+        """Quick readiness check (2 samples) for safety-critical decisions."""
+        return len(self.values) >= 2
 
 
 class RelayState:
@@ -254,7 +258,8 @@ class AutomationController:
         self._process_misting(now)
         
         # ===== 2. AIR PUMP (Relay 2) - DO hysteresis =====
-        if self.filters["do"].ready():
+        # Use fast_ready (2 samples) because low DO is dangerous
+        if self.filters["do"].fast_ready():
             if do < DO_LOW:
                 self._set_relay("AIR_PUMP", True)
             elif do >= DO_HIGH:

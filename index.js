@@ -5147,3 +5147,146 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     });
 });
+
+// ==================== Serial Console (Manual Tab) ====================
+(function() {
+	const output = document.getElementById('serialOutput');
+	const cmdInput = document.getElementById('serialCmdInput');
+	const sendBtn = document.getElementById('serialSendBtn');
+	const pauseBtn = document.getElementById('serialPauseBtn');
+	const clearBtn = document.getElementById('serialClearBtn');
+	const autoScrollChk = document.getElementById('serialAutoScroll');
+	const statusEl = document.getElementById('serialStatus');
+	
+	if (!output) return; // Manual tab not in DOM
+
+	let paused = false;
+	let lastLineCount = 0;
+	let pollInterval = null;
+
+	function classifyLine(line) {
+		if (line.includes('>>>')) return 'cmd-line';
+		if (line.includes('[E]') || line.includes('ERROR') || line.includes('error') || line.includes('failed') || line.includes('Poll failed')) return 'error-line';
+		if (line.includes('{') && line.includes('}')) return 'json-line';
+		if (line.includes('WiFi') || line.includes('IP:')) return 'wifi-line';
+		return '';
+	}
+
+	function renderLines(lines) {
+		const fragment = document.createDocumentFragment();
+		lines.forEach(line => {
+			const div = document.createElement('div');
+			div.className = 'serial-line ' + classifyLine(line);
+			div.textContent = line;
+			fragment.appendChild(div);
+		});
+		return fragment;
+	}
+
+	async function fetchSerialLog() {
+		if (paused) return;
+		try {
+			const res = await fetch(`${RELAY_API_URL}/serial-log?limit=200`);
+			if (!res.ok) throw new Error('HTTP ' + res.status);
+			const data = await res.json();
+			
+			statusEl.textContent = '● Connected';
+			statusEl.className = 'serial-status connected';
+
+			if (data.count !== lastLineCount) {
+				lastLineCount = data.count;
+				output.innerHTML = '';
+				output.appendChild(renderLines(data.lines));
+				if (autoScrollChk.checked) {
+					output.scrollTop = output.scrollHeight;
+				}
+			}
+		} catch (e) {
+			statusEl.textContent = '● Disconnected';
+			statusEl.className = 'serial-status disconnected';
+		}
+	}
+
+	async function sendCommand(cmd) {
+		if (!cmd) return;
+		try {
+			const res = await fetch(`${RELAY_API_URL}/serial-cmd`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ cmd })
+			});
+			const data = await res.json();
+			if (!data.success) {
+				console.warn('Serial command error:', data.error);
+			}
+			// Fetch updated log immediately
+			setTimeout(fetchSerialLog, 300);
+		} catch (e) {
+			console.error('Serial command failed:', e);
+		}
+	}
+
+	sendBtn.addEventListener('click', () => {
+		const cmd = cmdInput.value.trim();
+		if (cmd) {
+			sendCommand(cmd);
+			cmdInput.value = '';
+		}
+	});
+
+	cmdInput.addEventListener('keydown', (e) => {
+		if (e.key === 'Enter') {
+			sendBtn.click();
+		}
+	});
+
+	pauseBtn.addEventListener('click', () => {
+		paused = !paused;
+		pauseBtn.textContent = paused ? '▶️' : '⏸️';
+		pauseBtn.title = paused ? 'Resume' : 'Pause';
+	});
+
+	clearBtn.addEventListener('click', () => {
+		output.innerHTML = '';
+		lastLineCount = 0;
+	});
+
+	document.querySelectorAll('.serial-quick-btn').forEach(btn => {
+		btn.addEventListener('click', () => {
+			const cmd = btn.getAttribute('data-cmd');
+			sendCommand(cmd);
+		});
+	});
+
+	// Only poll when the manual tab is visible
+	function startPolling() {
+		if (!pollInterval) {
+			fetchSerialLog();
+			pollInterval = setInterval(fetchSerialLog, 1500);
+		}
+	}
+
+	function stopPolling() {
+		if (pollInterval) {
+			clearInterval(pollInterval);
+			pollInterval = null;
+		}
+	}
+
+	// Watch for tab switches
+	const observer = new MutationObserver(() => {
+		const manualSection = document.getElementById('manual');
+		if (manualSection && manualSection.classList.contains('active')) {
+			startPolling();
+		} else {
+			stopPolling();
+		}
+	});
+
+	const manualSection = document.getElementById('manual');
+	if (manualSection) {
+		observer.observe(manualSection, { attributes: true, attributeFilter: ['class'] });
+		// Also start if already active
+		if (manualSection.classList.contains('active')) startPolling();
+	}
+})();

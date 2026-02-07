@@ -5901,3 +5901,195 @@ body.sidebar-collapsed .brand{
     background: #1a4d2e;
     color: white;
 }
+
+/* ==================== Serial Console (Manual Tab) ==================== */
+.serial-console-card {
+	background: #1a1a2e;
+	border-radius: 16px;
+	padding: 20px;
+	box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+	display: flex;
+	flex-direction: column;
+	height: calc(100vh - 120px);
+	min-height: 400px;
+}
+
+.serial-console-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 12px;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.serial-console-header h2 {
+	color: #e0e0e0;
+	font-size: 18px;
+	margin: 0;
+	font-family: 'Poppins', sans-serif;
+}
+
+.serial-controls {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.serial-status {
+	font-size: 13px;
+	font-weight: 600;
+	padding: 4px 10px;
+	border-radius: 12px;
+}
+
+.serial-status.connected {
+	color: #4CAF50;
+	background: rgba(76, 175, 80, 0.15);
+}
+
+.serial-status.disconnected {
+	color: #f44336;
+	background: rgba(244, 67, 54, 0.15);
+}
+
+.serial-btn {
+	background: rgba(255,255,255,0.1);
+	border: 1px solid rgba(255,255,255,0.15);
+	color: #e0e0e0;
+	border-radius: 8px;
+	padding: 5px 10px;
+	cursor: pointer;
+	font-size: 14px;
+	transition: background 0.2s;
+}
+
+.serial-btn:hover {
+	background: rgba(255,255,255,0.2);
+}
+
+.serial-autoscroll {
+	color: #aaa;
+	font-size: 12px;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	cursor: pointer;
+}
+
+.serial-autoscroll input {
+	accent-color: #4CAF50;
+}
+
+.serial-output {
+	flex: 1;
+	background: #0d1117;
+	border: 1px solid #30363d;
+	border-radius: 10px;
+	padding: 12px;
+	overflow-y: auto;
+	font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+	font-size: 12.5px;
+	line-height: 1.6;
+	color: #c9d1d9;
+	min-height: 200px;
+}
+
+.serial-output .serial-line {
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.serial-output .serial-line.error-line {
+	color: #f85149;
+}
+
+.serial-output .serial-line.json-line {
+	color: #79c0ff;
+}
+
+.serial-output .serial-line.cmd-line {
+	color: #ffa657;
+	font-weight: bold;
+}
+
+.serial-output .serial-line.wifi-line {
+	color: #a5d6ff;
+}
+
+.serial-output .serial-line.timestamp {
+	color: #8b949e;
+}
+
+.serial-input-row {
+	display: flex;
+	gap: 8px;
+	margin-top: 10px;
+}
+
+.serial-cmd-input {
+	flex: 1;
+	background: #0d1117;
+	border: 1px solid #30363d;
+	border-radius: 8px;
+	padding: 10px 14px;
+	color: #c9d1d9;
+	font-family: 'JetBrains Mono', 'Fira Code', monospace;
+	font-size: 13px;
+	outline: none;
+	transition: border-color 0.2s;
+}
+
+.serial-cmd-input:focus {
+	border-color: #58a6ff;
+}
+
+.serial-cmd-input::placeholder {
+	color: #484f58;
+}
+
+.serial-send-btn {
+	background: #238636;
+	color: #fff;
+	border: none;
+	border-radius: 8px;
+	padding: 10px 20px;
+	font-weight: 600;
+	font-size: 13px;
+	cursor: pointer;
+	transition: background 0.2s;
+}
+
+.serial-send-btn:hover {
+	background: #2ea043;
+}
+
+.serial-quick-cmds {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 8px;
+	flex-wrap: wrap;
+}
+
+.quick-cmd-label {
+	color: #8b949e;
+	font-size: 12px;
+}
+
+.serial-quick-btn {
+	background: rgba(88, 166, 255, 0.1);
+	border: 1px solid rgba(88, 166, 255, 0.3);
+	color: #58a6ff;
+	border-radius: 6px;
+	padding: 4px 12px;
+	font-size: 11px;
+	font-family: 'JetBrains Mono', monospace;
+	cursor: pointer;
+	transition: all 0.2s;
+}
+
+.serial-quick-btn:hover {
+	background: rgba(88, 166, 255, 0.25);
+	border-color: #58a6ff;
+}
