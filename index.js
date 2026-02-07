@@ -2214,12 +2214,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				// Pulse the relay: ON for 2 seconds, then OFF
 				if(action.relay) {
 					try {
-						await fetch(`${RELAY_API_URL}/relay/${action.relay}/on`, { method: 'POST' });
-						console.log(`[Nutrient] ${action.label} relay ${action.relay} ON`);
-						setTimeout(async () => {
-							await fetch(`${RELAY_API_URL}/relay/${action.relay}/off`, { method: 'POST' });
-							console.log(`[Nutrient] ${action.label} relay ${action.relay} OFF`);
-						}, 2000);
+						if (isStaticHosting() && window.sendRelayCommandFirebase) {
+							// Vercel: use Firebase relay commands
+							await window.sendRelayCommandFirebase(`R${action.relay}`, 'ON');
+							console.log(`[Nutrient] ${action.label} relay ${action.relay} ON (Firebase)`);
+							setTimeout(async () => {
+								await window.sendRelayCommandFirebase(`R${action.relay}`, 'OFF');
+								console.log(`[Nutrient] ${action.label} relay ${action.relay} OFF (Firebase)`);
+							}, 2000);
+						} else {
+							// LAN: use direct API
+							await fetch(`${RELAY_API_URL}/relay/${action.relay}/on`, { method: 'POST' });
+							console.log(`[Nutrient] ${action.label} relay ${action.relay} ON`);
+							setTimeout(async () => {
+								await fetch(`${RELAY_API_URL}/relay/${action.relay}/off`, { method: 'POST' });
+								console.log(`[Nutrient] ${action.label} relay ${action.relay} OFF`);
+							}, 2000);
+						}
 					} catch(err) {
 						console.error(`[Nutrient] Failed to control relay ${action.relay}:`, err);
 					}
