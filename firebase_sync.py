@@ -28,7 +28,7 @@ except ImportError:
     print("ERROR: firebase-admin not installed. Run: pip install firebase-admin")
     exit(1)
 
-from db import SensorReading, init_db, get_session
+from db import SensorReading, ActuatorEvent, init_db, get_session
 
 # Configuration
 SERVICE_ACCOUNT_FILE = os.getenv(
@@ -376,6 +376,63 @@ def sync_history_to_firebase(db: firestore.Client, session, last_sync_ts: dateti
     return latest_ts
 
 
+def sync_actuator_events_to_firebase(db: firestore.Client, session, last_actuator_sync_ts: datetime) -> datetime:
+    """Sync new actuator events since last sync to Firebase actuators/history/events collection."""
+    if last_actuator_sync_ts.tzinfo is None:
+        last_actuator_sync_ts = last_actuator_sync_ts.replace(tzinfo=timezone.utc)
+
+    events = (
+        session.query(ActuatorEvent)
+        .filter(ActuatorEvent.timestamp > last_actuator_sync_ts)
+        .order_by(ActuatorEvent.timestamp.asc())
+        .limit(BATCH_SIZE * 5)
+        .all()
+    )
+
+    if not events:
+        return last_actuator_sync_ts
+
+    RELAY_LABELS = {
+        1: 'Leafy Green', 2: 'pH Down', 3: 'pH Up', 4: 'Misting',
+        5: 'Exhaust OUT', 6: 'Lights Aero', 7: 'Air Pump',
+        8: 'Lights DWC', 9: 'Exhaust IN'
+    }
+
+    batch = db.batch()
+    latest_ts = last_actuator_sync_ts
+    batch_count = 0
+
+    for evt in events:
+        if batch_count >= BATCH_SIZE * 2:
+            break
+
+        evt_ts = evt.timestamp
+        if evt_ts.tzinfo is None:
+            evt_ts = evt_ts.replace(tzinfo=timezone.utc)
+
+        doc_id = f"r{evt.relay_id}_{evt_ts.isoformat().replace(':', '-').replace('+', '_')}"
+        doc_ref = db.collection("actuators").document("history").collection("events").document(doc_id)
+
+        doc_data = {
+            "timestamp": evt_ts.isoformat(),
+            "relay_id": evt.relay_id,
+            "state": evt.state,
+            "label": RELAY_LABELS.get(evt.relay_id, f"Relay {evt.relay_id}"),
+            "meta": evt.meta if evt.meta else {},
+        }
+        batch.set(doc_ref, doc_data)
+        batch_count += 1
+
+        if evt_ts > latest_ts:
+            latest_ts = evt_ts
+
+    if batch_count > 0:
+        batch.commit()
+        print(f"  Synced {batch_count} actuator events to Firebase")
+
+    return latest_ts
+
+
 def load_last_sync_ts() -> datetime:
     """Load last sync timestamp from file."""
     ts_file = Path(__file__).parent / ".firebase_last_sync_ts"
@@ -416,6 +473,7 @@ def main():
         print("⚠️ Serial not available (relay control disabled)")
     
     last_sync_ts = load_last_sync_ts()
+    last_actuator_sync_ts = load_last_sync_ts()  # reuse same ts file logic
     last_cal_check = datetime.now(timezone.utc) - timedelta(hours=1)
     last_override_state = False  # Track override mode from dashboard
     print(f"Last sync: {last_sync_ts.isoformat()}")
@@ -456,6 +514,10 @@ def main():
                 if new_ts > last_sync_ts:
                     last_sync_ts = new_ts
                     save_last_sync_ts(last_sync_ts)
+                # Also sync actuator events
+                new_act_ts = sync_actuator_events_to_firebase(db, session, last_actuator_sync_ts)
+                if new_act_ts > last_actuator_sync_ts:
+                    last_actuator_sync_ts = new_act_ts
             
             # Check for calibration updates (every 15 syncs = ~30s)
             if sync_count % 15 == 0:

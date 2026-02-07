@@ -13,17 +13,18 @@ import json
 
 # ========== CONFIGURATION ==========
 
-# Relay mapping (1-indexed)
+# Relay mapping (1-indexed, matches ESP32 pin wiring)
+# Chan 1=pin19, 2=pin18, 3=pin17, 4=pin23, 5=pin14, 6=pin15, 7=pin12, 8=pin16, 9=pin13
 RELAY = {
-    "MISTING": 1,
-    "AIR_PUMP": 2,
-    "EXHAUST_IN": 3,
-    "EXHAUST_OUT": 4,
-    "GROW_LIGHTS_AERO": 5,
-    "GROW_LIGHTS_DWC": 6,
-    "PH_UP": 7,
-    "PH_DOWN": 8,
-    "LEAFY_GREEN": 9,
+    "LEAFY_GREEN": 1,       # Pin 19
+    "PH_DOWN": 2,           # Pin 18
+    "PH_UP": 3,             # Pin 17
+    "MISTING": 4,           # Pin 23
+    "EXHAUST_OUT": 5,       # Pin 14
+    "GROW_LIGHTS_AERO": 6,  # Pin 15
+    "AIR_PUMP": 7,          # Pin 12
+    "GROW_LIGHTS_DWC": 8,   # Pin 16
+    "EXHAUST_IN": 9,        # Pin 13
 }
 
 # Filtering: Moving average window size (number of samples)
@@ -166,6 +167,10 @@ class AutomationController:
         self.tds_dose_last_off = 0
         self.ph_dosing_until = 0
         
+        # Periodic state enforcement (push all states to callback every N seconds)
+        self._last_enforce = 0
+        self._ENFORCE_INTERVAL = 10  # seconds
+        
         # Thread for background processing
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
@@ -219,6 +224,9 @@ class AutomationController:
     
     def _set_relay(self, name: str, state: bool, force: bool = False):
         """Set relay state through callback."""
+        if state is None:
+            return
+        state = bool(state)
         relay = self.relays[name]
         if relay.set(state, force):
             print(f"[AUTOMATION] {name} -> {'ON' if state else 'OFF'}")
@@ -235,10 +243,23 @@ class AutomationController:
             try:
                 if not self.override_mode:
                     self._process_automation()
+                    self._enforce_relay_states()
             except Exception as e:
                 print(f"[AUTOMATION] Error: {e}")
             
             time.sleep(1)  # Run every second
+    
+    def _enforce_relay_states(self):
+        """Periodically push all known relay states to callback.
+        This ensures RELAY_STATES in api.py stays in sync even if
+        a callback was missed during startup or race conditions."""
+        now = time.time()
+        if now - self._last_enforce < self._ENFORCE_INTERVAL:
+            return
+        self._last_enforce = now
+        for name, relay in self.relays.items():
+            if relay.state is not None:
+                self.relay_callback(relay.relay_id, relay.state)
     
     def _process_automation(self):
         """Process all automation rules."""
@@ -250,6 +271,12 @@ class AutomationController:
         ph = self.filters["ph"].get()
         do = self.filters["do"].get()
         tds = self.filters["tds"].get()
+        
+        # Debug: log filter readiness once after override reset
+        if any(r.state is None for r in self.relays.values()):
+            ready_status = {k: (f.ready(), f.fast_ready() if hasattr(f, 'fast_ready') else 'N/A', len(f.values)) for k, f in self.filters.items()}
+            print(f"[AUTOMATION DEBUG] Filter status: {ready_status}", flush=True)
+            print(f"[AUTOMATION DEBUG] Values: temp={temp:.1f} hum={humidity:.1f} ph={ph:.2f} do={do:.2f} tds={tds:.0f}", flush=True)
         
         # Skip if filters not ready (not enough samples)
         filters_ready = all(f.ready() for f in self.filters.values())
@@ -271,8 +298,8 @@ class AutomationController:
         humidity_ready = self.filters["humidity"].ready()
         
         if temp_ready or humidity_ready:
-            # Start with current state (preserve if no clear decision)
-            exhaust_needed = self.relays["EXHAUST_IN"].state
+            # Start with current state (preserve if no clear decision, default False if unknown)
+            exhaust_needed = bool(self.relays["EXHAUST_IN"].state)
             
             # Temperature-based control (only if temp filter ready)
             if temp_ready:

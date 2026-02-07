@@ -1102,58 +1102,120 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			
 			// Use Firebase on static hosting (Vercel)
 			if (isStaticHosting() && window.loadPlantHistory) {
+				// Normalize interval for bucketing
+				let interval = historyState.interval.toLowerCase();
+				if (interval === '15-min') interval = '15min';
+
+				// Helper: bucket a Date to either daily or 15-min key
+				const bucketKey = (d) => {
+					if (!(d instanceof Date)) d = new Date(d);
+					if (interval === '15min') {
+						const m = Math.floor(d.getMinutes() / 15) * 15;
+						return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+					}
+					return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+				};
+
 				try {
-					// Fetch plant readings from Firebase
+					// --- PLANT HISTORY ---
 					if (plantTableWrap) {
-						const readings = await window.loadPlantHistory(farmingSystem, 100);
-						
-						let plantData;
-						if (readings && readings.length > 0) {
-							// Transform Firebase plant data to match API format
-							plantData = {
-								readings: readings.map(r => ({
-									timestamp: r.created_at?.toDate?.() || new Date(r.created_at),
-									plant_id: r.plant_id,
-									leaves: r.leaves,
-									branches: r.branches,
-									height: r.height,
-									weight: r.weight,
-									length: r.length,
-									// Sensor data from latest readings if available
-									ph: window.latestSensorData?.ph?.value,
-									do: window.latestSensorData?.do_mg_l?.value,
-									tds: window.latestSensorData?.tds_ppm?.value,
-									temperature: window.latestSensorData?.temperature_c?.value,
-									humidity: window.latestSensorData?.humidity?.value
-								}))
+						// Load sensor history from Firebase
+						const sensorReadings = window.loadSensorHistory ? await window.loadSensorHistory(500) : [];
+						const plantReadings = await window.loadPlantHistory(farmingSystem, 200);
+
+						// Bucket sensor readings
+						const sensorBuckets = {};
+						(sensorReadings || []).forEach(r => {
+							const ts = r.timestamp?.toDate?.() || (typeof r.timestamp === 'string' ? new Date(r.timestamp) : null);
+							if (!ts) return;
+							const bk = bucketKey(ts);
+							if (!sensorBuckets[bk]) sensorBuckets[bk] = { ph: [], do: [], tds: [], temperature: [], humidity: [], timestamp: ts };
+							const rd = r.readings || r;
+							if (rd.ph?.value != null) sensorBuckets[bk].ph.push(rd.ph.value);
+							if (rd.do_mg_l?.value != null) sensorBuckets[bk].do.push(rd.do_mg_l.value);
+							if (rd.tds_ppm?.value != null) sensorBuckets[bk].tds.push(rd.tds_ppm.value);
+							if (rd.temperature_c?.value != null) sensorBuckets[bk].temperature.push(rd.temperature_c.value);
+							if (rd.humidity?.value != null) sensorBuckets[bk].humidity.push(rd.humidity.value);
+						});
+
+						// Bucket plant readings
+						const plantBuckets = {};
+						(plantReadings || []).forEach(r => {
+							const ts = r.created_at?.toDate?.() || new Date(r.created_at);
+							if (!ts) return;
+							const bk = bucketKey(ts);
+							if (!plantBuckets[bk]) plantBuckets[bk] = r;
+						});
+
+						// Merge into rows
+						const allKeys = [...new Set([...Object.keys(sensorBuckets), ...Object.keys(plantBuckets)])].sort().reverse();
+						const plantData = { readings: allKeys.slice(0, 100).map(bk => {
+							const sb = sensorBuckets[bk] || {};
+							const pb = plantBuckets[bk];
+							const avg = (arr) => arr && arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+							return {
+								timestamp: sb.timestamp || (pb ? (pb.created_at?.toDate?.() || new Date(pb.created_at)) : bk),
+								ph: avg(sb.ph),
+								do: avg(sb.do),
+								tds: avg(sb.tds),
+								temperature: avg(sb.temperature),
+								humidity: avg(sb.humidity),
+								leaves: pb?.leaves || null,
+								branches: pb?.branches || null,
+								weight: pb?.weight || null,
+								length: pb?.length || null,
+								height: pb?.height || null,
 							};
-						} else if (window.loadSensorHistory) {
-							// If no plant readings, fetch sensor-only history from Firebase
-							const sensorReadings = await window.loadSensorHistory(100);
-							plantData = {
-								readings: (sensorReadings || []).map(r => ({
-									timestamp: r.timestamp?.toDate?.() || new Date(r.timestamp),
-									ph: r.ph?.value,
-									do: r.do_mg_l?.value,
-									tds: r.tds_ppm?.value,
-									temperature: r.temperature_c?.value,
-									humidity: r.humidity?.value,
-									leaves: null,
-									branches: null,
-									weight: null,
-									length: null,
-									height: null
-								}))
-							};
-						} else {
-							plantData = { readings: [] };
-						}
+						})};
 						populatePlantHistoryTable(plantTableWrap, plantData);
 					}
 					
-					// Actuator history not yet in Firebase - show empty
+					// --- ACTUATOR HISTORY ---
 					if (actuatorTableWrap) {
-						populateActuatorHistoryTable(actuatorTableWrap, { readings: [] });
+						const actuatorEvents = window.loadActuatorHistory ? await window.loadActuatorHistory(500) : [];
+						const sensorReadings2 = window.loadSensorHistory ? await window.loadSensorHistory(500) : [];
+
+						// Bucket actuator events
+						const actBuckets = {};
+						(actuatorEvents || []).forEach(evt => {
+							const ts = evt.timestamp?.toDate?.() || new Date(evt.timestamp);
+							if (!ts || isNaN(ts)) return;
+							const bk = bucketKey(ts);
+							if (!actBuckets[bk]) actBuckets[bk] = { relay_events: {}, ph: [], do: [], tds: [], temperature: [], humidity: [], timestamp: ts };
+							// Keep latest state per relay in bucket
+							actBuckets[bk].relay_events[evt.relay_id] = evt.state;
+						});
+
+						// Add sensor data to actuator buckets
+						(sensorReadings2 || []).forEach(r => {
+							const ts = r.timestamp?.toDate?.() || (typeof r.timestamp === 'string' ? new Date(r.timestamp) : null);
+							if (!ts) return;
+							const bk = bucketKey(ts);
+							if (!actBuckets[bk]) return; // Only add sensors to buckets that have actuator events
+							const rd = r.readings || r;
+							if (rd.ph?.value != null) actBuckets[bk].ph.push(rd.ph.value);
+							if (rd.do_mg_l?.value != null) actBuckets[bk].do.push(rd.do_mg_l.value);
+							if (rd.tds_ppm?.value != null) actBuckets[bk].tds.push(rd.tds_ppm.value);
+							if (rd.temperature_c?.value != null) actBuckets[bk].temperature.push(rd.temperature_c.value);
+							if (rd.humidity?.value != null) actBuckets[bk].humidity.push(rd.humidity.value);
+						});
+
+						// Build readings array
+						const actKeys = Object.keys(actBuckets).sort().reverse();
+						const actuatorData = { readings: actKeys.slice(0, 100).map(bk => {
+							const b = actBuckets[bk];
+							const avg = (arr) => arr && arr.length ? arr.reduce((a, v) => a + v, 0) / arr.length : null;
+							return {
+								timestamp: b.timestamp,
+								relay_events: Object.entries(b.relay_events).map(([rid, st]) => ({ relay_id: parseInt(rid), state: st })),
+								ph: avg(b.ph),
+								do: avg(b.do),
+								tds: avg(b.tds),
+								temperature: avg(b.temperature),
+								humidity: avg(b.humidity),
+							};
+						})};
+						populateActuatorHistoryTable(actuatorTableWrap, actuatorData);
 					}
 				} catch (error) {
 					console.error('Error fetching history from Firebase:', error);
@@ -1278,41 +1340,32 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				return;
 			}
 			
-			// Relay names mapping
-			const relayNames = {
-				1: 'Leafy Green', 2: 'pH Down', 3: 'pH Up', 4: 'Misting',
-				5: 'Exhaust OUT', 6: 'Lights Aero', 7: 'Air Pump', 8: 'Lights DWC', 9: 'Exhaust IN'
-			};
+			// Table column order matches HTML headers:
+			// Misting(R4), Air Pump(R7), Exhaust IN(R9), Exhaust OUT(R5),
+			// Lights Aero(R6), Lights DWC(R8), pH Up(R3), pH Down(R2), Leafy Green(R1)
+			const columnOrder = [4, 7, 9, 5, 6, 8, 3, 2, 1];
 			
 			const rows = readings.map(row => {
-				// Parse relay events
-				const relayStates = Array(9).fill('-');
+				// Parse relay events into a map: relay_id -> state string
+				const relayMap = {};
 				if (row.relay_events && Array.isArray(row.relay_events)) {
 					row.relay_events.forEach(evt => {
-						const idx = evt.relay_id - 1;
-						if (idx >= 0 && idx < 9) {
-							relayStates[idx] = evt.state === 1 ? 'ON' : 'OFF';
-						}
+						relayMap[evt.relay_id] = evt.state === 1 ? 'ON' : 'OFF';
 					});
 				}
+				
+				// Build relay cells in correct column order
+				const relayCells = columnOrder.map(rid => `<td>${relayMap[rid] || '-'}</td>`).join('');
 				
 				return `
 					<tr>
 						<td>${new Date(row.timestamp).toLocaleString()}</td>
-						<td>${relayStates[0]}</td>
-						<td>${relayStates[1]}</td>
-						<td>${relayStates[2]}</td>
-						<td>${relayStates[3]}</td>
-						<td>${relayStates[4]}</td>
-						<td>${relayStates[5]}</td>
-						<td>${relayStates[6]}</td>
-						<td>${relayStates[7]}</td>
-						<td>${relayStates[8]}</td>
-						<td>${row.ph !== null ? row.ph.toFixed(2) : '-'}</td>
-						<td>${row.do !== null ? row.do.toFixed(2) : '-'}</td>
-						<td>${row.tds !== null ? row.tds.toFixed(0) : '-'}</td>
-						<td>${row.temperature !== null ? row.temperature.toFixed(1) : '-'}</td>
-						<td>${row.humidity !== null ? row.humidity.toFixed(1) : '-'}</td>
+						${relayCells}
+						<td>${row.ph !== null && row.ph !== undefined ? row.ph.toFixed(2) : '-'}</td>
+						<td>${row.do !== null && row.do !== undefined ? row.do.toFixed(2) : '-'}</td>
+						<td>${row.tds !== null && row.tds !== undefined ? row.tds.toFixed(0) : '-'}</td>
+						<td>${row.temperature !== null && row.temperature !== undefined ? row.temperature.toFixed(1) : '-'}</td>
+						<td>${row.humidity !== null && row.humidity !== undefined ? row.humidity.toFixed(1) : '-'}</td>
 					</tr>
 				`;
 			}).join('');

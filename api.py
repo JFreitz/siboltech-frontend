@@ -43,7 +43,21 @@ Base.metadata.create_all(bind=engine)
 DISPLAY_TZ = ZoneInfo(os.getenv("DISPLAY_TIMEZONE", "Asia/Manila"))
 
 # ==================== Serial Configuration ====================
-SERIAL_PORT = os.getenv("SERIAL_PORT", "/dev/ttyUSB0")
+def _detect_serial_port():
+    """Auto-detect ESP32 serial port."""
+    import glob
+    env_port = os.getenv("SERIAL_PORT")
+    if env_port:
+        return env_port
+    # Try common ports in order
+    for pattern in ["/dev/ttyUSB*", "/dev/ttyACM*"]:
+        ports = sorted(glob.glob(pattern))
+        if ports:
+            print(f"[SERIAL] Auto-detected port: {ports[0]}", flush=True)
+            return ports[0]
+    return "/dev/ttyUSB0"  # fallback
+
+SERIAL_PORT = _detect_serial_port()
 SERIAL_BAUD = 115200
 _serial_lock = threading.Lock()
 _serial_conn = None
@@ -488,48 +502,117 @@ def get_history():
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     
     if history_type == 'plant':
-        # Get plant readings with latest sensor data for each timestamp
+        # Plant history: sensor averages per interval + plant measurements
         with Session() as session:
-            query = session.query(PlantReading).filter(PlantReading.timestamp >= cutoff)
-            if plant_id:
-                query = query.filter(PlantReading.plant_id == plant_id)
-            if farming_system:
-                query = query.filter(PlantReading.farming_system == farming_system)
-            
-            plant_rows = query.order_by(PlantReading.timestamp.desc()).limit(limit).all()
-        
-        data = []
-        for p in plant_rows:
-            # Get latest sensor readings at or before this plant reading timestamp
-            with Session() as session:
+            # --- Sensor averages bucketed by interval ---
+            if interval == 'daily':
                 sensor_rows = session.execute(
                     text("""
-                        SELECT sensor, AVG(value) as avg_value
+                        SELECT DATE(timestamp) as bucket, sensor, AVG(value) as avg_value
                         FROM sensor_readings
-                        WHERE timestamp <= :ts AND sensor IN ('temperature_c', 'humidity', 'tds_ppm', 'ph', 'do_mg_l')
-                        GROUP BY sensor
+                        WHERE sensor IN ('temperature_c', 'humidity', 'tds_ppm', 'ph', 'do_mg_l')
+                          AND timestamp >= :cutoff
+                        GROUP BY DATE(timestamp), sensor
+                        ORDER BY bucket DESC
                     """),
-                    {"ts": p.timestamp}
+                    {"cutoff": cutoff}
                 ).fetchall()
-            
-            sensor_data = {row[0]: row[1] for row in sensor_rows}
-            
+            else:
+                # Raw readings for 15-min bucketing in Python
+                sensor_rows = session.execute(
+                    text("""
+                        SELECT timestamp, sensor, value
+                        FROM sensor_readings
+                        WHERE sensor IN ('temperature_c', 'humidity', 'tds_ppm', 'ph', 'do_mg_l')
+                          AND timestamp >= :cutoff
+                        ORDER BY timestamp DESC
+                    """),
+                    {"cutoff": cutoff}
+                ).fetchall()
+
+            # --- Plant readings ---
+            pquery = session.query(PlantReading).filter(PlantReading.timestamp >= cutoff)
+            if plant_id:
+                pquery = pquery.filter(PlantReading.plant_id == plant_id)
+            if farming_system:
+                pquery = pquery.filter(PlantReading.farming_system == farming_system)
+            plant_rows = pquery.order_by(PlantReading.timestamp.desc()).limit(limit).all()
+
+        # Build sensor buckets
+        sensor_buckets = {}  # key -> {ph: [], do: [], ...}
+        sensor_map = {'ph': 'ph', 'do_mg_l': 'do', 'tds_ppm': 'tds', 'temperature_c': 'temperature', 'humidity': 'humidity'}
+
+        if interval == 'daily':
+            for row in sensor_rows:
+                bucket_key = str(row[0])  # DATE string
+                if bucket_key not in sensor_buckets:
+                    sensor_buckets[bucket_key] = {'ph': None, 'do': None, 'tds': None, 'temperature': None, 'humidity': None, 'timestamp': bucket_key}
+                mapped = sensor_map.get(row[1])
+                if mapped:
+                    sensor_buckets[bucket_key][mapped] = round(row[2], 2) if row[2] is not None else None
+        else:
+            # 15-min bucketing
+            for row in sensor_rows:
+                ts = row[0]
+                if isinstance(ts, str):
+                    try:
+                        ts = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                    except:
+                        continue
+                bucket_minute = (ts.minute // 15) * 15
+                bucket_ts = ts.replace(minute=bucket_minute, second=0, microsecond=0)
+                bucket_key = bucket_ts.strftime('%Y-%m-%d %H:%M')
+                if bucket_key not in sensor_buckets:
+                    sensor_buckets[bucket_key] = {'ph': [], 'do': [], 'tds': [], 'temperature': [], 'humidity': [], 'timestamp': bucket_ts}
+                mapped = sensor_map.get(row[1])
+                if mapped and row[2] is not None:
+                    sensor_buckets[bucket_key][mapped].append(row[2])
+
+            # Average the 15-min buckets
+            for bk in sensor_buckets:
+                b = sensor_buckets[bk]
+                for field in ['ph', 'do', 'tds', 'temperature', 'humidity']:
+                    vals = b[field]
+                    b[field] = round(sum(vals) / len(vals), 2) if vals else None
+
+        # Attach plant readings to the nearest bucket
+        plant_by_bucket = {}
+        for p in plant_rows:
+            pts = p.timestamp
+            if isinstance(pts, str):
+                try:
+                    pts = datetime.fromisoformat(pts.replace('Z', '+00:00'))
+                except:
+                    continue
+            if interval == 'daily':
+                bk = pts.strftime('%Y-%m-%d')
+            else:
+                bm = (pts.minute // 15) * 15
+                bk = pts.replace(minute=bm, second=0, microsecond=0).strftime('%Y-%m-%d %H:%M')
+            if bk not in plant_by_bucket:
+                plant_by_bucket[bk] = p  # keep first (latest since desc order)
+
+        # Merge: every sensor bucket becomes a row; add plant data if available
+        data = []
+        for bk in sorted(sensor_buckets.keys(), reverse=True)[:limit]:
+            sb = sensor_buckets[bk]
+            p = plant_by_bucket.get(bk)
             data.append({
-                'timestamp': _format_ts_for_display(p.timestamp),
-                'plant_id': p.plant_id,
-                'farming_system': p.farming_system,
-                'ph': sensor_data.get('ph'),
-                'do': sensor_data.get('do_mg_l'),
-                'tds': sensor_data.get('tds_ppm'),
-                'temperature': sensor_data.get('temperature_c'),
-                'humidity': sensor_data.get('humidity'),
-                'leaves': p.leaves,
-                'branches': p.branches,
-                'height': p.height,
-                'weight': p.weight,
-                'length': p.length
+                'timestamp': _format_ts_for_display(sb['timestamp']) if not isinstance(sb['timestamp'], str) else sb['timestamp'],
+                'plant_id': p.plant_id if p else None,
+                'farming_system': p.farming_system if p else (farming_system or ''),
+                'ph': sb['ph'],
+                'do': sb['do'],
+                'tds': sb['tds'],
+                'temperature': sb['temperature'],
+                'humidity': sb['humidity'],
+                'leaves': p.leaves if p else None,
+                'branches': p.branches if p else None,
+                'height': p.height if p else None,
+                'weight': p.weight if p else None,
+                'length': p.length if p else None,
             })
-        return jsonify({'success': True, 'type': 'plant', 'count': len(data), 'readings': data})
+        return jsonify({'success': True, 'type': 'plant', 'interval': interval, 'count': len(data), 'readings': data})
     
     elif history_type == 'actuator':
         # Get actuator events - bucket by interval (daily or 15min)
@@ -770,29 +853,33 @@ def _automation_relay_callback(relay_id: int, state: bool):
     """Callback for automation controller to set relay states."""
     global RELAY_STATES
     label = RELAY_LABELS.get(relay_id, f"Relay {relay_id}")
-    print(f"[CALLBACK] relay {relay_id} -> {state}, override={OVERRIDE_MODE_ENABLED}, calib={CALIBRATION_MODE_ENABLED}", flush=True)
+    # Reject None or non-bool values
+    if state is None:
+        return
+    state = bool(state)
     if OVERRIDE_MODE_ENABLED or CALIBRATION_MODE_ENABLED:
-        print(f"[CALLBACK] BLOCKED - relay {relay_id} change ignored", flush=True)
-        _serial_log_append(f"[AUTO] {label} -> {'ON' if state else 'OFF'} (BLOCKED - {'override' if OVERRIDE_MODE_ENABLED else 'calibration'} mode)")
         return  # Don't change relays in override or calibration mode
+    prev = RELAY_STATES.get(relay_id)
     RELAY_STATES[relay_id] = state
-    _save_relay_state(relay_id, state)
-    _serial_log_append(f"[AUTO] {label} -> {'ON' if state else 'OFF'}")
-    print(f"[CALLBACK] Set RELAY_STATES[{relay_id}] = {state}", flush=True)
+    if prev != state:
+        # State actually changed — save to DB and log
+        _save_relay_state(relay_id, state)
+        _serial_log_append(f"[AUTO] {label} -> {'ON' if state else 'OFF'}")
+        print(f"[CALLBACK] {label} (R{relay_id}) -> {'ON' if state else 'OFF'}", flush=True)
 
 # Initialize automation controller (starts background thread)
 _automation_controller = init_controller(_automation_relay_callback)
 
 RELAY_LABELS = {
-    1: "Misting Pump",
-    2: "Air Pump",
-    3: "Exhaust Fan (In)",
-    4: "Exhaust Fan (Out)",
-    5: "Grow Lights (Aeroponics)",
-    6: "Grow Lights (DWC)",
-    7: "pH Up",
-    8: "pH Down",
-    9: "Leafy Green"
+    1: "Leafy Green",              # Pin 19
+    2: "pH Down",                  # Pin 18
+    3: "pH Up",                    # Pin 17
+    4: "Misting Pump",             # Pin 23
+    5: "Exhaust Fan (Out)",        # Pin 14
+    6: "Grow Lights (Aeroponics)", # Pin 15
+    7: "Air Pump",                 # Pin 12
+    8: "Grow Lights (DWC)",        # Pin 16
+    9: "Exhaust Fan (In)",         # Pin 13
 }
 
 
@@ -1023,12 +1110,20 @@ def set_override_mode():
     
     OVERRIDE_MODE_ENABLED = bool(enabled)
     
+    # Always zero all relays on mode change (clean slate)
+    for i in range(1, 10):
+        RELAY_STATES[i] = False
+    print(f"[OVERRIDE MODE] All relays zeroed", flush=True)
+    
     # Sync with automation controller
     controller = get_controller()
     if controller:
         controller.set_override(OVERRIDE_MODE_ENABLED)
     
-    print(f"[OVERRIDE MODE] {'ENABLED' if OVERRIDE_MODE_ENABLED else 'DISABLED'} - Automation {'suspended' if OVERRIDE_MODE_ENABLED else 'active'}")
+    if not OVERRIDE_MODE_ENABLED:
+        print("[OVERRIDE MODE] DISABLED - automation will resync within 10s", flush=True)
+    else:
+        print("[OVERRIDE MODE] ENABLED - manual control active", flush=True)
     
     return jsonify({
         "success": True,
@@ -1154,8 +1249,11 @@ def _save_relay_state(relay_id, state):
                 meta={"label": RELAY_LABELS.get(relay_id), "source": "api"}
             ))
             session.commit()
+            print(f"[DB] Saved relay_{relay_id} = {state}", flush=True)
     except Exception as e:
-        print(f"[DB] Error saving relay state: {e}")
+        import traceback
+        print(f"[DB] Error saving relay state: {e}", flush=True)
+        traceback.print_exc()
 
 
 # ==================== Calibration Endpoints ====================

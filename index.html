@@ -1429,6 +1429,24 @@
 			};
 			
 			// Dispatch event when Firebase is ready
+
+                        // ===== LOAD ACTUATOR HISTORY =====
+                        window.loadActuatorHistory = async function(maxResults = 500) {
+                                try {
+                                        const eventsRef = collection(db, 'actuators', 'history', 'events');
+                                        const q = query(eventsRef, orderBy('timestamp', 'desc'), limit(maxResults));
+                                        const snapshot = await getDocs(q);
+                                        const events = [];
+                                        snapshot.forEach(docSnap => {
+                                                events.push({ id: docSnap.id, ...docSnap.data() });
+                                        });
+                                        console.log('⚡ Loaded ' + events.length + ' actuator events');
+                                        return events;
+                                } catch (error) {
+                                        console.error('Failed to load actuator history:', error);
+                                        return [];
+                                }
+                        };
 			window.dispatchEvent(new Event('firebaseReady'));
 		</script>
 </body>
