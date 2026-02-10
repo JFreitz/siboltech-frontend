@@ -3045,11 +3045,12 @@ body.sidebar-collapsed .brand{
 	gap:16px;
 }
 
-/* Connection Status Dot (inside topbar clock) */
+/* Connection Status Dot (in topbar-right) */
 .conn-dot {
-	display: inline-block;
-	width: 9px;
-	height: 9px;
+	width: 10px;
+	height: 10px;
+	min-width: 10px;
+	min-height: 10px;
 	border-radius: 50%;
 	background: #9aa49a;
 	flex-shrink: 0;
