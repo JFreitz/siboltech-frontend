@@ -154,6 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Fetch real sensor data from API
+let _lastDataTimestamp = 0;
 async function fetchSensorData() {
     // Skip if using Firebase real-time (Firebase will push updates)
     if (window.firebaseListenerActive) return;
@@ -165,10 +166,13 @@ async function fetchSensorData() {
         const res = await fetch(`${RELAY_API_URL}/latest`);
         const data = await res.json();
         updateSensorDisplayFromData(data);
+        _lastDataTimestamp = Date.now();
+        updateConnectionStatus(true);
     } catch (e) {
         console.log('API fetch error:', e);
         // On error, show zeros
         showSensorError();
+        updateConnectionStatus(false);
     }
 }
 
@@ -224,10 +228,13 @@ function initFirebaseListener() {
                 console.log('📡 Firebase update received:', Object.keys(data).filter(k => !k.startsWith('_')).join(', '));
                 updateSensorDisplayFromData(data);
                 window.firebaseListenerActive = true;
+                _lastDataTimestamp = Date.now();
+                updateConnectionStatus(true);
             }
         }, (error) => {
             console.error('Firebase listener error:', error);
             window.firebaseListenerActive = false;
+            updateConnectionStatus(false);
         });
         
         console.log('✅ Firebase real-time listener active');
@@ -251,6 +258,28 @@ window.addEventListener('firebaseReady', () => {
 // Start fetching sensor data (polling fallback)
 setInterval(fetchSensorData, 1000);
 setTimeout(fetchSensorData, 200);
+
+// === Connection Status Indicator ===
+function updateConnectionStatus(isConnected) {
+    const el = document.getElementById('connectionStatus');
+    if (!el) return;
+    const dot = el.querySelector('.connection-dot');
+    const label = el.querySelector('.connection-label');
+    if (isConnected) {
+        el.className = 'connection-status connected';
+        label.textContent = 'Connected';
+    } else {
+        el.className = 'connection-status disconnected';
+        label.textContent = 'Disconnected';
+    }
+}
+
+// Stale-data watchdog: if no data for 15s, mark disconnected
+setInterval(() => {
+    if (_lastDataTimestamp && (Date.now() - _lastDataTimestamp > 15000)) {
+        updateConnectionStatus(false);
+    }
+}, 5000);
 
 // --- Calibrate UI logic ---
 (function initCalibrate() {

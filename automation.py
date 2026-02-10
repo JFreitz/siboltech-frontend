@@ -14,7 +14,7 @@ import json
 # ========== CONFIGURATION ==========
 
 # Relay mapping (1-indexed, matches ESP32 pin wiring)
-# Chan 1=pin19, 2=pin18, 3=pin17, 4=pin23, 5=pin14, 6=pin15, 7=pin12, 8=pin16, 9=pin13
+# Chan 1=pin19, 2=pin18, 3=pin17, 4=pin23, 5=pin14, 6=pin15, 7=pin12, 8=pin26, 9=pin13
 RELAY = {
     "LEAFY_GREEN": 1,       # Pin 19
     "PH_DOWN": 2,           # Pin 18
@@ -23,7 +23,7 @@ RELAY = {
     "EXHAUST_OUT": 5,       # Pin 14
     "GROW_LIGHTS_AERO": 6,  # Pin 15
     "AIR_PUMP": 7,          # Pin 12
-    "GROW_LIGHTS_DWC": 8,   # Pin 16
+    "GROW_LIGHTS_DWC": 8,   # Pin 26
     "EXHAUST_IN": 9,        # Pin 13
 }
 
@@ -55,6 +55,7 @@ HUMIDITY_LOW = 60.0     # % - turn OFF exhaust
 PH_LOW = 5.5     # Below this - trigger pH UP
 PH_HIGH = 7.0    # Above this - trigger pH DOWN
 PH_DOSE_TIME = 3  # seconds to dose
+PH_COOLDOWN = 60  # seconds to wait after dose before re-checking
 
 # TDS (Leafy Green nutrient dosing)
 TDS_LOW = 675     # ppm - start dosing
@@ -337,7 +338,11 @@ class AutomationController:
             if ph < PH_LOW and now > self.ph_dosing_until:
                 self._set_relay("PH_UP", True)
                 self.ph_dosing_until = now + PH_DOSE_TIME
-            elif now >= self.ph_dosing_until:
+            elif self.relays["PH_UP"].state and now >= self.ph_dosing_until:
+                # Dose finished — turn OFF and start cooldown
+                self._set_relay("PH_UP", False)
+                self.ph_dosing_until = now + PH_COOLDOWN
+            elif not self.relays["PH_UP"].state and now >= self.ph_dosing_until:
                 self._set_relay("PH_UP", False)
         
         # ===== 8. pH DOWN (Relay 8) - High pH =====
@@ -345,7 +350,11 @@ class AutomationController:
             if ph > PH_HIGH and now > self.ph_dosing_until:
                 self._set_relay("PH_DOWN", True)
                 self.ph_dosing_until = now + PH_DOSE_TIME
-            elif now >= self.ph_dosing_until:
+            elif self.relays["PH_DOWN"].state and now >= self.ph_dosing_until:
+                # Dose finished — turn OFF and start cooldown
+                self._set_relay("PH_DOWN", False)
+                self.ph_dosing_until = now + PH_COOLDOWN
+            elif not self.relays["PH_DOWN"].state and now >= self.ph_dosing_until:
                 self._set_relay("PH_DOWN", False)
         
         # ===== 9. LEAFY GREEN (Relay 9) - TDS dosing =====
@@ -355,6 +364,12 @@ class AutomationController:
     def _process_misting(self, now: float):
         """Process misting pump cycle: 5s ON, 15min OFF."""
         relay = self.relays["MISTING"]
+        
+        # If state is unknown (None), initialize to OFF but keep existing timers
+        # so the 15-min cycle resumes where it left off after override toggle
+        if relay.state is None:
+            self._set_relay("MISTING", False, force=True)
+            return
         
         if relay.state:
             # Currently ON - check if time to turn OFF
@@ -370,6 +385,10 @@ class AutomationController:
     def _process_tds_dosing(self, now: float, tds: float):
         """Process TDS-based nutrient dosing for leafy green."""
         relay = self.relays["LEAFY_GREEN"]
+        
+        # If state is unknown (None), initialize to OFF but keep existing timers
+        if relay.state is None:
+            self._set_relay("LEAFY_GREEN", False, force=True)
         
         # Check if dosing should be active
         if tds < TDS_LOW:

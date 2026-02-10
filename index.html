@@ -21,6 +21,10 @@
 		</div>
 		
 		<div class="topbar-right">
+			<div id="connectionStatus" class="connection-status" title="System status">
+				<span class="connection-dot"></span>
+				<span class="connection-label">Connecting…</span>
+			</div>
 			<div id="topbarClock" class="topbar-clock" aria-live="polite">
 				<div id="topbarTime" class="topbar-time">--:--:--</div>
 				<div id="topbarDate" class="topbar-date">----</div>
@@ -914,9 +918,9 @@
 
 		<section id="history" class="tab-content">
 			<div class="history-board">
-				<div class="history-actions" style="display:flex;justify-content:flex-end;margin-bottom:8px;">
-					<button id="downloadTrainingData" class="submit-btn" style="font-size:13px;padding:8px 16px;border-radius:10px;display:flex;align-items:center;gap:6px;">
-						<span style="font-size:16px;">📥</span> Download Training Data (CSV)
+				<div class="history-actions">
+					<button id="downloadTrainingData" class="history-download-btn">
+						<span>��</span> Download CSV
 					</button>
 				</div>
 				<ul class="calibrate-tabs" id="historyTabs">

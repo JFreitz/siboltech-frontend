@@ -878,7 +878,7 @@ RELAY_LABELS = {
     5: "Exhaust Fan (Out)",        # Pin 14
     6: "Grow Lights (Aeroponics)", # Pin 15
     7: "Air Pump",                 # Pin 12
-    8: "Grow Lights (DWC)",        # Pin 16
+    8: "Grow Lights (DWC)",        # Pin 26
     9: "Exhaust Fan (In)",         # Pin 13
 }
 

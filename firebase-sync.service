@@ -1,7 +1,8 @@
 [Unit]
 Description=SIBOLTECH Firebase Sync Service
-After=network-online.target sensor-collector.service
+After=network-online.target siboltech-api.service
 Wants=network-online.target
+Requires=siboltech-api.service
 
 [Service]
 Type=simple
