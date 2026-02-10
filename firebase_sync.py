@@ -24,9 +24,14 @@ from pathlib import Path
 try:
     import firebase_admin
     from firebase_admin import credentials, firestore
+    from google.api_core.retry import Retry
 except ImportError:
     print("ERROR: firebase-admin not installed. Run: pip install firebase-admin")
     exit(1)
+
+# Short timeout + retry for Firestore operations to avoid 120s+ hangs on quota errors
+FIRESTORE_TIMEOUT = 3   # seconds (RPC deadline)
+FIRESTORE_RETRY = Retry(deadline=3, initial=0.5, maximum=2)  # retry for max 3s total
 
 from db import SensorReading, ActuatorEvent, init_db, get_session
 
@@ -35,7 +40,7 @@ SERVICE_ACCOUNT_FILE = os.getenv(
     "FIREBASE_SERVICE_ACCOUNT", 
     str(Path(__file__).parent / "firebase-service-account.json")
 )
-SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "2"))  # seconds (faster for relay response)
+SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "5"))  # seconds (balance responsiveness vs quota)
 BATCH_SIZE = 10  # Max readings per sync
 SERIAL_PORT = os.getenv("SERIAL_PORT", "/dev/ttyUSB0")
 BAUD_RATE = 115200
@@ -142,6 +147,7 @@ def get_latest_readings(session) -> dict:
 
 def sync_latest_to_firebase(db: firestore.Client, session):
     """Sync the latest sensor readings to Firebase."""
+    session.expire_all()  # Force fresh read from DB (avoid stale cache)
     readings = get_latest_readings(session)
     
     if not readings:
@@ -154,21 +160,24 @@ def sync_latest_to_firebase(db: firestore.Client, session):
     readings["_updated"] = firestore.SERVER_TIMESTAMP
     readings["_source"] = "rpi-collector"
     
-    doc_ref.set(readings, merge=True)
+    doc_ref.set(readings, merge=True, timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
     return True
 
 
 def process_relay_commands(db: firestore.Client):
-    """Check for pending relay commands and execute them via API."""
+    """Check for pending relay commands and execute them via API.
+    Returns True if any commands were processed."""
     import requests
     from google.cloud.firestore_v1.base_query import FieldFilter
     
     commands_ref = db.collection("relay_commands")
     
     # Get pending commands (without ordering to avoid index requirement)
-    pending = commands_ref.where(filter=FieldFilter("status", "==", "pending")).limit(10).stream()
+    pending = commands_ref.where(filter=FieldFilter("status", "==", "pending")).limit(10).stream(timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
     
+    had_commands = False
     for doc in pending:
+        had_commands = True
         cmd_data = doc.to_dict()
         relay = cmd_data.get("relay", "").upper()  # e.g., "R1"
         action = cmd_data.get("action", "").lower()  # "on" or "off"
@@ -177,7 +186,7 @@ def process_relay_commands(db: firestore.Client):
         try:
             relay_num = int(relay.replace("R", ""))
         except:
-            doc.reference.update({"status": "error", "response": f"Invalid relay: {relay}"})
+            doc.reference.update({"status": "error", "response": f"Invalid relay: {relay}"}, timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
             continue
         
         print(f"  🔌 Relay command: R{relay_num} {action.upper()}")
@@ -195,8 +204,10 @@ def process_relay_commands(db: firestore.Client):
             "status": "executed",
             "response": str(response),
             "executed_at": firestore.SERVER_TIMESTAMP
-        })
+        }, timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
         print(f"    → {response}")
+    
+    return had_commands
 
 
 def get_relay_status() -> dict:
@@ -224,7 +235,7 @@ def sync_relay_status_to_firebase(db: firestore.Client):
         doc_ref.set({
             "status": status,
             "_updated": firestore.SERVER_TIMESTAMP
-        }, merge=True)
+        }, merge=True, timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
 
 
 def load_calibration() -> dict:
@@ -251,7 +262,7 @@ def sync_calibration_to_firebase(db: firestore.Client):
             "sensors": cal,
             "_updated": firestore.SERVER_TIMESTAMP,
             "_source": "rpi"
-        }, merge=True)
+        }, merge=True, timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
 
 
 def check_override_mode(db: firestore.Client, last_override_state: bool) -> bool:
@@ -261,7 +272,7 @@ def check_override_mode(db: firestore.Client, last_override_state: bool) -> bool
     
     try:
         doc_ref = db.collection("settings").document("override_mode")
-        doc = doc_ref.get()
+        doc = doc_ref.get(timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
         
         if doc.exists:
             data = doc.to_dict()
@@ -280,7 +291,7 @@ def check_override_mode(db: firestore.Client, last_override_state: bool) -> bool
                     if resp.ok:
                         print(f"    → API synced: override={'ON' if enabled else 'OFF'}")
                         # Mark as processed so we don't re-apply
-                        doc_ref.update({"source": "rpi-synced"})
+                        doc_ref.update({"source": "rpi-synced"}, timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
                     else:
                         print(f"    → API error: {resp.status_code}")
                 except Exception as e:
@@ -290,7 +301,7 @@ def check_override_mode(db: firestore.Client, last_override_state: bool) -> bool
         return last_override_state
     except Exception as e:
         print(f"  ⚠️ Override check error: {e}")
-        return last_override_state
+        raise  # re-raise so main loop backoff can handle it
 
 
 def check_calibration_mode(db: firestore.Client, last_cal_mode_state: bool) -> bool:
@@ -300,7 +311,7 @@ def check_calibration_mode(db: firestore.Client, last_cal_mode_state: bool) -> b
 
     try:
         doc_ref = db.collection("settings").document("calibration_mode")
-        doc = doc_ref.get()
+        doc = doc_ref.get(timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
 
         if doc.exists:
             data = doc.to_dict()
@@ -317,7 +328,7 @@ def check_calibration_mode(db: firestore.Client, last_cal_mode_state: bool) -> b
                     )
                     if resp.ok:
                         print(f"    → API synced: calibration_mode={'ON' if enabled else 'OFF'}")
-                        doc_ref.update({"source": "rpi-synced"})
+                        doc_ref.update({"source": "rpi-synced"}, timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
                     else:
                         print(f"    → API error: {resp.status_code}")
                 except Exception as e:
@@ -326,14 +337,14 @@ def check_calibration_mode(db: firestore.Client, last_cal_mode_state: bool) -> b
 
         return last_cal_mode_state
     except Exception as e:
-        print(f"  ⚠️ Calibration mode check error: {e}")
-        return last_cal_mode_state
+        print(f"  ⚠️ Cal mode check error: {e}")
+        raise  # re-raise so main loop backoff can handle it
 
 
 def check_calibration_updates(db: firestore.Client, last_cal_check: datetime) -> datetime:
     """Check if calibration was updated from dashboard."""
     doc_ref = db.collection("settings").document("calibration")
-    doc = doc_ref.get()
+    doc = doc_ref.get(timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
     
     if doc.exists:
         data = doc.to_dict()
@@ -353,7 +364,7 @@ def check_calibration_updates(db: firestore.Client, last_cal_check: datetime) ->
                 if cal:
                     save_calibration(cal)
                     # Reset source to prevent re-applying
-                    doc_ref.update({"_source": "rpi"})
+                    doc_ref.update({"_source": "rpi"}, timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
                 return update_time
     
     return last_cal_check
@@ -415,7 +426,7 @@ def sync_history_to_firebase(db: firestore.Client, session, last_sync_ts: dateti
         batch_count += 1
     
     if batch_count > 0:
-        batch.commit()
+        batch.commit(timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
         print(f"  Synced {batch_count} history entries to Firebase")
     
     return latest_ts
@@ -472,7 +483,7 @@ def sync_actuator_events_to_firebase(db: firestore.Client, session, last_actuato
             latest_ts = evt_ts
 
     if batch_count > 0:
-        batch.commit()
+        batch.commit(timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
         print(f"  Synced {batch_count} actuator events to Firebase")
 
     return latest_ts
@@ -531,34 +542,57 @@ def main():
     print("✅ Calibration synced to Firebase")
     
     sync_count = 0
+    # Backoff timestamps: skip slow ops after they fail (quota errors)
+    _relay_backoff_until = 0
+    _override_backoff_until = 0
+    _calmode_backoff_until = 0
+    RELAY_BACKOFF_SECS = 10   # short backoff for relays (user-facing, needs responsiveness)
+    OTHER_BACKOFF_SECS = 300  # 5 min backoff for override/cal mode (rarely used)
     
     while True:
         try:
             sync_count += 1
+            now_ts = time.time()
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Sync #{sync_count}...")
             
-            # Check for relay commands FIRST (priority for fast response)
-            try:
-                process_relay_commands(db)
-                sync_relay_status_to_firebase(db)
-            except Exception as e:
-                print(f"  ⚠️ Relay error: {e}")
+            # === PRIORITY 1: Relay commands ONLY (minimal quota usage) ===
+            if now_ts >= _relay_backoff_until:
+                try:
+                    had_commands = process_relay_commands(db)
+                    # Only sync relay status to Firebase when a command was executed
+                    if had_commands:
+                        sync_relay_status_to_firebase(db)
+                except Exception as e:
+                    print(f"  ⚠️ Relay error: {e}")
+                    if "429" in str(e) or "Quota" in str(e) or "Timeout" in str(e):
+                        _relay_backoff_until = now_ts + RELAY_BACKOFF_SECS
+                        print(f"    → backing off relay ops for {RELAY_BACKOFF_SECS}s")
             
-            # Check override mode from dashboard (every sync for fast response)
-            try:
-                last_override_state = check_override_mode(db, last_override_state)
-            except Exception as e:
-                print(f"  ⚠️ Override check error: {e}")
+            # === PRIORITY 2: Sync latest readings every 2nd cycle (~10s) ===
+            if sync_count % 2 == 0:
+                try:
+                    if sync_latest_to_firebase(db, session):
+                        print("  ✅ Latest readings synced")
+                except Exception as e:
+                    print(f"  ⚠️ Latest sync error: {e}")
             
-            # Check calibration mode from dashboard
-            try:
-                last_cal_mode_state = check_calibration_mode(db, last_cal_mode_state)
-            except Exception as e:
-                print(f"  ⚠️ Cal mode check error: {e}")
+            # === LOW PRIORITY: Override mode every 6th cycle (~30s) ===
+            if sync_count % 6 == 0 and now_ts >= _override_backoff_until:
+                try:
+                    last_override_state = check_override_mode(db, last_override_state)
+                except Exception as e:
+                    if "429" in str(e) or "Quota" in str(e) or "Timeout" in str(e):
+                        _override_backoff_until = now_ts + OTHER_BACKOFF_SECS
+                        print(f"    → backing off override ops for {OTHER_BACKOFF_SECS}s")
             
-            # Sync latest readings (for real-time dashboard)
-            if sync_latest_to_firebase(db, session):
-                print("  ✅ Latest readings synced")
+            # === LOW PRIORITY: Cal mode every 10th cycle (~50s) ===
+            if sync_count % 10 == 0 and now_ts >= _calmode_backoff_until:
+                try:
+                    last_cal_mode_state = check_calibration_mode(db, last_cal_mode_state)
+                except Exception as e:
+                    if "429" in str(e) or "Quota" in str(e) or "Timeout" in str(e):
+                        _calmode_backoff_until = now_ts + OTHER_BACKOFF_SECS
+                        print(f"    → backing off cal mode ops for {OTHER_BACKOFF_SECS}s")
             
             # Sync history (for charts) - every 5 syncs
             if sync_count % 5 == 0:

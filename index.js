@@ -2192,10 +2192,35 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	}
 
 	// Toggle relay via API or Firebase
+	// RPi LAN API URL for direct relay control (even from Vercel, browser is on same LAN)
+	const RPI_LAN_URL = 'http://192.168.100.72:5000/api';
+
 	async function toggleRelay(relayNum, newState, stateEl) {
 		const action = newState ? 'ON' : 'OFF';
 		
-		// Use Firebase on static hosting (Vercel)
+		// Always try direct RPi API first (fastest, no quota issues)
+		try {
+			const response = await fetch(`${RPI_LAN_URL}/relay/${relayNum}/${action.toLowerCase()}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				signal: AbortSignal.timeout(3000)
+			});
+			if (response.ok) {
+				if (stateEl) {
+					stateEl.classList.remove('state-off', 'state-on');
+					stateEl.classList.add(newState ? 'state-on' : 'state-off');
+					stateEl.textContent = newState ? 'ON' : 'OFF';
+				}
+				const actuatorId = RELAY_TO_ACTUATOR[relayNum];
+				if (actuatorId) syncActuatorUI(actuatorId, newState);
+				console.log(`✅ Relay ${relayNum} ${action} via direct API`);
+				return;
+			}
+		} catch (e) {
+			console.warn(`Direct API failed for relay ${relayNum}, trying Firebase...`, e.message);
+		}
+		
+		// Fallback: Use Firebase on static hosting (Vercel)
 		if (isStaticHosting() && window.sendRelayCommandFirebase) {
 			const success = await window.sendRelayCommandFirebase(`R${relayNum}`, action);
 			if (success && stateEl) {
@@ -2206,7 +2231,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			return;
 		}
 		
-		// Use direct API when available
+		// Use direct API when available (non-Vercel)
 		try {
 			const response = await fetch(`${RELAY_API_URL}/relay/${relayNum}/${action.toLowerCase()}`, {
 				method: 'POST',
@@ -2237,11 +2262,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	// Fetch relay status from API and sync all actuator UIs
 	async function loadRelayStatus() {
-		// Skip on static hosting (Vercel) - API not available
-		if (isStaticHosting()) return;
-		
+		// Try direct RPi API (works from LAN even on Vercel)
 		try {
-			const response = await fetch(`${RELAY_API_URL}/relay/status`);
+			const url = isStaticHosting() ? `${RPI_LAN_URL}/relay/status` : `${RELAY_API_URL}/relay/status`;
+			const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
 			if (response.ok) {
 				const data = await response.json();
 				if (data.relays) {
@@ -2254,19 +2278,34 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				}
 			}
 		} catch (error) {
-			console.error('Error loading relay status:', error);
+			// Silent fail - Firebase onSnapshot will handle it on Vercel
 		}
 	}
 
 	// Turn all actuators/relays OFF
 	async function turnAllActuatorsOff() {
-		// Use Firebase on static hosting (Vercel)
+		// Try direct RPi API first (fastest, no quota issues)
+		try {
+			const resp = await fetch(`${RPI_LAN_URL}/relay/all/off`, {
+				method: 'POST',
+				signal: AbortSignal.timeout(3000)
+			});
+			if (resp.ok) {
+				Object.keys(ACTUATOR_TO_RELAY).forEach(actuatorId => {
+					syncActuatorUI(actuatorId, false);
+				});
+				console.log('All actuators turned OFF via direct API');
+				return;
+			}
+		} catch (e) {
+			console.warn('Direct API all-off failed, trying Firebase...', e.message);
+		}
+
+		// Fallback: Firebase on static hosting (Vercel)
 		if (isStaticHosting() && window.sendRelayCommandFirebase) {
-			// Send OFF command for all 9 relays via Firebase
 			for (let i = 1; i <= 9; i++) {
 				await window.sendRelayCommandFirebase(`R${i}`, 'OFF');
 			}
-			// Update all actuator UIs to OFF
 			Object.keys(ACTUATOR_TO_RELAY).forEach(actuatorId => {
 				syncActuatorUI(actuatorId, false);
 			});
@@ -2442,19 +2481,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			}
 			
 			// Sync with backend automation controller
-			if (!isStaticHosting()) {
-				try {
-					await fetch(`${API_BASE_URL}/override-mode`, {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ enabled: actuatorOverride })
-					});
-					console.log(`[API] Override mode synced: ${actuatorOverride}`);
-				} catch (e) {
-					console.warn('[API] Failed to sync override mode:', e);
+			// Try direct RPi API first (even from Vercel, browser is on LAN)
+			let synced = false;
+			try {
+				const resp = await fetch(`${RPI_LAN_URL}/override-mode`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ enabled: actuatorOverride }),
+					signal: AbortSignal.timeout(3000)
+				});
+				if (resp.ok) {
+					console.log(`[API] Override mode synced directly: ${actuatorOverride}`);
+					synced = true;
 				}
-			} else if (window.sendOverrideModeFirebase) {
-				// On Vercel: sync override via Firebase -> RPi picks it up
+			} catch (e) {
+				console.warn('[API] Direct override sync failed:', e.message);
+			}
+			
+			// Fallback to Firebase if direct API failed
+			if (!synced && window.sendOverrideModeFirebase) {
 				const ok = await window.sendOverrideModeFirebase(actuatorOverride);
 				if (ok) {
 					console.log(`[Firebase] Override mode synced: ${actuatorOverride}`);
