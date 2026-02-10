@@ -355,6 +355,8 @@
 	background: #f8faf8;
 	border-radius: 12px;
 	margin: 16px 0;
+	padding: 16px;
+}
 
 /* Ensure each plant list fills its card and matches DWC sizing
    - make inner list a flex child so all three lists match height
@@ -376,8 +378,6 @@
 
 .params-card .sensor-input-card1 {
 	display: block;
-}
-	padding: 16px;
 }
 
 .calibration-toggle-header {
@@ -3021,6 +3021,7 @@ body.sidebar-collapsed .brand{
     display:flex;
     flex-direction:column;
 	gap: 6px; /* tighten gaps so columns sit close together */
+}
 
 .side-col{
     display:flex;
@@ -3038,6 +3039,14 @@ body.sidebar-collapsed .brand{
     background: rgba(255, 255, 255, 0.25);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    grid-template-areas:
+        "header header header header header"
+        "ph do temp hum tds";
+}
+
 .topbar-right{
 	margin-left: auto;
 	display:flex;
@@ -3101,13 +3110,6 @@ body.sidebar-collapsed .brand{
 .topbar-clock .topbar-time{
 	/* keep compact monospace for time if desired */
 	font-family: 'SFMono-Regular', Consolas, 'Roboto Mono', monospace;
-}
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    grid-template-areas:
-        "header header header header header"
-        "ph do temp hum tds";
 }
 
 .sensors-card{
