@@ -1460,6 +1460,264 @@ def export_training_data():
     )
     return response
 
+
+# ==================== ML TRAINING CSV (15-min averages) ====================
+@app.route("/api/export-ml-training", methods=["GET"])
+def export_ml_training():
+    """Export 15-minute averaged sensor data merged with plant readings for ML.
+
+    Columns: timestamp, day, farming_system, ave_ph, ave_do, ave_tds,
+             ave_temp, ave_humidity, Leaves, Branches, Weight, Length, Height
+
+    Every 15-min sensor window is emitted for BOTH aero and dwc.
+    Plant columns are '-' when no measurement exists for that window/system.
+
+    Query params:
+        days  – number of days to include (default: all)
+    """
+    import io
+    import csv as csv_mod
+
+    days_param = request.args.get('days', 'all')
+    if days_param.lower() == 'all':
+        cutoff = datetime(2000, 1, 1, tzinfo=timezone.utc)
+    else:
+        try:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=int(days_param))
+        except Exception:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=365)
+
+    with Session() as session:
+        # 15-minute averaged sensor readings
+        sensor_rows = session.execute(text("""
+            SELECT
+                strftime('%Y-%m-%d %H:', timestamp) ||
+                    SUBSTR('0' || CAST((CAST(strftime('%M', timestamp) AS INTEGER) / 15) * 15 AS TEXT), -2, 2) AS time_bucket,
+                sensor,
+                ROUND(AVG(value), 4) AS avg_value
+            FROM sensor_readings
+            WHERE sensor IN ('ph','do_mg_l','tds_ppm','temperature_c','humidity')
+              AND timestamp >= :cutoff
+            GROUP BY time_bucket, sensor
+            ORDER BY time_bucket
+        """), {"cutoff": cutoff}).fetchall()
+
+        # All plant readings
+        plant_rows = session.execute(text("""
+            SELECT timestamp, plant_id, farming_system,
+                   leaves, branches, weight, length, height
+            FROM plant_readings
+            WHERE timestamp >= :cutoff
+            ORDER BY timestamp
+        """), {"cutoff": cutoff}).fetchall()
+
+    # Build sensor lookup:  { time_bucket: { sensor: avg_value } }
+    sensor_lookup = {}
+    all_buckets = []
+    for row in sensor_rows:
+        bucket = row[0]
+        if bucket not in sensor_lookup:
+            sensor_lookup[bucket] = {}
+            all_buckets.append(bucket)
+        sensor_lookup[bucket][row[1]] = row[2]
+
+    # Build plant lookup:  { (bucket_prefix, farming_system): {cols} }
+    # Match plant reading to the nearest 15-min bucket
+    plant_lookup = {}
+    for row in plant_rows:
+        ts_str = str(row[0])[:16]  # 'YYYY-MM-DD HH:MM'
+        try:
+            ts_dt = datetime.strptime(ts_str, "%Y-%m-%d %H:%M")
+        except Exception:
+            continue
+        minute_bucket = (ts_dt.minute // 15) * 15
+        bucket_key = f"{ts_dt.strftime('%Y-%m-%d %H:')}{minute_bucket:02d}"
+        fs = row[2]
+        key = (bucket_key, fs)
+        # Keep latest per bucket+system
+        plant_lookup[key] = {
+            "Leaves": row[3] if row[3] is not None else "-",
+            "Branches": row[4] if row[4] is not None else "-",
+            "Weight": row[5] if row[5] is not None else "-",
+            "Length": row[6] if row[6] is not None else "-",
+            "Height": row[7] if row[7] is not None else "-",
+        }
+
+    # Calculate day numbers from first bucket
+    first_day = all_buckets[0][:10] if all_buckets else ""
+    def day_num(bucket):
+        try:
+            d1 = datetime.strptime(first_day, "%Y-%m-%d")
+            d2 = datetime.strptime(bucket[:10], "%Y-%m-%d")
+            return (d2 - d1).days + 1
+        except Exception:
+            return 0
+
+    farming_systems = ['aeroponics', 'dwc']
+
+    headers = ['timestamp', 'day', 'farming_system',
+               'ave_ph', 'ave_do', 'ave_tds', 'ave_temp', 'ave_humidity',
+               'Leaves', 'Branches', 'Weight', 'Length', 'Height']
+
+    csv_rows = []
+    for bucket in all_buckets:
+        sensors = sensor_lookup.get(bucket, {})
+        for fs in farming_systems:
+            plant = plant_lookup.get((bucket, fs), {})
+            csv_rows.append({
+                'timestamp': bucket,
+                'day': day_num(bucket),
+                'farming_system': fs,
+                'ave_ph': sensors.get('ph', '-'),
+                'ave_do': sensors.get('do_mg_l', '-'),
+                'ave_tds': sensors.get('tds_ppm', '-'),
+                'ave_temp': sensors.get('temperature_c', '-'),
+                'ave_humidity': sensors.get('humidity', '-'),
+                'Leaves': plant.get('Leaves', '-'),
+                'Branches': plant.get('Branches', '-'),
+                'Weight': plant.get('Weight', '-'),
+                'Length': plant.get('Length', '-'),
+                'Height': plant.get('Height', '-'),
+            })
+
+    fmt = request.args.get('format', 'csv')
+    if fmt == 'json':
+        return jsonify({"headers": headers, "rows": csv_rows, "count": len(csv_rows)})
+
+    output = io.StringIO()
+    writer = csv_mod.DictWriter(output, fieldnames=headers)
+    writer.writeheader()
+    writer.writerows(csv_rows)
+
+    return app.response_class(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename=siboltech_ml_training_{datetime.now().strftime("%Y%m%d")}.csv'}
+    )
+
+
+# ==================== SENSOR + ACTUATOR STATE CSV ====================
+@app.route("/api/export-sensor-actuator", methods=["GET"])
+def export_sensor_actuator():
+    """Export sensor readings + actuator states for accuracy checking.
+
+    Builds a row per 15-min window with latest sensor values and
+    the relay ON/OFF state at that point in time.
+
+    Query params:
+        days – number of days (default: all)
+    """
+    import io
+    import csv as csv_mod
+
+    days_param = request.args.get('days', 'all')
+    if days_param.lower() == 'all':
+        cutoff = datetime(2000, 1, 1, tzinfo=timezone.utc)
+    else:
+        try:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=int(days_param))
+        except Exception:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=365)
+
+    relay_labels = {
+        1: 'Misting', 2: 'AirPump', 3: 'ExhaustIN', 4: 'ExhaustOUT',
+        5: 'LightsAero', 6: 'LightsDWC', 7: 'pHUp', 8: 'pHDown', 9: 'LeafyGreen'
+    }
+
+    with Session() as session:
+        # 15-min averaged sensor readings
+        sensor_rows = session.execute(text("""
+            SELECT
+                strftime('%Y-%m-%d %H:', timestamp) ||
+                    SUBSTR('0' || CAST((CAST(strftime('%M', timestamp) AS INTEGER) / 15) * 15 AS TEXT), -2, 2) AS time_bucket,
+                sensor,
+                ROUND(AVG(value), 4) AS avg_value
+            FROM sensor_readings
+            WHERE sensor IN ('ph','do_mg_l','tds_ppm','temperature_c','humidity')
+              AND timestamp >= :cutoff
+            GROUP BY time_bucket, sensor
+            ORDER BY time_bucket
+        """), {"cutoff": cutoff}).fetchall()
+
+        # All actuator events (to derive state at each bucket)
+        act_rows = session.execute(text("""
+            SELECT timestamp, relay_id, state
+            FROM actuator_events
+            WHERE timestamp >= :cutoff
+            ORDER BY timestamp
+        """), {"cutoff": cutoff}).fetchall()
+
+    # Build sensor lookup
+    sensor_lookup = {}
+    all_buckets = []
+    for row in sensor_rows:
+        bucket = row[0]
+        if bucket not in sensor_lookup:
+            sensor_lookup[bucket] = {}
+            all_buckets.append(bucket)
+        sensor_lookup[bucket][row[1]] = row[2]
+
+    # Build relay state timeline: for each bucket, derive last known state
+    # First, build ordered list of relay events
+    relay_events = []  # [(bucket_key, relay_id, state)]
+    for row in act_rows:
+        ts_str = str(row[0])[:16]
+        try:
+            ts_dt = datetime.strptime(ts_str, "%Y-%m-%d %H:%M")
+        except Exception:
+            continue
+        minute_bucket = (ts_dt.minute // 15) * 15
+        bucket_key = f"{ts_dt.strftime('%Y-%m-%d %H:')}{minute_bucket:02d}"
+        relay_events.append((bucket_key, int(row[1]), int(row[2])))
+
+    # For each bucket, carry forward relay states
+    relay_state = {i: 0 for i in range(1, 10)}
+    relay_by_bucket = {}
+    event_idx = 0
+    for bucket in all_buckets:
+        # Apply all events up to this bucket
+        while event_idx < len(relay_events) and relay_events[event_idx][0] <= bucket:
+            _, rid, st = relay_events[event_idx]
+            relay_state[rid] = st
+            event_idx += 1
+        relay_by_bucket[bucket] = dict(relay_state)
+
+    relay_headers = [f'relay{i}_{relay_labels.get(i, f"R{i}")}' for i in range(1, 10)]
+    headers = ['timestamp', 'ph', 'do_mg_l', 'tds_ppm', 'temperature_c', 'humidity'] + relay_headers
+
+    csv_rows = []
+    for bucket in all_buckets:
+        sensors = sensor_lookup.get(bucket, {})
+        relays = relay_by_bucket.get(bucket, {i: 0 for i in range(1, 10)})
+        row_data = {
+            'timestamp': bucket,
+            'ph': sensors.get('ph', ''),
+            'do_mg_l': sensors.get('do_mg_l', ''),
+            'tds_ppm': sensors.get('tds_ppm', ''),
+            'temperature_c': sensors.get('temperature_c', ''),
+            'humidity': sensors.get('humidity', ''),
+        }
+        for i in range(1, 10):
+            col = f'relay{i}_{relay_labels.get(i, f"R{i}")}'
+            row_data[col] = 'ON' if relays.get(i, 0) == 1 else 'OFF'
+        csv_rows.append(row_data)
+
+    fmt = request.args.get('format', 'csv')
+    if fmt == 'json':
+        return jsonify({"headers": headers, "rows": csv_rows, "count": len(csv_rows)})
+
+    output = io.StringIO()
+    writer = csv_mod.DictWriter(output, fieldnames=headers)
+    writer.writeheader()
+    writer.writerows(csv_rows)
+
+    return app.response_class(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename=siboltech_sensor_actuator_{datetime.now().strftime("%Y%m%d")}.csv'}
+    )
+
+
 @app.route("/api/predict", methods=["GET", "POST"])
 def predict_growth():
     """Predict plant growth using trained ML models.

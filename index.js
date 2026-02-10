@@ -1437,9 +1437,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		}
 	}
 
-	// ── Download Training Data CSV button ───────────────────────
-	(function initDownloadTrainingData(){
-		const btn = document.getElementById('downloadTrainingData');
+	// ── Download ML Training CSV button ─────────────────────────
+	(function initDownloadMLTraining(){
+		const btn = document.getElementById('downloadMLTraining');
 		if (!btn) return;
 
 		btn.addEventListener('click', async () => {
@@ -1447,104 +1447,209 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			btn.textContent = '⏳ Preparing…';
 
 			try {
-				// On Vercel (static hosting), build CSV from Firebase data
 				if (isStaticHosting() && window.loadSensorHistory && window.loadPlantHistory) {
-					// Fetch all history from Firebase
-					const sensorData = await window.loadSensorHistory(5000);
+					// Firebase path: build CSV client-side from Firebase data
+					const sensorData = await window.loadSensorHistory(10000);
 					const plantAero = await window.loadPlantHistory('aeroponics', 5000);
 					const plantDwc = await window.loadPlantHistory('dwc', 5000);
-					const plantTrad = await window.loadPlantHistory('traditional', 5000);
-					const allPlant = [...(plantAero || []), ...(plantDwc || []), ...(plantTrad || [])];
+					const allPlant = [...(plantAero || []), ...(plantDwc || [])];
 
-					if (!allPlant.length) {
-						showToast('No plant data to export. Enter measurements in the Training tab first.', 'warning');
-						return;
-					}
-
-					// Build CSV headers
 					const headers = [
-						'day', 'day_num', 'plant_id', 'farming_system',
-						'height', 'length', 'width', 'leaf_count', 'branch_count',
-						'avg_temperature', 'avg_humidity', 'avg_ph', 'avg_tds', 'avg_do',
-						'relay_4_hours', 'relay_5_hours', 'relay_6_hours',
-						'relay_7_hours', 'relay_8_hours', 'relay_9_hours'
+						'timestamp', 'day', 'farming_system',
+						'ave_ph', 'ave_do', 'ave_tds', 'ave_temp', 'ave_humidity',
+						'Leaves', 'Branches', 'Weight', 'Length', 'Height'
 					];
 
-					// Build sensor lookup by date
-					const sensorByDate = {};
+					// Group sensor data into 15-min buckets
+					const sensorBuckets = {};
 					if (sensorData && sensorData.length) {
 						sensorData.forEach(s => {
-							const dayKey = (s.timestamp || '').substring(0, 10);
-							if (!dayKey) return;
-							if (!sensorByDate[dayKey]) sensorByDate[dayKey] = {};
-							if (s.ph !== undefined) sensorByDate[dayKey].avg_ph = s.ph;
-							if (s.do !== undefined) sensorByDate[dayKey].avg_do = s.do;
-							if (s.tds !== undefined) sensorByDate[dayKey].avg_tds = s.tds;
-							if (s.temperature !== undefined) sensorByDate[dayKey].avg_temperature = s.temperature;
-							if (s.humidity !== undefined) sensorByDate[dayKey].avg_humidity = s.humidity;
+							const ts = s.timestamp || '';
+							if (!ts) return;
+							// Bucket: YYYY-MM-DD HH:MM (round down to 15)
+							const dt = new Date(ts);
+							const min15 = Math.floor(dt.getMinutes() / 15) * 15;
+							const bucket = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${min15}`;
+							if (!sensorBuckets[bucket]) sensorBuckets[bucket] = { ph: [], do: [], tds: [], temp: [], hum: [] };
+							if (s.ph !== undefined) sensorBuckets[bucket].ph.push(s.ph);
+							if (s.do !== undefined) sensorBuckets[bucket].do.push(s.do);
+							if (s.tds !== undefined) sensorBuckets[bucket].tds.push(s.tds);
+							if (s.temperature !== undefined) sensorBuckets[bucket].temp.push(s.temperature);
+							if (s.humidity !== undefined) sensorBuckets[bucket].hum.push(s.humidity);
 						});
 					}
 
-					// Collect unique dates for day_num
-					const allDates = [...new Set(allPlant.map(p => (p.timestamp || '').substring(0, 10)))].sort();
-					const dayNumMap = {};
-					allDates.forEach((d, i) => { dayNumMap[d] = i + 1; });
+					// Average helper
+					const avg = arr => arr.length ? (arr.reduce((a,b) => a+b, 0) / arr.length).toFixed(4) : '-';
 
-					// Default relay schedule
-					const defaultRelay = {
-						relay_4_hours: 0.33, relay_5_hours: 8, relay_6_hours: 12,
-						relay_7_hours: 24, relay_8_hours: 12, relay_9_hours: 8
-					};
-
-					// Build rows
-					let csvContent = headers.join(',') + '\n';
+					// Build plant lookup by bucket + system
+					const plantLookup = {};
 					allPlant.forEach(p => {
-						const dayKey = (p.timestamp || '').substring(0, 10);
-						const sensors = sensorByDate[dayKey] || {};
-						const sys = p.farming_system || 'aeroponics';
-						const row = [
-							dayKey,
-							dayNumMap[dayKey] || 0,
-							p.plant_id || '',
-							sys,
-							p.height || '', p.length || '', p.width || p.weight || '',
-							p.leaves || p.leaf_count || '', p.branches || p.branch_count || '',
-							sensors.avg_temperature || '', sensors.avg_humidity || '',
-							sensors.avg_ph || '', sensors.avg_tds || '', sensors.avg_do || '',
-							sys === 'aeroponics' ? defaultRelay.relay_4_hours : 0,
-							defaultRelay.relay_5_hours, defaultRelay.relay_6_hours,
-							defaultRelay.relay_7_hours, defaultRelay.relay_8_hours,
-							defaultRelay.relay_9_hours
-						];
-						csvContent += row.join(',') + '\n';
+						const ts = p.timestamp || '';
+						if (!ts) return;
+						const dt = new Date(ts);
+						const min15 = Math.floor(dt.getMinutes() / 15) * 15;
+						const bucket = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${min15}`;
+						const key = `${bucket}|${p.farming_system || 'aeroponics'}`;
+						plantLookup[key] = p;
 					});
 
-					// Trigger download
+					// Day numbering
+					const allBuckets = Object.keys(sensorBuckets).sort();
+					const firstDay = allBuckets.length ? allBuckets[0].substring(0, 10) : '';
+					const dayNum = (bucket) => {
+						const d1 = new Date(firstDay);
+						const d2 = new Date(bucket.substring(0, 10));
+						return Math.floor((d2 - d1) / 86400000) + 1;
+					};
+
+					const systems = ['aeroponics', 'dwc'];
+					let csvContent = headers.join(',') + '\n';
+					allBuckets.forEach(bucket => {
+						const s = sensorBuckets[bucket];
+						systems.forEach(fs => {
+							const plant = plantLookup[`${bucket}|${fs}`] || {};
+							const row = [
+								bucket,
+								dayNum(bucket),
+								fs,
+								avg(s.ph), avg(s.do), avg(s.tds), avg(s.temp), avg(s.hum),
+								plant.leaves || plant.leaf_count || '-',
+								plant.branches || plant.branch_count || '-',
+								plant.weight || '-',
+								plant.length || '-',
+								plant.height || '-'
+							];
+							csvContent += row.join(',') + '\n';
+						});
+					});
+
 					const blob = new Blob([csvContent], { type: 'text/csv' });
 					const url = URL.createObjectURL(blob);
 					const a = document.createElement('a');
 					a.href = url;
-					a.download = `siboltech_training_data_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.csv`;
+					a.download = `siboltech_ml_training_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.csv`;
 					a.click();
 					URL.revokeObjectURL(url);
-					showToast(`Exported ${allPlant.length} plant records to CSV`, 'success');
-
+					showToast(`Exported ${allBuckets.length * 2} rows to ML Training CSV`, 'success');
 				} else {
-					// On RPi with API available
+					// RPi API path
 					await waitForAPIUrl();
-					const url = `${RELAY_API_URL}/export-training-data`;
 					const a = document.createElement('a');
-					a.href = url;
+					a.href = `${RELAY_API_URL}/export-ml-training`;
 					a.download = '';
 					a.click();
-					showToast('Downloading training data CSV…', 'success');
+					showToast('Downloading ML Training CSV…', 'success');
 				}
 			} catch (err) {
-				console.error('[Download] Error:', err);
-				showToast('Failed to export training data: ' + err.message, 'error');
+				console.error('[Download ML] Error:', err);
+				showToast('Failed to export ML training data: ' + err.message, 'error');
 			} finally {
 				btn.disabled = false;
-				btn.innerHTML = '<span style="font-size:16px;">📥</span> Download Training Data (CSV)';
+				btn.textContent = '⬇ ML Training CSV';
+			}
+		});
+	})();
+
+	// ── Download Sensor + Actuator CSV button ───────────────────
+	(function initDownloadSensorActuator(){
+		const btn = document.getElementById('downloadSensorActuator');
+		if (!btn) return;
+
+		btn.addEventListener('click', async () => {
+			btn.disabled = true;
+			btn.textContent = '⏳ Preparing…';
+
+			try {
+				if (isStaticHosting() && window.loadSensorHistory && window.loadActuatorHistory) {
+					// Firebase path
+					const sensorData = await window.loadSensorHistory(10000);
+					const actuatorData = await window.loadActuatorHistory(10000);
+
+					const relayLabels = {1:'Misting',2:'AirPump',3:'ExhaustIN',4:'ExhaustOUT',5:'LightsAero',6:'LightsDWC',7:'pHUp',8:'pHDown',9:'LeafyGreen'};
+					const relayHeaders = [];
+					for (let i = 1; i <= 9; i++) relayHeaders.push(`relay${i}_${relayLabels[i]}`);
+					const headers = ['timestamp','ph','do_mg_l','tds_ppm','temperature_c','humidity'].concat(relayHeaders);
+
+					// Group sensors into 15-min buckets
+					const sensorBuckets = {};
+					const allBuckets = [];
+					if (sensorData && sensorData.length) {
+						sensorData.forEach(s => {
+							const ts = s.timestamp || '';
+							if (!ts) return;
+							const dt = new Date(ts);
+							const min15 = Math.floor(dt.getMinutes() / 15) * 15;
+							const bucket = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${min15}`;
+							if (!sensorBuckets[bucket]) { sensorBuckets[bucket] = { ph:[], do:[], tds:[], temp:[], hum:[] }; allBuckets.push(bucket); }
+							if (s.ph !== undefined) sensorBuckets[bucket].ph.push(s.ph);
+							if (s.do !== undefined) sensorBuckets[bucket].do.push(s.do);
+							if (s.tds !== undefined) sensorBuckets[bucket].tds.push(s.tds);
+							if (s.temperature !== undefined) sensorBuckets[bucket].temp.push(s.temperature);
+							if (s.humidity !== undefined) sensorBuckets[bucket].hum.push(s.humidity);
+						});
+					}
+					const uniqueBuckets = [...new Set(allBuckets)].sort();
+					const avg = arr => arr.length ? (arr.reduce((a,b) => a+b, 0) / arr.length).toFixed(4) : '';
+
+					// Build relay state per bucket (carry-forward)
+					const relayState = {};
+					for (let i = 1; i <= 9; i++) relayState[i] = 'OFF';
+					const relayEvents = [];
+					if (actuatorData && actuatorData.length) {
+						actuatorData.forEach(e => {
+							const ts = e.timestamp || '';
+							if (!ts) return;
+							const dt = new Date(ts);
+							const min15 = Math.floor(dt.getMinutes() / 15) * 15;
+							const bucket = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${min15}`;
+							relayEvents.push({ bucket, relay: e.relay_id, state: e.state ? 'ON' : 'OFF' });
+						});
+						relayEvents.sort((a,b) => a.bucket.localeCompare(b.bucket));
+					}
+
+					let evtIdx = 0;
+					const relayByBucket = {};
+					uniqueBuckets.forEach(bucket => {
+						while (evtIdx < relayEvents.length && relayEvents[evtIdx].bucket <= bucket) {
+							relayState[relayEvents[evtIdx].relay] = relayEvents[evtIdx].state;
+							evtIdx++;
+						}
+						relayByBucket[bucket] = {...relayState};
+					});
+
+					let csvContent = headers.join(',') + '\n';
+					uniqueBuckets.forEach(bucket => {
+						const s = sensorBuckets[bucket] || { ph:[], do:[], tds:[], temp:[], hum:[] };
+						const r = relayByBucket[bucket] || {};
+						const row = [bucket, avg(s.ph), avg(s.do), avg(s.tds), avg(s.temp), avg(s.hum)];
+						for (let i = 1; i <= 9; i++) row.push(r[i] || 'OFF');
+						csvContent += row.join(',') + '\n';
+					});
+
+					const blob = new Blob([csvContent], { type: 'text/csv' });
+					const url = URL.createObjectURL(blob);
+					const a = document.createElement('a');
+					a.href = url;
+					a.download = `siboltech_sensor_actuator_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.csv`;
+					a.click();
+					URL.revokeObjectURL(url);
+					showToast(`Exported ${uniqueBuckets.length} rows to Sensor+Actuator CSV`, 'success');
+				} else {
+					// RPi API path
+					await waitForAPIUrl();
+					const a = document.createElement('a');
+					a.href = `${RELAY_API_URL}/export-sensor-actuator`;
+					a.download = '';
+					a.click();
+					showToast('Downloading Sensor+Actuator CSV…', 'success');
+				}
+			} catch (err) {
+				console.error('[Download S+A] Error:', err);
+				showToast('Failed to export sensor/actuator data: ' + err.message, 'error');
+			} finally {
+				btn.disabled = false;
+				btn.textContent = '⬇ Sensor+Actuator CSV';
 			}
 		});
 	})();
