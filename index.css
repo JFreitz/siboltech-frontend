@@ -3047,8 +3047,9 @@ body.sidebar-collapsed .brand{
 
 /* Connection Status Dot (inside topbar clock) */
 .conn-dot {
-	width: 7px;
-	height: 7px;
+	display: inline-block;
+	width: 9px;
+	height: 9px;
 	border-radius: 50%;
 	background: #9aa49a;
 	flex-shrink: 0;
@@ -3057,12 +3058,12 @@ body.sidebar-collapsed .brand{
 
 .conn-dot.connected {
 	background: #22c55e;
-	box-shadow: 0 0 4px rgba(34, 197, 94, 0.5);
+	box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
 }
 
 .conn-dot.disconnected {
 	background: #ef4444;
-	box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);
+	box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
 	animation: blink-dot 1.5s infinite;
 }
 
