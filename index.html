@@ -21,11 +21,8 @@
 		</div>
 		
 		<div class="topbar-right">
-			<div id="connectionStatus" class="connection-status" title="System status">
-				<span class="connection-dot"></span>
-				<span class="connection-label">Connecting…</span>
-			</div>
 			<div id="topbarClock" class="topbar-clock" aria-live="polite">
+				<span id="connectionDot" class="conn-dot" title="Connecting…"></span>
 				<div id="topbarTime" class="topbar-time">--:--:--</div>
 				<div id="topbarDate" class="topbar-date">----</div>
 			</div>
@@ -918,11 +915,6 @@
 
 		<section id="history" class="tab-content">
 			<div class="history-board">
-				<div class="history-actions">
-					<button id="downloadTrainingData" class="history-download-btn">
-						<span>��</span> Download CSV
-					</button>
-				</div>
 				<ul class="calibrate-tabs" id="historyTabs">
 					<li class="calibrate-tab-btn active" data-history-tab="aero" id="historyTabAero">Aeroponics</li>
 					<li class="calibrate-tab-btn" data-history-tab="dwc" id="historyTabDwc">Deep Water Culture</li>
@@ -942,6 +934,7 @@
 					<div class="history-frequency" >
 						<button class="history-chip active">Daily</button>
 						<button class="history-chip">15-min</button>
+						<button id="downloadTrainingData" class="history-chip history-download-chip">⬇ Download CSV</button>
 					</div>
 				</div>
 

@@ -3045,61 +3045,25 @@ body.sidebar-collapsed .brand{
 	gap:16px;
 }
 
-/* Connection Status Indicator */
-.connection-status {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	padding: 4px 12px;
-	border-radius: 20px;
-	background: rgba(255, 255, 255, 0.15);
-	border: 1px solid rgba(255, 255, 255, 0.25);
-	backdrop-filter: blur(8px);
-	-webkit-backdrop-filter: blur(8px);
-	transition: all 0.4s ease;
-	cursor: default;
-}
-
-.connection-dot {
-	width: 8px;
-	height: 8px;
+/* Connection Status Dot (inside topbar clock) */
+.conn-dot {
+	width: 7px;
+	height: 7px;
 	border-radius: 50%;
-	background: #f59e0b;
-	transition: background 0.4s ease, box-shadow 0.4s ease;
+	background: #9aa49a;
 	flex-shrink: 0;
+	transition: background 0.4s ease, box-shadow 0.4s ease;
 }
 
-.connection-label {
-	font-size: 11px;
-	font-weight: 600;
-	color: #9aa49a;
-	white-space: nowrap;
-	transition: color 0.4s ease;
-}
-
-/* Connected state */
-.connection-status.connected .connection-dot {
+.conn-dot.connected {
 	background: #22c55e;
-	box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
-}
-.connection-status.connected .connection-label {
-	color: #22c55e;
-}
-.connection-status.connected {
-	border-color: rgba(34, 197, 94, 0.3);
+	box-shadow: 0 0 4px rgba(34, 197, 94, 0.5);
 }
 
-/* Disconnected state */
-.connection-status.disconnected .connection-dot {
+.conn-dot.disconnected {
 	background: #ef4444;
-	box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+	box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);
 	animation: blink-dot 1.5s infinite;
-}
-.connection-status.disconnected .connection-label {
-	color: #ef4444;
-}
-.connection-status.disconnected {
-	border-color: rgba(239, 68, 68, 0.3);
 }
 
 @keyframes blink-dot {
@@ -3107,47 +3071,10 @@ body.sidebar-collapsed .brand{
 	50% { opacity: 0.3; }
 }
 
-/* History download button */
-.history-actions {
-	display: flex;
-	justify-content: flex-end;
-	margin-bottom: 10px;
-}
-
-.history-download-btn {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	padding: 8px 18px;
-	font-size: 13px;
-	font-weight: 600;
-	font-family: 'Poppins', sans-serif;
-	color: #2f3a2f;
-	background: rgba(255, 255, 255, 0.22);
-	backdrop-filter: blur(12px);
-	-webkit-backdrop-filter: blur(12px);
-	border: 1px solid rgba(255, 255, 255, 0.35);
-	border-radius: 12px;
-	cursor: pointer;
-	transition: all 0.25s ease;
-	white-space: nowrap;
-	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-.history-download-btn:hover {
-	background: linear-gradient(150deg, rgba(76, 175, 80, 0.35), rgba(76, 175, 80, 0.15));
-	border-color: rgba(76, 175, 80, 0.4);
-	transform: translateY(-1px);
-	box-shadow: 0 6px 16px rgba(76, 175, 80, 0.2);
-}
-
-.history-download-btn:active {
-	transform: translateY(0);
-}
-
-@media (max-width: 600px) {
-	.connection-label { display: none; }
-	.connection-status { padding: 4px 8px; }
+/* History download chip - matches history-chip style */
+.history-download-chip {
+	margin-left: 4px;
+	border-style: dashed;
 }
 
 .topbar-clock{
