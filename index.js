@@ -261,15 +261,10 @@ setTimeout(fetchSensorData, 200);
 
 // === Connection Status Indicator ===
 function updateConnectionStatus(isConnected) {
-    const dot = document.getElementById('connectionDot');
-    if (!dot) return;
-    if (isConnected) {
-        dot.className = 'conn-dot connected';
-        dot.title = 'System connected';
-    } else {
-        dot.className = 'conn-dot disconnected';
-        dot.title = 'System disconnected';
-    }
+    const el = document.getElementById('topbarTime');
+    if (!el) return;
+    el.classList.remove('connected', 'disconnected');
+    el.classList.add(isConnected ? 'connected' : 'disconnected');
 }
 
 // Stale-data watchdog: if no data for 15s, mark disconnected

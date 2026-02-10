@@ -3045,24 +3045,25 @@ body.sidebar-collapsed .brand{
 	gap:16px;
 }
 
-/* Connection Status Dot (in topbar-right) */
-.conn-dot {
-	width: 10px;
-	height: 10px;
-	min-width: 10px;
-	min-height: 10px;
+/* Connection Status Dot (pseudo-element on time) */
+.topbar-time::before {
+	content: '';
+	display: inline-block;
+	width: 8px;
+	height: 8px;
 	border-radius: 50%;
 	background: #9aa49a;
-	flex-shrink: 0;
+	margin-right: 6px;
+	vertical-align: middle;
 	transition: background 0.4s ease, box-shadow 0.4s ease;
 }
 
-.conn-dot.connected {
+.topbar-time.connected::before {
 	background: #22c55e;
 	box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
 }
 
-.conn-dot.disconnected {
+.topbar-time.disconnected::before {
 	background: #ef4444;
 	box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
 	animation: blink-dot 1.5s infinite;
