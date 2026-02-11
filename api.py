@@ -25,6 +25,66 @@ import serial
 from db import Base, SensorReading, PlantReading, ActuatorEvent
 from automation import init_controller, get_controller
 
+# === Firebase direct-push for near-instant dashboard updates ===
+_firebase_db = None
+_firebase_lock = threading.Lock()
+
+def _init_firebase():
+    """Lazy-init Firebase. Returns Firestore client or None."""
+    global _firebase_db
+    if _firebase_db is not None:
+        return _firebase_db
+    with _firebase_lock:
+        if _firebase_db is not None:
+            return _firebase_db
+        try:
+            import firebase_admin
+            from firebase_admin import credentials, firestore
+            sa_path = os.path.join(os.path.dirname(__file__), "firebase-service-account.json")
+            if not os.path.exists(sa_path):
+                print("[FIREBASE] No service account file, direct-push disabled")
+                _firebase_db = False  # sentinel: don't retry
+                return None
+            # Use a separate app name so it doesn't conflict with firebase_sync.py
+            try:
+                fb_app = firebase_admin.get_app("api-push")
+            except ValueError:
+                cred = credentials.Certificate(sa_path)
+                fb_app = firebase_admin.initialize_app(cred, name="api-push")
+            _firebase_db = firestore.client(app=fb_app)
+            print("[FIREBASE] Direct-push to Firestore enabled")
+            return _firebase_db
+        except Exception as e:
+            print(f"[FIREBASE] Init failed (direct-push disabled): {e}")
+            _firebase_db = False
+            return None
+
+def _firebase_push_latest(readings_dict: dict):
+    """Push latest readings to Firebase in background thread. Fire-and-forget."""
+    def _push():
+        try:
+            fb = _init_firebase()
+            if not fb:
+                return
+            from firebase_admin import firestore as fs
+            units = {"temperature_c": "C", "humidity": "%", "tds_ppm": "ppm", "ph": "pH", "do_mg_l": "mg/L"}
+            now_iso = datetime.now(timezone.utc).isoformat()
+            doc = {}
+            for sensor, value in readings_dict.items():
+                if sensor in units:
+                    doc[sensor] = {
+                        "value": value,
+                        "unit": units[sensor],
+                        "timestamp": now_iso,
+                    }
+            if doc:
+                doc["_updated"] = fs.SERVER_TIMESTAMP
+                doc["_source"] = "api-direct"
+                fb.collection("sensors").document("latest").set(doc, merge=True, timeout=5)
+        except Exception as e:
+            print(f"[FIREBASE] Push error: {e}")
+    threading.Thread(target=_push, daemon=True).start()
+
 
 app = Flask(__name__)
 # Enable CORS for all origins (allows Vercel frontend to access)
@@ -411,6 +471,9 @@ def ingest():
             controller.update_sensors(computed_readings)
     except Exception as e:
         print(f"[AUTOMATION] Failed to update sensors: {e}")
+
+    # Push to Firebase immediately (background, non-blocking)
+    _firebase_push_latest(computed_readings)
 
     return {"ok": True, "inserted": len(to_insert)}
 

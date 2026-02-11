@@ -40,7 +40,7 @@ SERVICE_ACCOUNT_FILE = os.getenv(
     "FIREBASE_SERVICE_ACCOUNT", 
     str(Path(__file__).parent / "firebase-service-account.json")
 )
-SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "5"))  # seconds (balance responsiveness vs quota)
+SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "3"))  # seconds (fast dashboard updates)
 BATCH_SIZE = 10  # Max readings per sync
 SERIAL_PORT = os.getenv("SERIAL_PORT", "/dev/ttyUSB0")
 BAUD_RATE = 115200
@@ -568,13 +568,12 @@ def main():
                         _relay_backoff_until = now_ts + RELAY_BACKOFF_SECS
                         print(f"    → backing off relay ops for {RELAY_BACKOFF_SECS}s")
             
-            # === PRIORITY 2: Sync latest readings every 2nd cycle (~10s) ===
-            if sync_count % 2 == 0:
-                try:
-                    if sync_latest_to_firebase(db, session):
-                        print("  ✅ Latest readings synced")
-                except Exception as e:
-                    print(f"  ⚠️ Latest sync error: {e}")
+            # === PRIORITY 2: Sync latest readings EVERY cycle for fast dashboard updates ===
+            try:
+                if sync_latest_to_firebase(db, session):
+                    print("  ✅ Latest readings synced")
+            except Exception as e:
+                print(f"  ⚠️ Latest sync error: {e}")
             
             # === LOW PRIORITY: Override mode every 6th cycle (~30s) ===
             if sync_count % 6 == 0 and now_ts >= _override_backoff_until:

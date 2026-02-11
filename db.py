@@ -6,8 +6,23 @@ from sqlalchemy.sql import func
 
 _DEFAULT_SQLITE_PATH = os.path.join(os.path.dirname(__file__), "sensors.db")
 DB_URL = os.getenv("DATABASE_URL", f"sqlite:///{_DEFAULT_SQLITE_PATH}")
-engine = create_engine(DB_URL, echo=False, future=True)
+
+_connect_args = {}
+if DB_URL.startswith("sqlite"):
+    _connect_args["timeout"] = 10  # Wait up to 10s for locks instead of failing immediately
+
+engine = create_engine(DB_URL, echo=False, future=True, connect_args=_connect_args)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+# Enable WAL mode for SQLite (allows concurrent reads + writes)
+if DB_URL.startswith("sqlite"):
+    from sqlalchemy import event
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragma(dbapi_conn, connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=10000")
+        cursor.close()
 Base = declarative_base()
 
 class SensorReading(Base):
