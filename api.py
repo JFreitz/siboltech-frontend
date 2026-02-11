@@ -59,9 +59,28 @@ def _init_firebase():
             _firebase_db = False
             return None
 
+_last_firebase_push_ts = 0
+_FIREBASE_PUSH_INTERVAL = 3  # Push at most once every 3 seconds (quota-safe)
+_firebase_push_backoff_until = 0  # auto-disable on 429
+_firebase_push_fails = 0
+
 def _firebase_push_latest(readings_dict: dict):
-    """Push latest readings to Firebase in background thread. Fire-and-forget."""
+    """Push latest readings to Firebase in background thread.
+    Throttled to 1 push per 3s.  Auto-disables on 429 with exponential backoff."""
+    global _last_firebase_push_ts, _firebase_push_backoff_until, _firebase_push_fails
+    import time as _time
+    now = _time.time()
+    if now - _last_firebase_push_ts < _FIREBASE_PUSH_INTERVAL:
+        return  # Throttle
+    # Skip if disabled by env or quota backoff
+    if os.getenv("FIREBASE_DIRECT_PUSH", "1") == "0":
+        return
+    if now < _firebase_push_backoff_until:
+        return  # Still in quota backoff
+    _last_firebase_push_ts = now
+
     def _push():
+        global _firebase_push_backoff_until, _firebase_push_fails
         try:
             fb = _init_firebase()
             if not fb:
@@ -81,8 +100,16 @@ def _firebase_push_latest(readings_dict: dict):
                 doc["_updated"] = fs.SERVER_TIMESTAMP
                 doc["_source"] = "api-direct"
                 fb.collection("sensors").document("latest").set(doc, merge=True, timeout=5)
+                _firebase_push_fails = 0  # reset on success
         except Exception as e:
-            print(f"[FIREBASE] Push error: {e}")
+            err_s = str(e)
+            if "429" in err_s or "Quota" in err_s or "RESOURCE_EXHAUSTED" in err_s:
+                _firebase_push_fails += 1
+                backoff = min(300, 5 * (2 ** (_firebase_push_fails - 1)))  # 5,10,20,40,80,160,300
+                _firebase_push_backoff_until = _time.time() + backoff
+                print(f"[FIREBASE] 429 quota hit — auto-disabling push for {backoff}s")
+            else:
+                print(f"[FIREBASE] Push error: {e}")
     threading.Thread(target=_push, daemon=True).start()
 
 

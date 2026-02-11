@@ -29,9 +29,9 @@ except ImportError:
     print("ERROR: firebase-admin not installed. Run: pip install firebase-admin")
     exit(1)
 
-# Short timeout + retry for Firestore operations to avoid 120s+ hangs on quota errors
-FIRESTORE_TIMEOUT = 3   # seconds (RPC deadline)
-FIRESTORE_RETRY = Retry(deadline=3, initial=0.5, maximum=2)  # retry for max 3s total
+# Firestore timeout — keep short to fail fast on 429 (backoff handles retries)
+FIRESTORE_TIMEOUT = 8     # seconds (RPC deadline)
+FIRESTORE_RETRY = Retry(deadline=8, initial=0.5, maximum=2)  # fast fail, don't wait
 
 from db import SensorReading, ActuatorEvent, init_db, get_session
 
@@ -40,11 +40,64 @@ SERVICE_ACCOUNT_FILE = os.getenv(
     "FIREBASE_SERVICE_ACCOUNT", 
     str(Path(__file__).parent / "firebase-service-account.json")
 )
-SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "5"))  # seconds (history/relay sync only, latest pushed by api.py)
-BATCH_SIZE = 50  # Max readings per sync (Firestore batch limit 500)
+SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "5"))  # seconds
+BATCH_SIZE = 10  # Keep small — only new data flows in, no backlog
 SERIAL_PORT = os.getenv("SERIAL_PORT", "/dev/ttyUSB0")
 BAUD_RATE = 115200
 CALIBRATION_FILE = Path(__file__).parent / "calibration.json"
+
+# ---------------------------------------------------------------------------
+# Quota-aware backoff — automatically throttle when Firestore returns 429
+# ---------------------------------------------------------------------------
+class QuotaTracker:
+    """Global exponential backoff for Firestore 429 / timeout errors.
+    
+    Maintains per-operation backoff counters and a global 'quota_ok' flag.
+    Any successful Firestore call should call .success() to reset the flag.
+    Any 429/timeout should call .fail(op_name) to engage backoff.
+    """
+    BACKOFF_STEPS = [5, 15, 30, 60, 120, 300]  # seconds
+
+    def __init__(self):
+        self._counters: dict[str, int] = {}       # op -> consecutive fail count
+        self._backoff_until: dict[str, float] = {} # op -> timestamp to resume
+        self.quota_ok = True                       # global: any op succeeding?
+        self._consec_global_fails = 0
+
+    def should_skip(self, op: str) -> bool:
+        return time.time() < self._backoff_until.get(op, 0)
+
+    def fail(self, op: str, err: Exception | str = ""):
+        n = self._counters.get(op, 0) + 1
+        self._counters[op] = n
+        idx = min(n - 1, len(self.BACKOFF_STEPS) - 1)
+        wait = self.BACKOFF_STEPS[idx]
+        self._backoff_until[op] = time.time() + wait
+        self._consec_global_fails += 1
+        if self._consec_global_fails >= 3:
+            self.quota_ok = False
+        print(f"    → backoff {op} for {wait}s (fail #{n})")
+
+    def success(self, op: str = ""):
+        if op:
+            self._counters[op] = 0
+            self._backoff_until[op] = 0
+        self._consec_global_fails = 0
+        self.quota_ok = True
+
+    def current_wait(self, op: str) -> int:
+        until = self._backoff_until.get(op, 0)
+        remaining = until - time.time()
+        return max(0, int(remaining))
+
+quota = QuotaTracker()
+
+
+def _is_quota_error(e: Exception) -> bool:
+    """Return True if the error is a Firestore quota / rate-limit / overload issue."""
+    s = str(e)
+    return any(k in s for k in ("429", "Quota", "RESOURCE_EXHAUSTED", "503", "504", "Deadline"))
+
 
 # Global serial connection (shared with relay control)
 serial_lock = threading.Lock()
@@ -542,67 +595,96 @@ def main():
     print("✅ Calibration synced to Firebase")
     
     sync_count = 0
-    # Backoff timestamps: skip slow ops after they fail (quota errors)
-    _relay_backoff_until = 0
-    _override_backoff_until = 0
-    _calmode_backoff_until = 0
-    RELAY_BACKOFF_SECS = 10   # short backoff for relays (user-facing, needs responsiveness)
-    OTHER_BACKOFF_SECS = 300  # 5 min backoff for override/cal mode (rarely used)
     
     while True:
         try:
             sync_count += 1
-            now_ts = time.time()
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] Sync #{sync_count}...")
+            ts_str = datetime.now().strftime('%H:%M:%S')
+
+            # When quota is NOT ok, slow the loop to avoid hammering
+            if not quota.quota_ok:
+                relay_wait = quota.current_wait("relay")
+                print(f"[{ts_str}] ⏳ Quota exhausted — waiting {relay_wait}s before retry...")
+                time.sleep(max(SYNC_INTERVAL, relay_wait))
+                # Probe with a lightweight read to see if quota recovered
+                try:
+                    from google.api_core.retry import Retry as _Retry
+                    _probe_retry = _Retry(deadline=5, initial=0.5, maximum=2)
+                    db.collection("relay_commands").limit(1).get(
+                        timeout=5, retry=_probe_retry
+                    )
+                    quota.success("probe")
+                    print(f"  ✅ Quota recovered!")
+                except Exception as e:
+                    if _is_quota_error(e) or "Timeout" in str(e):
+                        quota.fail("relay", e)  # keeps escalating backoff
+                        continue  # skip this cycle entirely
+                    # Non-quota error (DNS etc) — also back off
+                    print(f"  ⚠️ Probe failed (non-quota): {e}")
+                    time.sleep(SYNC_INTERVAL)
+                    continue
+
+            print(f"[{ts_str}] Sync #{sync_count}...")
             
-            # === PRIORITY 1: Relay commands ONLY (minimal quota usage) ===
-            if now_ts >= _relay_backoff_until:
+            # === PRIORITY 1: Relay commands (every cycle when quota ok) ===
+            if not quota.should_skip("relay"):
                 try:
                     had_commands = process_relay_commands(db)
-                    # Only sync relay status to Firebase when a command was executed
+                    quota.success("relay")
                     if had_commands:
                         sync_relay_status_to_firebase(db)
                 except Exception as e:
                     print(f"  ⚠️ Relay error: {e}")
-                    if "429" in str(e) or "Quota" in str(e) or "Timeout" in str(e):
-                        _relay_backoff_until = now_ts + RELAY_BACKOFF_SECS
-                        print(f"    → backing off relay ops for {RELAY_BACKOFF_SECS}s")
+                    if _is_quota_error(e):
+                        quota.fail("relay", e)
+                    elif "Timeout" in str(e):
+                        quota.fail("relay", e)  # timeout likely means 429-throttled
             
-            # NOTE: Latest readings are now pushed directly by api.py on ingest
-            # firebase_sync only handles history, relays, override, calibration
+            # NOTE: Latest readings pushed directly by api.py on ingest
             
             # === LOW PRIORITY: Override mode every 6th cycle (~30s) ===
-            if sync_count % 6 == 0 and now_ts >= _override_backoff_until:
+            if sync_count % 6 == 0 and not quota.should_skip("override"):
                 try:
                     last_override_state = check_override_mode(db, last_override_state)
+                    quota.success("override")
                 except Exception as e:
-                    if "429" in str(e) or "Quota" in str(e) or "Timeout" in str(e):
-                        _override_backoff_until = now_ts + OTHER_BACKOFF_SECS
-                        print(f"    → backing off override ops for {OTHER_BACKOFF_SECS}s")
+                    if _is_quota_error(e) or "Timeout" in str(e):
+                        quota.fail("override", e)
             
             # === LOW PRIORITY: Cal mode every 10th cycle (~50s) ===
-            if sync_count % 10 == 0 and now_ts >= _calmode_backoff_until:
+            if sync_count % 10 == 0 and not quota.should_skip("calmode"):
                 try:
                     last_cal_mode_state = check_calibration_mode(db, last_cal_mode_state)
+                    quota.success("calmode")
                 except Exception as e:
-                    if "429" in str(e) or "Quota" in str(e) or "Timeout" in str(e):
-                        _calmode_backoff_until = now_ts + OTHER_BACKOFF_SECS
-                        print(f"    → backing off cal mode ops for {OTHER_BACKOFF_SECS}s")
+                    if _is_quota_error(e) or "Timeout" in str(e):
+                        quota.fail("calmode", e)
             
-            # Sync history (for charts) - every 5 syncs
-            if sync_count % 5 == 0:
-                new_ts = sync_history_to_firebase(db, session, last_sync_ts)
-                if new_ts > last_sync_ts:
-                    last_sync_ts = new_ts
-                    save_last_sync_ts(last_sync_ts)
-                # Also sync actuator events
-                new_act_ts = sync_actuator_events_to_firebase(db, session, last_actuator_sync_ts)
-                if new_act_ts > last_actuator_sync_ts:
-                    last_actuator_sync_ts = new_act_ts
+            # === History sync every 12th cycle (~60s), skip if paused or quota bad ===
+            if (sync_count % 12 == 0
+                    and quota.quota_ok
+                    and os.getenv("FIREBASE_PAUSE_HISTORY", "0") != "1"):
+                try:
+                    new_ts = sync_history_to_firebase(db, session, last_sync_ts)
+                    if new_ts > last_sync_ts:
+                        last_sync_ts = new_ts
+                        save_last_sync_ts(last_sync_ts)
+                    new_act_ts = sync_actuator_events_to_firebase(db, session, last_actuator_sync_ts)
+                    if new_act_ts > last_actuator_sync_ts:
+                        last_actuator_sync_ts = new_act_ts
+                except Exception as e:
+                    print(f"  ⚠️ History sync error: {e}")
+                    if _is_quota_error(e) or "Timeout" in str(e):
+                        quota.fail("history", e)
             
-            # Check for calibration updates (every 15 syncs = ~30s)
-            if sync_count % 15 == 0:
-                last_cal_check = check_calibration_updates(db, last_cal_check)
+            # === Calibration updates every 15th cycle ===
+            if sync_count % 15 == 0 and not quota.should_skip("cal_update"):
+                try:
+                    last_cal_check = check_calibration_updates(db, last_cal_check)
+                    quota.success("cal_update")
+                except Exception as e:
+                    if _is_quota_error(e) or "Timeout" in str(e):
+                        quota.fail("cal_update", e)
             
             time.sleep(SYNC_INTERVAL)
             
