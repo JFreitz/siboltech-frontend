@@ -60,7 +60,7 @@ def _init_firebase():
             return None
 
 _last_firebase_push_ts = 0
-_FIREBASE_PUSH_INTERVAL = 3  # Push at most once every 3 seconds (quota-safe)
+_FIREBASE_PUSH_INTERVAL = 10  # Push at most once every 10s (8,640 writes/day — fits Spark plan)
 _firebase_push_backoff_until = 0  # auto-disable on 429
 _firebase_push_fails = 0
 

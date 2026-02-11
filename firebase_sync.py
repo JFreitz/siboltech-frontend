@@ -660,8 +660,9 @@ def main():
                     if _is_quota_error(e) or "Timeout" in str(e):
                         quota.fail("calmode", e)
             
-            # === History sync every 12th cycle (~60s), skip if paused or quota bad ===
-            if (sync_count % 12 == 0
+            # === History sync every 60th cycle (~5min), skip if paused or quota bad ===
+            # At BATCH_SIZE=10 every 5min ≈ 2,880 writes/day (fits Spark plan)
+            if (sync_count % 60 == 0
                     and quota.quota_ok
                     and os.getenv("FIREBASE_PAUSE_HISTORY", "0") != "1"):
                 try:
