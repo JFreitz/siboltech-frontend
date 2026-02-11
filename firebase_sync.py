@@ -40,8 +40,8 @@ SERVICE_ACCOUNT_FILE = os.getenv(
     "FIREBASE_SERVICE_ACCOUNT", 
     str(Path(__file__).parent / "firebase-service-account.json")
 )
-SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "3"))  # seconds (fast dashboard updates)
-BATCH_SIZE = 10  # Max readings per sync
+SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "5"))  # seconds (history/relay sync only, latest pushed by api.py)
+BATCH_SIZE = 50  # Max readings per sync (Firestore batch limit 500)
 SERIAL_PORT = os.getenv("SERIAL_PORT", "/dev/ttyUSB0")
 BAUD_RATE = 115200
 CALIBRATION_FILE = Path(__file__).parent / "calibration.json"
@@ -568,12 +568,8 @@ def main():
                         _relay_backoff_until = now_ts + RELAY_BACKOFF_SECS
                         print(f"    → backing off relay ops for {RELAY_BACKOFF_SECS}s")
             
-            # === PRIORITY 2: Sync latest readings EVERY cycle for fast dashboard updates ===
-            try:
-                if sync_latest_to_firebase(db, session):
-                    print("  ✅ Latest readings synced")
-            except Exception as e:
-                print(f"  ⚠️ Latest sync error: {e}")
+            # NOTE: Latest readings are now pushed directly by api.py on ingest
+            # firebase_sync only handles history, relays, override, calibration
             
             # === LOW PRIORITY: Override mode every 6th cycle (~30s) ===
             if sync_count % 6 == 0 and now_ts >= _override_backoff_until:
