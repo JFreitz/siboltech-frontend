@@ -481,12 +481,18 @@ setInterval(() => {
 		if (outSlope) outSlope.textContent = Number.isFinite(slope) ? slope.toFixed(2) : '0.00';
 		if (outOffset) outOffset.textContent = Number.isFinite(offset) ? offset.toFixed(2) : '0.00';
 
-		// Update display values for all sensors (pH, DO, TDS)
-		if (config.displayIds) {
-			Object.entries(config.displayIds).forEach(([key, id]) => {
-				const el = document.getElementById(id);
-				if (el && lastPoint[key] !== undefined) {
-					el.textContent = Number.isFinite(lastPoint[key]) ? lastPoint[key].toFixed(2) : '0.00';
+		// Update capture point displays with voltage values
+		if (sensorType === 'ph' || sensorType === 'do') {
+			data.forEach((point, idx) => {
+				const pointNum = idx + 1;
+				const voltageEl = document.getElementById(`${sensorType}Point${pointNum}Voltage`);
+				if (voltageEl && point.voltage !== undefined) {
+					voltageEl.textContent = Number.isFinite(point.voltage) ? point.voltage.toFixed(2) : '--';
+				}
+				const statusEl = document.getElementById(`${sensorType}Point${pointNum}Status`);
+				if (statusEl) {
+					statusEl.textContent = 'Captured';
+					statusEl.style.color = '#4caf50';
 				}
 			});
 		}
