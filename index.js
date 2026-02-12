@@ -1171,9 +1171,181 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			const plantTableWrap = historyBoard.querySelector('[data-history-view="plant"]');
 			const actuatorTableWrap = historyBoard.querySelector('[data-history-view="actuator"]');
 			
-			// Always use API for history (saves Firebase quota - no getDocs reads)
-			// On local: uses local API
-			// On Vercel: uses remote API if configured via localStorage
+			// Use Firebase on static hosting (Vercel) with quota optimization
+			if (isStaticHosting() && window.loadPlantHistory) {
+				// Normalize interval for bucketing
+				let interval = historyState.interval.toLowerCase();
+				if (interval === '15-min') interval = '15min';
+
+				// Helper: bucket a Date to either daily or 15-min key
+				const bucketKey = (d) => {
+					if (!(d instanceof Date)) d = new Date(d);
+					if (interval === '15min') {
+						const m = Math.floor(d.getMinutes() / 15) * 15;
+						return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+					}
+					return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+				};
+
+				try {
+					// --- PLANT HISTORY ---
+					if (plantTableWrap) {
+						// QUOTA OPTIMIZATION: Reduce limit from 500 to 100, cache results
+						const cacheKey = `plantHistory_${farmingSystem}_${plant}`;
+						let sensorReadings = [];
+						let plantReadings = [];
+						
+						// Try cache first (5 min validity)
+						const cached = sessionStorage.getItem(cacheKey);
+						if (cached) {
+							const { data, timestamp } = JSON.parse(cached);
+							if (Date.now() - timestamp < 5 * 60 * 1000) {
+								sensorReadings = data.sensorReadings || [];
+								plantReadings = data.plantReadings || [];
+							} else {
+								sessionStorage.removeItem(cacheKey);
+							}
+						}
+						
+						// If not cached, fetch from Firebase (QUOTA HIT)
+						if (sensorReadings.length === 0) {
+							sensorReadings = window.loadSensorHistory ? await window.loadSensorHistory(100) : []; // Reduced from 500 to 100
+							plantReadings = await window.loadPlantHistory(farmingSystem, 100);
+							
+							// Cache for 5 minutes
+							sessionStorage.setItem(cacheKey, JSON.stringify({
+								data: { sensorReadings, plantReadings },
+								timestamp: Date.now()
+							}));
+						}
+
+						// Bucket sensor readings
+						const sensorBuckets = {};
+						(sensorReadings || []).forEach(r => {
+							const ts = r.timestamp?.toDate?.() || (typeof r.timestamp === 'string' ? new Date(r.timestamp) : null);
+							if (!ts) return;
+							const bk = bucketKey(ts);
+							if (!sensorBuckets[bk]) sensorBuckets[bk] = { ph: [], do: [], tds: [], temperature: [], humidity: [], timestamp: ts };
+							const rd = r.readings || r;
+							if (rd.ph?.value != null) sensorBuckets[bk].ph.push(rd.ph.value);
+							if (rd.do_mg_l?.value != null) sensorBuckets[bk].do.push(rd.do_mg_l.value);
+							if (rd.tds_ppm?.value != null) sensorBuckets[bk].tds.push(rd.tds_ppm.value);
+							if (rd.temperature_c?.value != null) sensorBuckets[bk].temperature.push(rd.temperature_c.value);
+							if (rd.humidity?.value != null) sensorBuckets[bk].humidity.push(rd.humidity.value);
+						});
+
+						// Bucket plant readings
+						const plantBuckets = {};
+						(plantReadings || []).forEach(r => {
+							const ts = r.created_at?.toDate?.() || new Date(r.created_at);
+							if (!ts) return;
+							const bk = bucketKey(ts);
+							if (!plantBuckets[bk]) plantBuckets[bk] = r;
+						});
+
+						// Merge into rows
+						const allKeys = [...new Set([...Object.keys(sensorBuckets), ...Object.keys(plantBuckets)])].sort().reverse();
+						const plantData = { readings: allKeys.slice(0, 100).map(bk => {
+							const sb = sensorBuckets[bk] || {};
+							const pb = plantBuckets[bk];
+							const avg = (arr) => arr && arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+							return {
+								timestamp: sb.timestamp || (pb ? (pb.created_at?.toDate?.() || new Date(pb.created_at)) : bk),
+								ph: avg(sb.ph),
+								do: avg(sb.do),
+								tds: avg(sb.tds),
+								temperature: avg(sb.temperature),
+								humidity: avg(sb.humidity),
+								leaves: pb?.leaves || null,
+								branches: pb?.branches || null,
+								weight: pb?.weight || null,
+								length: pb?.length || null,
+								height: pb?.height || null,
+							};
+						})};
+						populatePlantHistoryTable(plantTableWrap, plantData);
+					}
+					
+					// --- ACTUATOR HISTORY ---
+					if (actuatorTableWrap) {
+						// QUOTA OPTIMIZATION: Reduce limit from 500 to 100, cache results
+						const cacheKey2 = `actuatorHistory_${plant}`;
+						let actuatorEvents = [];
+						let sensorReadings2 = [];
+						
+						// Try cache first (5 min validity)
+						const cached2 = sessionStorage.getItem(cacheKey2);
+						if (cached2) {
+							const { data, timestamp } = JSON.parse(cached2);
+							if (Date.now() - timestamp < 5 * 60 * 1000) {
+								actuatorEvents = data.actuatorEvents || [];
+								sensorReadings2 = data.sensorReadings || [];
+							} else {
+								sessionStorage.removeItem(cacheKey2);
+							}
+						}
+						
+						// If not cached, fetch from Firebase (QUOTA HIT)
+						if (actuatorEvents.length === 0) {
+							actuatorEvents = window.loadActuatorHistory ? await window.loadActuatorHistory(100) : []; // Reduced from 500 to 100
+							sensorReadings2 = window.loadSensorHistory ? await window.loadSensorHistory(100) : [];
+							
+							// Cache for 5 minutes
+							sessionStorage.setItem(cacheKey2, JSON.stringify({
+								data: { actuatorEvents, sensorReadings: sensorReadings2 },
+								timestamp: Date.now()
+							}));
+						}
+
+						// Bucket actuator events
+						const actBuckets = {};
+						(actuatorEvents || []).forEach(evt => {
+							const ts = evt.timestamp?.toDate?.() || new Date(evt.timestamp);
+							if (!ts || isNaN(ts)) return;
+							const bk = bucketKey(ts);
+							if (!actBuckets[bk]) actBuckets[bk] = { relay_events: {}, ph: [], do: [], tds: [], temperature: [], humidity: [], timestamp: ts };
+							// Keep latest state per relay in bucket
+							actBuckets[bk].relay_events[evt.relay_id] = evt.state;
+						});
+
+						// Add sensor data to actuator buckets
+						(sensorReadings2 || []).forEach(r => {
+							const ts = r.timestamp?.toDate?.() || (typeof r.timestamp === 'string' ? new Date(r.timestamp) : null);
+							if (!ts) return;
+							const bk = bucketKey(ts);
+							if (!actBuckets[bk]) return; // Only add sensors to buckets that have actuator events
+							const rd = r.readings || r;
+							if (rd.ph?.value != null) actBuckets[bk].ph.push(rd.ph.value);
+							if (rd.do_mg_l?.value != null) actBuckets[bk].do.push(rd.do_mg_l.value);
+							if (rd.tds_ppm?.value != null) actBuckets[bk].tds.push(rd.tds_ppm.value);
+							if (rd.temperature_c?.value != null) actBuckets[bk].temperature.push(rd.temperature_c.value);
+							if (rd.humidity?.value != null) actBuckets[bk].humidity.push(rd.humidity.value);
+						});
+
+						// Build readings array
+						const actKeys = Object.keys(actBuckets).sort().reverse();
+						const actuatorData = { readings: actKeys.slice(0, 100).map(bk => {
+							const b = actBuckets[bk];
+							const avg = (arr) => arr && arr.length ? arr.reduce((a, v) => a + v, 0) / arr.length : null;
+							return {
+								timestamp: b.timestamp,
+								relay_events: Object.entries(b.relay_events).map(([rid, st]) => ({ relay_id: parseInt(rid), state: st })),
+								ph: avg(b.ph),
+								do: avg(b.do),
+								tds: avg(b.tds),
+								temperature: avg(b.temperature),
+								humidity: avg(b.humidity),
+							};
+						})};
+						populateActuatorHistoryTable(actuatorTableWrap, actuatorData);
+					}
+				} catch (error) {
+					console.error('Error fetching history from Firebase:', error);
+				}
+				return;
+			}
+			
+			// Use API when available (local)
 			await waitForAPIUrl();
 			
 			// Normalize interval: "Daily" -> "daily", "15-min" -> "15min"
