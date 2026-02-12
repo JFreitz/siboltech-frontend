@@ -60,7 +60,7 @@ def _init_firebase():
             return None
 
 _last_firebase_push_ts = 0
-_FIREBASE_PUSH_INTERVAL = 10  # Push at most once every 10s (8,640 writes/day — fits Spark plan)
+_FIREBASE_PUSH_INTERVAL = 7  # Push every 7s (12,343 writes/day — max safe for Spark plan)
 _firebase_push_backoff_until = 0  # auto-disable on 429
 _firebase_push_fails = 0
 
@@ -96,6 +96,23 @@ def _firebase_push_latest(readings_dict: dict):
                         "unit": units[sensor],
                         "timestamp": now_iso,
                     }
+            # Also include raw voltages from local DB for calibration display on Vercel
+            try:
+                from db import get_session, SensorReading
+                session = get_session()
+                latest_readings = {}
+                for sensor_name in ['ph', 'do_mg_l', 'tds_ppm']:
+                    last = session.query(SensorReading).filter_by(sensor=sensor_name).order_by(SensorReading.timestamp.desc()).first()
+                    if last and last.meta:
+                        meta = last.meta if isinstance(last.meta, dict) else json.loads(last.meta) if isinstance(last.meta, str) else {}
+                        voltage_keys = {'ph': 'ph_voltage_v', 'do_mg_l': 'do_voltage_v', 'tds_ppm': 'tds_voltage_v'}
+                        vk = voltage_keys.get(sensor_name)
+                        if vk and vk in meta:
+                            doc[sensor_name]['raw_voltage'] = meta[vk]
+                session.close()
+            except Exception as e:
+                pass  # Non-fatal: if voltage data unavailable, continue without it
+            
             if doc:
                 doc["_updated"] = fs.SERVER_TIMESTAMP
                 doc["_source"] = "api-direct"
