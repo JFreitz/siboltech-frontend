@@ -14,11 +14,12 @@ import json
 # ========== CONFIGURATION ==========
 
 # Relay mapping (1-indexed, matches ESP32 pin wiring)
-# Chan 1=pin19, 2=pin18, 3=pin17, 4=pin23, 5=pin14, 6=pin15, 7=pin12, 8=pin26, 9=pin13
+# Chan 1=pin19, 2=pin18, 3=pin27, 4=pin23, 5=pin14, 6=pin15, 7=pin12, 8=pin26, 9=pin13
+# Note: Relay 3 (pH Up) reassigned from GPIO 17 to GPIO 27 (GPIO 17 hardware failure)
 RELAY = {
     "LEAFY_GREEN": 1,       # Pin 19
     "PH_DOWN": 2,           # Pin 18
-    "PH_UP": 3,             # Pin 17
+    "PH_UP": 3,             # Pin 27 (was pin 17 - faulty)
     "MISTING": 4,           # Pin 23
     "EXHAUST_OUT": 5,       # Pin 14
     "GROW_LIGHTS_AERO": 6,  # Pin 15
