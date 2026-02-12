@@ -7,7 +7,7 @@ from db import init_db, get_session, SensorReading
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("collector")
 
-SAMPLE_INTERVAL = 30  # seconds
+SAMPLE_INTERVAL = 15  # seconds (was 30, now 2x faster)
 
 def insert(session, sensor: str, value: float, unit: str = None, meta: dict = None):
     r = SensorReading(timestamp=datetime.now(timezone.utc), sensor=sensor, value=value, unit=unit, meta=meta)
