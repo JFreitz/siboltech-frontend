@@ -1520,10 +1520,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 			try {
 				if (isStaticHosting() && window.loadSensorHistory && window.loadPlantHistory) {
-					// Firebase path: build CSV client-side from Firebase data
-					const sensorData = await window.loadSensorHistory(10000);
-					const plantAero = await window.loadPlantHistory('aeroponics', 5000);
-					const plantDwc = await window.loadPlantHistory('dwc', 5000);
+					// Firebase path: QUOTA WARNING for large exports
+					const confirmed = confirm(
+						'⚠️ QUOTA WARNING\n\n' +
+						'Downloading 10,000+ sensor/plant records will consume ~20,000 Firebase reads.\n' +
+						'Daily limit: 50,000 reads (Spark free tier)\n\n' +
+						'Continue? (Use local API instead if available)'
+					);
+					if (!confirmed) {
+						btn.disabled = false;
+						btn.textContent = '⬇ ML Training CSV';
+						return;
+					}
+
+					// QUOTA OPTIMIZATION: Reduce from 10000 to 2000 per type
+					const sensorData = await window.loadSensorHistory(2000);
+					const plantAero = await window.loadPlantHistory('aeroponics', 1000);
+					const plantDwc = await window.loadPlantHistory('dwc', 1000);
 					const allPlant = [...(plantAero || []), ...(plantDwc || [])];
 
 					const headers = [
@@ -1603,9 +1616,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 					a.download = `siboltech_ml_training_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.csv`;
 					a.click();
 					URL.revokeObjectURL(url);
-					showToast(`Exported ${allBuckets.length * 2} rows to ML Training CSV`, 'success');
+					showToast(`Exported ${allBuckets.length * 2} rows to ML Training CSV (quota optimized: 2000 sensor + 1000 plant limit)`, 'success');
 				} else {
-					// RPi API path
+					// RPi API path (no quota hit)
 					await waitForAPIUrl();
 					const a = document.createElement('a');
 					a.href = `${RELAY_API_URL}/export-ml-training`;
@@ -1634,9 +1647,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 			try {
 				if (isStaticHosting() && window.loadSensorHistory && window.loadActuatorHistory) {
-					// Firebase path
-					const sensorData = await window.loadSensorHistory(10000);
-					const actuatorData = await window.loadActuatorHistory(10000);
+					// Firebase path: QUOTA WARNING for large exports
+					const confirmed = confirm(
+						'⚠️ QUOTA WARNING\n\n' +
+						'Downloading 10,000+ sensor/actuator records will consume ~20,000 Firebase reads.\n' +
+						'Daily limit: 50,000 reads (Spark free tier)\n\n' +
+						'Continue? (Use local API instead if available)'
+					);
+					if (!confirmed) {
+						btn.disabled = false;
+						btn.textContent = '⬇ Sensor+Actuator CSV';
+						return;
+					}
+
+					// QUOTA OPTIMIZATION: Reduce from 10000 to 2000
+					const sensorData = await window.loadSensorHistory(2000);
+					const actuatorData = await window.loadActuatorHistory(2000);
 
 					const relayLabels = {1:'Misting',2:'AirPump',3:'ExhaustIN',4:'ExhaustOUT',5:'LightsAero',6:'LightsDWC',7:'pHUp',8:'pHDown',9:'LeafyGreen'};
 					const relayHeaders = [];
@@ -1706,9 +1732,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 					a.download = `siboltech_sensor_actuator_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.csv`;
 					a.click();
 					URL.revokeObjectURL(url);
-					showToast(`Exported ${uniqueBuckets.length} rows to Sensor+Actuator CSV`, 'success');
+					showToast(`Exported ${uniqueBuckets.length} rows to Sensor+Actuator CSV (quota optimized: 2000 record limit)`, 'success');
 				} else {
-					// RPi API path
+					// RPi API path (no quota hit)
 					await waitForAPIUrl();
 					const a = document.createElement('a');
 					a.href = `${RELAY_API_URL}/export-sensor-actuator`;
