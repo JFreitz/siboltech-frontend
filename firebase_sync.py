@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# Force native DNS resolver BEFORE any grpc import
+import os as _os
+_os.environ["GRPC_DNS_RESOLVER"] = "native"
+
 """
 Firebase Firestore sync for SIBOLTECH sensor readings.
 Pushes sensor readings from local DB to Firebase in real-time.
@@ -29,9 +33,9 @@ except ImportError:
     print("ERROR: firebase-admin not installed. Run: pip install firebase-admin")
     exit(1)
 
-# Firestore timeout — keep short to fail fast on 429 (backoff handles retries)
-FIRESTORE_TIMEOUT = 8     # seconds (RPC deadline)
-FIRESTORE_RETRY = Retry(deadline=8, initial=0.5, maximum=2)  # fast fail, don't wait
+# Firestore timeout — 15s allows gRPC cold-start DNS to resolve
+FIRESTORE_TIMEOUT = 15    # seconds (RPC deadline)
+FIRESTORE_RETRY = Retry(deadline=15, initial=1, maximum=4)  # retry with longer deadline
 
 from db import SensorReading, ActuatorEvent, init_db, get_session
 
@@ -590,9 +594,14 @@ def main():
     print(f"Sync interval: {SYNC_INTERVAL}s")
     print("-" * 50)
     
-    # Initial calibration sync
-    sync_calibration_to_firebase(db)
-    print("✅ Calibration synced to Firebase")
+    # Initial calibration sync (non-fatal — gRPC cold start can be slow)
+    try:
+        sync_calibration_to_firebase(db)
+        print("✅ Calibration synced to Firebase")
+    except Exception as e:
+        print(f"⚠️ Initial cal sync failed (will retry later): {e}")
+        if _is_quota_error(e):
+            quota.fail("cal_update", e)
     
     sync_count = 0
     
@@ -626,7 +635,8 @@ def main():
 
             print(f"[{ts_str}] Sync #{sync_count}...")
             
-            # === PRIORITY 1: Relay commands (every cycle when quota ok) ===
+            # === PRIORITY 1: Relay commands (every cycle, ~5s) ===
+            # 17,280 reads/day — acceptable at 50% quota target
             if not quota.should_skip("relay"):
                 try:
                     had_commands = process_relay_commands(db)
@@ -651,8 +661,8 @@ def main():
                     if _is_quota_error(e) or "Timeout" in str(e):
                         quota.fail("override", e)
             
-            # === LOW PRIORITY: Cal mode every 10th cycle (~50s) ===
-            if sync_count % 10 == 0 and not quota.should_skip("calmode"):
+            # === LOW PRIORITY: Cal mode every 12th cycle (~60s) ===
+            if sync_count % 12 == 0 and not quota.should_skip("calmode"):
                 try:
                     last_cal_mode_state = check_calibration_mode(db, last_cal_mode_state)
                     quota.success("calmode")
