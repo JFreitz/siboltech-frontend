@@ -2651,10 +2651,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	function setupNutrientButtons(){
 		const actions = [
-			{ id: 'btn-ph-up', label: 'pH Up', relay: 3 },
-			{ id: 'btn-ph-down', label: 'pH Down', relay: 2 },
-			{ id: 'btn-leafy-green', label: 'Leafy Green', relay: 1 },
-			{ id: 'btn-misting-pump', label: 'Misting Pump', relay: 4 }
+			{ id: 'btn-ph-up', label: 'pH Up', relay: 3, pulseDuration: 2000 },
+			{ id: 'btn-ph-down', label: 'pH Down', relay: 2, pulseDuration: 2000 },
+			{ id: 'btn-leafy-green', label: 'Leafy Green', relay: 1, pulseDuration: 2000 },
+			{ id: 'btn-misting-pump', label: 'Misting Pump', relay: 4, pulseDuration: 5000 }
 		];
 
 		actions.forEach(action => {
@@ -2667,7 +2667,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 				btn.setAttribute('aria-pressed', 'true');
 				showNutrientNotification(action.label);
 				
-				// Pulse the relay: ON for 2 seconds, then OFF
+				// Pulse the relay: ON for pulseDuration, then OFF
 				if(action.relay) {
 					try {
 						if (isStaticHosting() && window.sendRelayCommandFirebase) {
@@ -2677,7 +2677,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 							setTimeout(async () => {
 								await window.sendRelayCommandFirebase(`R${action.relay}`, 'OFF');
 								console.log(`[Nutrient] ${action.label} relay ${action.relay} OFF (Firebase)`);
-							}, 2000);
+							}, action.pulseDuration);
 						} else {
 							// LAN: use direct API
 							await fetch(`${RELAY_API_URL}/relay/${action.relay}/on`, { method: 'POST' });
@@ -2685,7 +2685,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 							setTimeout(async () => {
 								await fetch(`${RELAY_API_URL}/relay/${action.relay}/off`, { method: 'POST' });
 								console.log(`[Nutrient] ${action.label} relay ${action.relay} OFF`);
-							}, 2000);
+							}, action.pulseDuration);
 						}
 					} catch(err) {
 						console.error(`[Nutrient] Failed to control relay ${action.relay}:`, err);
@@ -2696,7 +2696,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 					btn.disabled = false;
 					btn.classList.remove('is-dosing');
 					btn.setAttribute('aria-pressed', 'false');
-				}, 2500);
+				}, action.pulseDuration + 500);
 			});
 		});
 	}

@@ -243,6 +243,12 @@ class AutomationController:
         """Main automation loop."""
         while not self._stop_event.is_set():
             try:
+                # Always process misting cycle (regardless of override mode)
+                # since manual button presses should still pulse correctly
+                now = time.time()
+                self._process_misting(now)
+                
+                # Full automation only when override is OFF
                 if not self.override_mode:
                     self._process_automation()
                     self._enforce_relay_states()
@@ -363,22 +369,28 @@ class AutomationController:
             self._process_tds_dosing(now, tds)
     
     def _process_misting(self, now: float):
-        """Process misting pump cycle: 5s ON, 15min OFF."""
+        """Process misting pump cycle: 5s ON, 15min OFF.
+        Handles both automatic cycles and manual button presses."""
         relay = self.relays["MISTING"]
         
         # If state is unknown (None), initialize to OFF but keep existing timers
-        # so the 15-min cycle resumes where it left off after override toggle
         if relay.state is None:
             self._set_relay("MISTING", False, force=True)
             return
         
         if relay.state:
-            # Currently ON - check if time to turn OFF
+            # Currently ON
+            # Detect if relay was just turned ON (manual button press or cycle start)
+            if self.misting_last_on == 0 or (now - self.misting_last_on) < 0.1:
+                # State just changed to ON - record the time
+                self.misting_last_on = now
+            
+            # Check if time to turn OFF (after 5 seconds)
             if now - self.misting_last_on >= MISTING_ON:
                 self._set_relay("MISTING", False, force=True)
                 self.misting_last_off = now
         else:
-            # Currently OFF - check if time to turn ON
+            # Currently OFF - check if time to turn ON for next cycle
             if now - self.misting_last_off >= MISTING_OFF:
                 self._set_relay("MISTING", True, force=True)
                 self.misting_last_on = now
