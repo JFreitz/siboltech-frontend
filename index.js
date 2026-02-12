@@ -1209,8 +1209,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 						
 						// If not cached, fetch from Firebase (QUOTA HIT)
 						if (sensorReadings.length === 0) {
-							sensorReadings = window.loadSensorHistory ? await window.loadSensorHistory(100) : []; // Reduced from 500 to 100
-							plantReadings = await window.loadPlantHistory(farmingSystem, 100);
+							sensorReadings = window.loadSensorHistory ? await window.loadSensorHistory(50) : []; // QUOTA OPT: Reduced to 50 (from 100)
+							plantReadings = await window.loadPlantHistory(farmingSystem, 50);
 							
 							// Cache for 5 minutes
 							sessionStorage.setItem(cacheKey, JSON.stringify({
@@ -1287,8 +1287,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 						
 						// If not cached, fetch from Firebase (QUOTA HIT)
 						if (actuatorEvents.length === 0) {
-							actuatorEvents = window.loadActuatorHistory ? await window.loadActuatorHistory(100) : []; // Reduced from 500 to 100
-							sensorReadings2 = window.loadSensorHistory ? await window.loadSensorHistory(100) : [];
+							actuatorEvents = window.loadActuatorHistory ? await window.loadActuatorHistory(50) : []; // QUOTA OPT: Reduced to 50 (from 100)
+							sensorReadings2 = window.loadSensorHistory ? await window.loadSensorHistory(50) : [];
 							
 							// Cache for 5 minutes
 							sessionStorage.setItem(cacheKey2, JSON.stringify({
