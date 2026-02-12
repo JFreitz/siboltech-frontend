@@ -29,16 +29,22 @@ async function initializeAPIUrl() {
         API_BASE_URL = RELAY_API_URL;
         console.log('Local access detected, API URL:', RELAY_API_URL);
     } else {
-        console.log('Using Firebase for sensor data (no API URL needed)');
-        // API calls will be skipped on static hosting
+        // On static hosting (Vercel), use Railway proxy or ngrok tunnel
+        // For history tab: bypass Firebase to save quota, use API directly
+        const remoteAPI = localStorage.getItem('remoteAPIUrl');
+        if (remoteAPI) {
+            RELAY_API_URL = remoteAPI;
+            API_BASE_URL = remoteAPI;
+            console.log('Using remote API for history (quota optimization):', RELAY_API_URL);
+        } else {
+            console.log('Using Firebase for sensor data (no remote API configured)');
+        }
     }
 }
 
-// Firebase handles all data - no API settings needed
-
-// Stub function for backward compatibility (does nothing now)
+// Stub function for backward compatibility
 async function waitForAPIUrl() {
-    // Firebase handles data, no waiting needed
+    // Firebase handles real-time data, API used for history tabs
     return Promise.resolve();
 }
 
@@ -1165,130 +1171,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			const plantTableWrap = historyBoard.querySelector('[data-history-view="plant"]');
 			const actuatorTableWrap = historyBoard.querySelector('[data-history-view="actuator"]');
 			
-			// Use Firebase on static hosting (Vercel)
-			if (isStaticHosting() && window.loadPlantHistory) {
-				// Normalize interval for bucketing
-				let interval = historyState.interval.toLowerCase();
-				if (interval === '15-min') interval = '15min';
-
-				// Helper: bucket a Date to either daily or 15-min key
-				const bucketKey = (d) => {
-					if (!(d instanceof Date)) d = new Date(d);
-					if (interval === '15min') {
-						const m = Math.floor(d.getMinutes() / 15) * 15;
-						return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-					}
-					return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-				};
-
-				try {
-					// --- PLANT HISTORY ---
-					if (plantTableWrap) {
-						// Load sensor history from Firebase
-						const sensorReadings = window.loadSensorHistory ? await window.loadSensorHistory(500) : [];
-						const plantReadings = await window.loadPlantHistory(farmingSystem, 200);
-
-						// Bucket sensor readings
-						const sensorBuckets = {};
-						(sensorReadings || []).forEach(r => {
-							const ts = r.timestamp?.toDate?.() || (typeof r.timestamp === 'string' ? new Date(r.timestamp) : null);
-							if (!ts) return;
-							const bk = bucketKey(ts);
-							if (!sensorBuckets[bk]) sensorBuckets[bk] = { ph: [], do: [], tds: [], temperature: [], humidity: [], timestamp: ts };
-							const rd = r.readings || r;
-							if (rd.ph?.value != null) sensorBuckets[bk].ph.push(rd.ph.value);
-							if (rd.do_mg_l?.value != null) sensorBuckets[bk].do.push(rd.do_mg_l.value);
-							if (rd.tds_ppm?.value != null) sensorBuckets[bk].tds.push(rd.tds_ppm.value);
-							if (rd.temperature_c?.value != null) sensorBuckets[bk].temperature.push(rd.temperature_c.value);
-							if (rd.humidity?.value != null) sensorBuckets[bk].humidity.push(rd.humidity.value);
-						});
-
-						// Bucket plant readings
-						const plantBuckets = {};
-						(plantReadings || []).forEach(r => {
-							const ts = r.created_at?.toDate?.() || new Date(r.created_at);
-							if (!ts) return;
-							const bk = bucketKey(ts);
-							if (!plantBuckets[bk]) plantBuckets[bk] = r;
-						});
-
-						// Merge into rows
-						const allKeys = [...new Set([...Object.keys(sensorBuckets), ...Object.keys(plantBuckets)])].sort().reverse();
-						const plantData = { readings: allKeys.slice(0, 100).map(bk => {
-							const sb = sensorBuckets[bk] || {};
-							const pb = plantBuckets[bk];
-							const avg = (arr) => arr && arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
-							return {
-								timestamp: sb.timestamp || (pb ? (pb.created_at?.toDate?.() || new Date(pb.created_at)) : bk),
-								ph: avg(sb.ph),
-								do: avg(sb.do),
-								tds: avg(sb.tds),
-								temperature: avg(sb.temperature),
-								humidity: avg(sb.humidity),
-								leaves: pb?.leaves || null,
-								branches: pb?.branches || null,
-								weight: pb?.weight || null,
-								length: pb?.length || null,
-								height: pb?.height || null,
-							};
-						})};
-						populatePlantHistoryTable(plantTableWrap, plantData);
-					}
-					
-					// --- ACTUATOR HISTORY ---
-					if (actuatorTableWrap) {
-						const actuatorEvents = window.loadActuatorHistory ? await window.loadActuatorHistory(500) : [];
-						const sensorReadings2 = window.loadSensorHistory ? await window.loadSensorHistory(500) : [];
-
-						// Bucket actuator events
-						const actBuckets = {};
-						(actuatorEvents || []).forEach(evt => {
-							const ts = evt.timestamp?.toDate?.() || new Date(evt.timestamp);
-							if (!ts || isNaN(ts)) return;
-							const bk = bucketKey(ts);
-							if (!actBuckets[bk]) actBuckets[bk] = { relay_events: {}, ph: [], do: [], tds: [], temperature: [], humidity: [], timestamp: ts };
-							// Keep latest state per relay in bucket
-							actBuckets[bk].relay_events[evt.relay_id] = evt.state;
-						});
-
-						// Add sensor data to actuator buckets
-						(sensorReadings2 || []).forEach(r => {
-							const ts = r.timestamp?.toDate?.() || (typeof r.timestamp === 'string' ? new Date(r.timestamp) : null);
-							if (!ts) return;
-							const bk = bucketKey(ts);
-							if (!actBuckets[bk]) return; // Only add sensors to buckets that have actuator events
-							const rd = r.readings || r;
-							if (rd.ph?.value != null) actBuckets[bk].ph.push(rd.ph.value);
-							if (rd.do_mg_l?.value != null) actBuckets[bk].do.push(rd.do_mg_l.value);
-							if (rd.tds_ppm?.value != null) actBuckets[bk].tds.push(rd.tds_ppm.value);
-							if (rd.temperature_c?.value != null) actBuckets[bk].temperature.push(rd.temperature_c.value);
-							if (rd.humidity?.value != null) actBuckets[bk].humidity.push(rd.humidity.value);
-						});
-
-						// Build readings array
-						const actKeys = Object.keys(actBuckets).sort().reverse();
-						const actuatorData = { readings: actKeys.slice(0, 100).map(bk => {
-							const b = actBuckets[bk];
-							const avg = (arr) => arr && arr.length ? arr.reduce((a, v) => a + v, 0) / arr.length : null;
-							return {
-								timestamp: b.timestamp,
-								relay_events: Object.entries(b.relay_events).map(([rid, st]) => ({ relay_id: parseInt(rid), state: st })),
-								ph: avg(b.ph),
-								do: avg(b.do),
-								tds: avg(b.tds),
-								temperature: avg(b.temperature),
-								humidity: avg(b.humidity),
-							};
-						})};
-						populateActuatorHistoryTable(actuatorTableWrap, actuatorData);
-					}
-				} catch (error) {
-					console.error('Error fetching history from Firebase:', error);
-				}
-				return;
-			}
-			
-			// Use API when available (local)
+			// Always use API for history (saves Firebase quota - no getDocs reads)
+			// On local: uses local API
+			// On Vercel: uses remote API if configured via localStorage
 			await waitForAPIUrl();
 			
 			// Normalize interval: "Daily" -> "daily", "15-min" -> "15min"
