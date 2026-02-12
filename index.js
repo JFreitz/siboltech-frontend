@@ -256,8 +256,15 @@ window.addEventListener('firebaseReady', () => {
 });
 
 // Start fetching sensor data (polling fallback)
-setInterval(fetchSensorData, 1000);
-setTimeout(fetchSensorData, 200);
+// On Vercel/static hosting, always poll sensor data every 2s for real-time updates
+if (isStaticHosting()) {
+	setInterval(fetchSensorData, 2000);
+	setTimeout(fetchSensorData, 200);
+} else {
+	// On local/LAN, poll every 1s (unless Firebase listener disables it)
+	setInterval(fetchSensorData, 1000);
+	setTimeout(fetchSensorData, 200);
+}
 
 // === Connection Status Indicator ===
 function updateConnectionStatus(isConnected) {
@@ -474,11 +481,13 @@ setInterval(() => {
 		if (outSlope) outSlope.textContent = Number.isFinite(slope) ? slope.toFixed(2) : '0.00';
 		if (outOffset) outOffset.textContent = Number.isFinite(offset) ? offset.toFixed(2) : '0.00';
 
-		// Update display values for pH
-		if (sensorType === 'ph' && config.displayIds) {
+		// Update display values for all sensors (pH, DO, TDS)
+		if (config.displayIds) {
 			Object.entries(config.displayIds).forEach(([key, id]) => {
 				const el = document.getElementById(id);
-				if (el) el.textContent = lastPoint[key].toFixed(2);
+				if (el && lastPoint[key] !== undefined) {
+					el.textContent = Number.isFinite(lastPoint[key]) ? lastPoint[key].toFixed(2) : '0.00';
+				}
 			});
 		}
 	}
