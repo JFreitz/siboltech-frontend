@@ -2316,7 +2316,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		
 		// On LAN: try direct RPi API first (fastest, no quota issues)
 		try {
-			const url = isLocalAccess() ? `${RPI_LAN_URL}/relay/${relayNum}/${action.toLowerCase()}` : `${RELAY_API_URL}/relay/${relayNum}/${action.toLowerCase()}`;
+			const url = `${RELAY_API_URL}/relay/${relayNum}/${action.toLowerCase()}`;
 			const response = await fetch(url, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -2353,7 +2353,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		
 		// On LAN: fetch directly from RPi API
 		try {
-			const url = `${RELAY_API_URL}/relay/status`;
+			const url = `${RELAY_API_URL}/relay/status`;  // Fixed: use RELAY_API_URL which includes /api
 			const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
 			if (response.ok) {
 				const data = await response.json();

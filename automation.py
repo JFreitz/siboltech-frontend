@@ -54,14 +54,14 @@ HUMIDITY_LOW = 60.0     # % - turn OFF exhaust
 # pH thresholds
 PH_LOW = 5.5     # Below this - trigger pH UP
 PH_HIGH = 7.0    # Above this - trigger pH DOWN
-PH_DOSE_TIME = 3  # seconds to dose
-PH_COOLDOWN = 60  # seconds to wait after dose before re-checking
+PH_DOSE_TIME = 2  # seconds to dose (ON time for relay pulse)
+PH_COOLDOWN = 30  # seconds to wait after dose before re-checking (OFF interval)
 
 # TDS (Leafy Green nutrient dosing)
 TDS_LOW = 675     # ppm - start dosing
 TDS_HIGH = 800    # ppm - stop dosing
-TDS_DOSE_ON = 5   # seconds ON
-TDS_DOSE_OFF = 30 # seconds OFF
+TDS_DOSE_ON = 2   # seconds ON (pulse duration, matching manual buttons)
+TDS_DOSE_OFF = 30 # seconds OFF (interval between pulses)
 
 # Misting cycle
 MISTING_ON = 5           # seconds ON
