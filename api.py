@@ -72,6 +72,7 @@ def _firebase_push_latest(readings_dict: dict):
     now = _time.time()
     if now - _last_firebase_push_ts < _FIREBASE_PUSH_INTERVAL:
         return  # Throttle
+    print(f"[FIREBASE] Pushing readings to Firebase...", flush=True)
     # Skip if disabled by env or quota backoff
     if os.getenv("FIREBASE_DIRECT_PUSH", "1") == "0":
         return

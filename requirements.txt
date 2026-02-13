@@ -13,3 +13,4 @@ paho-mqtt
 scikit-learn
 pandas
 numpy
+firebase-admin
