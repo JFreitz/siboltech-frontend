@@ -261,7 +261,7 @@ def process_relay_commands(db: firestore.Client):
         # Use API to update relay state (ESP32 polls this)
         try:
             api_url = f"http://localhost:5000/api/relay/{relay_num}/{action}"
-            resp = requests.post(api_url, timeout=2)
+            resp = requests.post(api_url, timeout=5)  # Increased timeout for reliability
             response = resp.json() if resp.ok else f"API error: {resp.status_code}"
         except Exception as e:
             response = f"API error: {e}"
