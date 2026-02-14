@@ -130,6 +130,97 @@ def get_serial():
             return None
     return serial_conn
 
+
+# ---------------------------------------------------------------------------
+# Serial sensor ingestion — reads ESP32 JSON lines and POSTs to /api/ingest
+# ---------------------------------------------------------------------------
+# ESP32 serial keys → API ingest keys mapping
+_SERIAL_KEY_MAP = {
+    "temp": "temperature_c",
+    "humidity": "humidity",
+    "tds": "tds_ppm",
+    "ph_v": "ph_voltage_v",
+    "do_v": "do_voltage_v",
+    "tds_v": "tds_voltage_v",
+}
+_serial_ingest_interval = 5  # POST to /api/ingest every 5s (not every line)
+_last_serial_ingest_ts = 0
+_last_serial_readings = {}  # latest parsed readings from serial
+
+def _serial_reader_thread():
+    """Background thread: read ESP32 serial JSON, POST to /api/ingest periodically."""
+    global _last_serial_ingest_ts, _last_serial_readings
+    import requests
+
+    print("  📡 Serial sensor reader thread started")
+    while True:
+        try:
+            with serial_lock:
+                ser = get_serial()
+                if not ser:
+                    time.sleep(2)
+                    continue
+                # Read all available lines (non-blocking, timeout=1 already set)
+                lines = []
+                while ser.in_waiting:
+                    try:
+                        line = ser.readline().decode('utf-8', errors='ignore').strip()
+                        if line:
+                            lines.append(line)
+                    except Exception:
+                        break
+
+            # Parse JSON sensor lines
+            for line in lines:
+                if not line.startswith('{'):
+                    continue
+                try:
+                    data = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                readings = data.get("readings")
+                if not readings or not isinstance(readings, dict):
+                    continue
+
+                # Map serial keys to API keys
+                mapped = {}
+                for sk, ak in _SERIAL_KEY_MAP.items():
+                    if sk in readings:
+                        mapped[ak] = readings[sk]
+
+                if mapped:
+                    _last_serial_readings = mapped
+
+            # POST to /api/ingest periodically
+            now = time.time()
+            if _last_serial_readings and (now - _last_serial_ingest_ts >= _serial_ingest_interval):
+                _last_serial_ingest_ts = now
+                try:
+                    payload = {
+                        "device": "esp32-serial",
+                        "key": "espkey123",
+                        "readings": dict(_last_serial_readings),
+                    }
+                    resp = requests.post(
+                        "http://localhost:5000/api/ingest",
+                        json=payload,
+                        timeout=5,
+                    )
+                    if resp.ok:
+                        r = resp.json()
+                        if r.get("inserted", 0) > 0:
+                            print(f"  📡 Serial→API: {r.get('inserted')} readings ingested")
+                    else:
+                        print(f"  ⚠️ Serial ingest error: HTTP {resp.status_code}")
+                except Exception as e:
+                    print(f"  ⚠️ Serial ingest error: {e}")
+
+        except Exception as e:
+            print(f"  ⚠️ Serial reader error: {e}")
+
+        time.sleep(1)  # Read serial every 1s
+
 def send_relay_command(cmd: str) -> str:
     """Send command to ESP32 and return response."""
     with serial_lock:
@@ -592,6 +683,10 @@ def main():
     # Check serial
     if get_serial():
         print("✅ Serial connected to ESP32")
+        # Start background serial reader thread
+        serial_thread = threading.Thread(target=_serial_reader_thread, daemon=True)
+        serial_thread.start()
+        print("✅ Serial sensor reader thread started")
     else:
         print("⚠️ Serial not available (relay control disabled)")
     
@@ -661,6 +756,16 @@ def main():
                         quota.fail("relay", e)  # timeout likely means 429-throttled
             
             # NOTE: Latest readings pushed directly by api.py on ingest
+            # Backup: also push from here every 3rd cycle (~15s) in case api.py push fails
+            if sync_count % 3 == 0 and not quota.should_skip("latest"):
+                try:
+                    pushed = sync_latest_to_firebase(db, session)
+                    if pushed:
+                        quota.success("latest")
+                except Exception as e:
+                    print(f"  ⚠️ Latest sync error: {e}")
+                    if _is_quota_error(e) or "Timeout" in str(e):
+                        quota.fail("latest", e)
             
             # === LOW PRIORITY: Override mode every 6th cycle (~30s) ===
             if sync_count % 6 == 0 and not quota.should_skip("override"):
