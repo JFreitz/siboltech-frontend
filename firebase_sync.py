@@ -46,7 +46,17 @@ SERVICE_ACCOUNT_FILE = os.getenv(
 )
 SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "5"))  # seconds
 BATCH_SIZE = 10  # Keep small — only new data flows in, no backlog
-SERIAL_PORT = os.getenv("SERIAL_PORT", "/dev/ttyUSB0")
+
+# Auto-detect serial port (prefer ttyUSB1 which is more stable on this system)
+def _auto_detect_serial():
+    import glob
+    for p in ["/dev/ttyUSB1", "/dev/ttyUSB0", "/dev/ttyACM0", "/dev/ttyACM1"]:
+        if os.path.exists(p):
+            return p
+    ports = glob.glob("/dev/ttyUSB*") + glob.glob("/dev/ttyACM*")
+    return ports[0] if ports else "/dev/ttyUSB0"
+
+SERIAL_PORT = os.getenv("SERIAL_PORT", _auto_detect_serial())
 BAUD_RATE = 115200
 CALIBRATION_FILE = Path(__file__).parent / "calibration.json"
 
