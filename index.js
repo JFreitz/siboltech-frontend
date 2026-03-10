@@ -2220,10 +2220,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			alertEl.className = `alert ${statusClass}`;
 		});
 
-		// Only show notifications for critical (dangerous) values, not warning or optimal
-		if(statusClass === 'dangerous'){
-			showNotification(sensorType, value, status, statusClass);
-		}
+		// Side pop-up notifications for critical sensor values disabled by user request
+		// Actuator button notifications (showNutrientNotification) still active
 	}
 
 	// Override starts ON (manual mode) - actuators won't go crazy on startup
