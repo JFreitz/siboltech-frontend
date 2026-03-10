@@ -440,7 +440,9 @@ def ingest():
 
             v_ph = float(computed_readings.get("ph_voltage_v"))
             v_ph_smooth = _smoothed_voltage(_PH_VOLTAGE_BUF, v_ph)
-            computed_readings["ph"] = float(calibrate_ph(v_ph_smooth))
+            ph_val = float(calibrate_ph(v_ph_smooth))
+            # Clamp pH to physically valid range (0-14)
+            computed_readings["ph"] = max(0.0, min(14.0, ph_val))
         except Exception:
             pass
 
