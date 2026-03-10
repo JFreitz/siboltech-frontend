@@ -25,6 +25,21 @@ import serial
 from db import Base, SensorReading, PlantReading, ActuatorEvent
 from automation import init_controller, get_controller
 
+# === Voltage smoothing buffers (reduce ADC noise before calibration) ===
+from collections import deque
+_PH_VOLTAGE_BUF = deque(maxlen=10)    # rolling window of pH voltages
+_DO_VOLTAGE_BUF = deque(maxlen=10)    # rolling window of DO voltages
+_TDS_PPM_BUF = deque(maxlen=10)       # rolling window of TDS ppm (filters ADC noise/drops)
+
+def _smoothed_voltage(buf, new_v):
+    """Add new voltage to buffer, return the median (robust to outliers)."""
+    buf.append(new_v)
+    sorted_vals = sorted(buf)
+    n = len(sorted_vals)
+    if n % 2 == 1:
+        return sorted_vals[n // 2]
+    return (sorted_vals[n // 2 - 1] + sorted_vals[n // 2]) / 2.0
+
 # === Firebase direct-push for near-instant dashboard updates ===
 _firebase_db = None
 _firebase_lock = threading.Lock()
@@ -60,7 +75,7 @@ def _init_firebase():
             return None
 
 _last_firebase_push_ts = 0
-_FIREBASE_PUSH_INTERVAL = 5  # Push every 5s (17,280 writes/day — faster updates, same quota as relay polling)
+_FIREBASE_PUSH_INTERVAL = 7  # Push every 7s (~12,343 writes/day — fits Spark 20k limit)
 _firebase_push_backoff_until = 0  # auto-disable on 429
 _firebase_push_fails = 0
 
@@ -117,17 +132,18 @@ def _firebase_push_latest(readings_dict: dict):
             if doc:
                 doc["_updated"] = fs.SERVER_TIMESTAMP
                 doc["_source"] = "api-direct"
-                fb.collection("sensors").document("latest").set(doc, merge=True, timeout=5)
+                fb.collection("sensors").document("latest").set(doc, merge=True, timeout=10)
                 _firebase_push_fails = 0  # reset on success
+                print(f"[FIREBASE] ✅ Pushed {len(doc)-2} sensors", flush=True)
         except Exception as e:
             err_s = str(e)
-            if "429" in err_s or "Quota" in err_s or "RESOURCE_EXHAUSTED" in err_s:
+            if any(k in err_s for k in ("429", "Quota", "RESOURCE_EXHAUSTED", "503", "504", "Deadline")):
                 _firebase_push_fails += 1
                 backoff = min(300, 5 * (2 ** (_firebase_push_fails - 1)))  # 5,10,20,40,80,160,300
                 _firebase_push_backoff_until = _time.time() + backoff
-                print(f"[FIREBASE] 429 quota hit — auto-disabling push for {backoff}s")
+                print(f"[FIREBASE] ⚠️ Quota/timeout — pausing push for {backoff}s (fail #{_firebase_push_fails})", flush=True)
             else:
-                print(f"[FIREBASE] Push error: {e}")
+                print(f"[FIREBASE] ❌ Push error: {e}", flush=True)
     threading.Thread(target=_push, daemon=True).start()
 
 
@@ -226,46 +242,33 @@ def _get_serial():
 
 
 def _send_serial_command(cmd: str) -> dict:
-    """Send command to ESP32 via serial and return response."""
-    import time
-    with _serial_lock:
-        try:
-            ser = _get_serial()
-            if not ser:
-                return {"success": False, "error": "Serial not available"}
-            
-            # Clear buffers - discard any pending sensor data
-            ser.reset_input_buffer()
-            ser.reset_output_buffer()
-            time.sleep(0.02)  # Small delay to ensure buffer is cleared
-            ser.reset_input_buffer()  # Clear again after any queued data arrives
-            
-            # Send command
-            ser.write((cmd + "\n").encode())
-            ser.flush()
-            
-            # Wait for ESP32 to process
-            time.sleep(0.1)
-            
-            # Read response - only look for relay-related JSON
-            response_lines = []
-            start = time.time()
-            while (time.time() - start) < 0.5:
-                if ser.in_waiting:
-                    line = ser.readline().decode('utf-8', errors='ignore').strip()
-                    if line:
-                        # Only capture relay-related responses
-                        if '"relay"' in line or '"relay_status"' in line or '"all_relays"' in line:
-                            response_lines.append(line)
-                            break  # Got our response
-                else:
-                    time.sleep(0.01)
-            
-            print(f"[Serial] Sent: {cmd} | Response: {response_lines}")
-            return {"success": True, "response": response_lines}
-        except Exception as e:
-            print(f"Serial command error: {e}")
-            return {"success": False, "error": str(e)}
+    """Send relay command to ESP32 via firebase_sync's serial connection.
+    API no longer opens serial directly to avoid port conflicts.
+    Falls back to HTTP relay endpoint for firebase_sync to forward."""
+    try:
+        import requests as _req
+        resp = _req.post(
+            "http://localhost:5001/serial/send",
+            json={"command": cmd},
+            timeout=3
+        )
+        if resp.ok:
+            print(f"[Serial→firebase_sync] Sent: {cmd}", flush=True)
+            return {"success": True, "response": resp.json()}
+    except Exception:
+        pass  # firebase_sync serial proxy not available
+    # ESP32 will still get the command via WiFi polling /api/relay/pending
+    print(f"[Serial] Skipped (firebase_sync proxy unavailable): {cmd}", flush=True)
+    return {"success": True, "response": ["via-wifi"]}
+
+
+def _send_serial_bg(cmd: str):
+    """Fire-and-forget serial command in background thread.
+    The relay state is already set in memory + DB; this just pushes
+    the command to ESP32 over serial for faster hardware response.
+    ESP32 also polls /api/relay/pending every 200ms as backup."""
+    import threading
+    threading.Thread(target=_send_serial_command, args=(cmd,), daemon=True).start()
 
 
 # ==================== MQTT Configuration ====================
@@ -436,7 +439,8 @@ def ingest():
             from calibration import calibrate_ph
 
             v_ph = float(computed_readings.get("ph_voltage_v"))
-            computed_readings["ph"] = float(calibrate_ph(v_ph))
+            v_ph_smooth = _smoothed_voltage(_PH_VOLTAGE_BUF, v_ph)
+            computed_readings["ph"] = float(calibrate_ph(v_ph_smooth))
         except Exception:
             pass
 
@@ -445,7 +449,22 @@ def ingest():
             from calibration import calibrate_do
 
             v_do = float(computed_readings.get("do_voltage_v"))
-            computed_readings["do_mg_l"] = float(calibrate_do(v_do))
+            v_do_smooth = _smoothed_voltage(_DO_VOLTAGE_BUF, v_do)
+            computed_readings["do_mg_l"] = float(calibrate_do(v_do_smooth))
+        except Exception:
+            pass
+
+    # Re-calibrate TDS: smooth first (median filter), then apply linear correction
+    if "tds_ppm" in computed_readings:
+        try:
+            from calibration import load_calibration
+            raw_tds = float(computed_readings["tds_ppm"])
+            # Median-smooth to reject ADC noise drops (0, 200, etc.)
+            raw_tds_smooth = _smoothed_voltage(_TDS_PPM_BUF, raw_tds)
+            _tds_cal = load_calibration().get("tds", {})
+            _tds_slope = _tds_cal.get("slope", 1.0)
+            _tds_offset = _tds_cal.get("offset", 0.0)
+            computed_readings["tds_ppm"] = max(0.0, _tds_slope * raw_tds_smooth + _tds_offset)
         except Exception:
             pass
 
@@ -574,13 +593,18 @@ def get_readings():
 def get_latest():
     """Get latest value per sensor."""
     with Session() as session:
+        # Use a fast subquery: get the max timestamp per sensor, then join
         rows = session.execute(
             text(
                 """
-                SELECT sensor, value, unit, timestamp
-                FROM sensor_readings
-                WHERE sensor IN ('temperature_c', 'humidity', 'tds_ppm', 'ph', 'do_mg_l')
-                ORDER BY sensor ASC, timestamp DESC
+                SELECT s.sensor, s.value, s.unit, s.timestamp
+                FROM sensor_readings s
+                INNER JOIN (
+                    SELECT sensor, MAX(timestamp) AS max_ts
+                    FROM sensor_readings
+                    WHERE sensor IN ('temperature_c', 'humidity', 'tds_ppm', 'ph', 'do_mg_l')
+                    GROUP BY sensor
+                ) latest ON s.sensor = latest.sensor AND s.timestamp = latest.max_ts
                 """
             )
         ).fetchall()
@@ -964,7 +988,9 @@ OVERRIDE_MODE_ENABLED = False  # When True, disables automation (manual control)
 
 # ==================== AUTOMATION CONTROLLER ====================
 def _automation_relay_callback(relay_id: int, state: bool):
-    """Callback for automation controller to set relay states."""
+    """Callback for automation controller to set relay states.
+    Updates in-memory state (for WiFi polling) AND sends serial command
+    directly to ESP32 (works even when WiFi is down)."""
     global RELAY_STATES
     label = RELAY_LABELS.get(relay_id, f"Relay {relay_id}")
     # Reject None or non-bool values
@@ -980,6 +1006,8 @@ def _automation_relay_callback(relay_id: int, state: bool):
         _save_relay_state(relay_id, state)
         _serial_log_append(f"[AUTO] {label} -> {'ON' if state else 'OFF'}")
         print(f"[CALLBACK] {label} (R{relay_id}) -> {'ON' if state else 'OFF'}", flush=True)
+        # Fire-and-forget serial command (don't block automation loop)
+        _send_serial_bg(f"R{relay_id} {'ON' if state else 'OFF'}")
 
 # Initialize automation controller (starts background thread)
 _automation_controller = init_controller(_automation_relay_callback)
@@ -1299,6 +1327,8 @@ def relay_on(relay_id):
     
     RELAY_STATES[relay_id] = True
     _save_relay_state(relay_id, True)
+    # Fire-and-forget serial command (don't block HTTP response)
+    _send_serial_bg(f"R{relay_id} ON")
     
     return jsonify({
         "success": True,
@@ -1316,6 +1346,8 @@ def relay_off(relay_id):
     
     RELAY_STATES[relay_id] = False
     _save_relay_state(relay_id, False)
+    # Fire-and-forget serial command (don't block HTTP response)
+    _send_serial_bg(f"R{relay_id} OFF")
     
     return jsonify({
         "success": True,
@@ -1328,18 +1360,22 @@ def relay_off(relay_id):
 @app.route("/api/relay/all/on", methods=["POST"])
 def relay_all_on():
     """Turn all relays ON."""
-    for i in range(1, 9):
+    for i in range(1, 10):
         RELAY_STATES[i] = True
         _save_relay_state(i, True)
+    # Fire-and-forget serial command (don't block HTTP response)
+    _send_serial_bg("ALL ON")
     return jsonify({"success": True, "message": "All relays ON"})
 
 
 @app.route("/api/relay/all/off", methods=["POST"])
 def relay_all_off():
     """Turn all relays OFF."""
-    for i in range(1, 9):
+    for i in range(1, 10):
         RELAY_STATES[i] = False
         _save_relay_state(i, False)
+    # Fire-and-forget serial command (don't block HTTP response)
+    _send_serial_bg("ALL OFF")
     return jsonify({"success": True, "message": "All relays OFF"})
 
 
@@ -2007,9 +2043,10 @@ def serial_cmd():
 
 
 if __name__ == "__main__":
-    # Start serial reader thread
-    _serial_reader = threading.Thread(target=_serial_reader_thread, daemon=True)
-    _serial_reader.start()
+    # NOTE: Serial port is owned exclusively by firebase_sync.service
+    # Do NOT start serial reader thread here - it conflicts with firebase_sync's serial reader
+    # ESP32 gets relay commands via WiFi polling /api/relay/pending
+    print("[API] Serial handled by firebase_sync (not opening port)", flush=True)
 
     # Start automation controller background thread
     if _automation_controller:
