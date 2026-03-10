@@ -2038,9 +2038,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			name: 'pH Level',
 			unit: 'pH',
 			ranges: {
-				neutral: [[5.5, 6.5]], // Hydroponics optimal range
-				normal: [[6.5, 8.5]], // General water acceptable range
-				dangerous: [[-Infinity, 5.5], [8.5, Infinity]] // Too acidic or too alkaline
+				neutral: [[5.8, 6.2]], // Hydroponics optimal range
+				normal: [[5.5, 5.8], [6.2, 7.0]], // Acceptable range
+				dangerous: [[-Infinity, 5.5], [7.0, Infinity]] // Critical: too acidic or too alkaline
 			}
 		},
 		do: {
@@ -2115,11 +2115,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		}
 
 		if(matchesRangeSet(numValue, thresholds.ranges.neutral)){
-			return {status: 'Normal', statusClass: 'neutral'};
+			return {status: 'Optimal', statusClass: 'neutral'};
 		}
 
 		if(matchesRangeSet(numValue, thresholds.ranges.normal)){
-			return {status: 'Warning', statusClass: 'dangerous'};
+			return {status: 'Warning', statusClass: 'warning'};
 		}
 
 		return {status: 'Normal', statusClass: 'normal'};

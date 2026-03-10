@@ -3210,6 +3210,10 @@ body.sidebar-collapsed .brand{
 	color:#35530a;
 }
 
+.alert.warning{
+	color: #f9a825;
+}
+
 .alert.normal{
 	color: #f57c00;
 }
