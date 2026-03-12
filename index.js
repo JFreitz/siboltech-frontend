@@ -3467,31 +3467,31 @@ const metricInfo = {
 	leaves: { 
 		label: 'Number of Leaves', 
 		unit: 'leaves', 
-		range: [5, 25], 
+		range: [30, 500], 
 		description: 'Predicted leaf count based on growth model for all plants.'
 	},
 	width: { 
-		label: 'Width', 
-		unit: 'cm', 
-		range: [0.5, 3.5], 
-		description: 'Estimated plant width over time for all plants.'
+		label: 'Weight', 
+		unit: 'g', 
+		range: [5, 55], 
+		description: 'Measured plant weight over time for all plants.'
 	},
 	height: { 
 		label: 'Height', 
 		unit: 'cm', 
-		range: [20, 80], 
+		range: [15, 50], 
 		description: 'Predicted plant height progression for all plants.'
 	},
 	length: { 
 		label: 'Length', 
 		unit: 'cm', 
-		range: [15, 60], 
+		range: [15, 75], 
 		description: 'Expected stem/vine length for all plants.'
 	},
 	branches: { 
 		label: 'Number of Branches', 
 		unit: 'branches', 
-		range: [2, 12], 
+		range: [5, 55], 
 		description: 'Forecasted branch count for all plants.'
 	}
 };
@@ -3660,10 +3660,10 @@ function generatePlantGraphs(metric, farmingMethod = 'aeroponics') {
 
 		// Create side-by-side predicted and actual layout
 		metricsList.forEach(m => {
-			// predicted value either frozen (if previously submitted) or computed for today
-			let predVal;
+			// No trained ML model yet – show "--" for predicted
+			let predVal = null;
 			if(frozenPreds && typeof frozenPreds[m] !== 'undefined') predVal = frozenPreds[m];
-			else predVal = computePredictedValue(m, plant.plantNum, todayStr);
+			// (when a trained model is available, fetch from /api/predict here)
 
 			// Predicted card
 			const predCard = document.createElement('div');
@@ -3673,9 +3673,9 @@ function generatePlantGraphs(metric, farmingMethod = 'aeroponics') {
 			predLabel.textContent = `PREDICTED ${(metricInfo[m] ? metricInfo[m].label : m).toUpperCase()}`;
 			const predValue = document.createElement('div');
 			predValue.className = 'metric-value';
-			predValue.textContent = formatPred(predVal);
+			predValue.textContent = (predVal !== null && Number.isFinite(predVal)) ? formatPred(predVal) : '--';
 			predValue.setAttribute('data-metric', m);
-			predValue.setAttribute('data-value', predVal);
+			predValue.setAttribute('data-value', predVal !== null ? predVal : '');
 			predCard.appendChild(predLabel);
 			predCard.appendChild(predValue);
 
@@ -3759,13 +3759,13 @@ function generatePlantGraphs(metric, farmingMethod = 'aeroponics') {
 		card.setAttribute('data-metric', metric);
 
 		// Draw graph for this plant
-		setTimeout(() => {
-			drawPlantGraph(canvas.id, metric, plant.plantNum, farmingMethod);
+		setTimeout(async () => {
+			await drawPlantGraph(canvas.id, metric, plant.plantNum, farmingMethod);
 		}, 50);
 	});
 }
 
-function drawPlantGraph(canvasId, metric, plantNum, farmingMethod = 'aeroponics') {
+async function drawPlantGraph(canvasId, metric, plantNum, farmingMethod = 'aeroponics') {
 	const canvas = document.getElementById(canvasId);
 	if(!canvas || !canvas.getContext) return;
 	
@@ -3780,7 +3780,22 @@ function drawPlantGraph(canvasId, metric, plantNum, farmingMethod = 'aeroponics'
 	if(!info) return;
 	
 	const leftPad = 50, rightPad = 20, topPad = 20, bottomPad = 40;
-	const [minVal, maxVal] = info.range;
+	// Auto-scale from data if available, otherwise use metricInfo defaults
+	let minVal, maxVal;
+	if(canvas._actualData && canvas._actualData.length > 0) {
+		const vals = canvas._actualData.filter(v => v !== null && Number.isFinite(v));
+		if(vals.length > 0) {
+			const dataMin = Math.min(...vals);
+			const dataMax = Math.max(...vals);
+			const pad = (dataMax - dataMin) * 0.15 || 2;
+			minVal = Math.max(0, Math.floor(dataMin - pad));
+			maxVal = Math.ceil(dataMax + pad);
+		} else {
+			[minVal, maxVal] = info.range;
+		}
+	} else {
+		[minVal, maxVal] = info.range;
+	}
 	
 	// Draw background
 	ctx.fillStyle = '#ffffff';
@@ -3824,39 +3839,50 @@ function drawPlantGraph(canvasId, metric, plantNum, farmingMethod = 'aeroponics'
 	
 	// Prepare or reuse datasets for this canvas so toggles/redraws use consistent series
 	if(!canvas._actualData || !canvas._predictedData) {
-		// Use a daily series from Jan 15 to Jan 22 (inclusive) to match requested per-day data
-		const dateLabels = generateDateLabels('2026-01-15', 8); // 8 days: Jan15..Jan22
-		const nPoints = dateLabels.length;
-		const baseValue = (minVal + maxVal) / 2;
-		const variance = (maxVal - minVal) / 8;
-		const plantVariance = (plantNum - 3.5) * (variance * 0.3);
-		const actual = window.randomWalk(nPoints, baseValue + plantVariance, variance)
-			.map(v => Math.max(minVal, Math.min(maxVal, v)));
-		// default predicted derived from actual
-		let predictedSeries = actual.map((v, i) => {
-			const trend = (i / actual.length) * (variance * 0.6);
-			const bias = plantVariance * 0.25;
-			return Math.max(minVal, Math.min(maxVal, v + trend + bias));
-		});
-
-		// If a frozen predicted value exists for this plant/metric, use it to build a stable predicted series
+		// ── Fetch real data from /api/plant-history ──
 		try {
-			const frozenKey = `plant_${farmingMethod}-${plantNum}_frozenPreds`;
-			const frozen = JSON.parse(localStorage.getItem(frozenKey));
-			if(frozen && typeof frozen[metric] !== 'undefined') {
-				const frozenVal = parseFloat(frozen[metric]);
-				if(Number.isFinite(frozenVal)) {
-					predictedSeries = new Array(actual.length).fill(frozenVal);
-				}
+			const res = await fetch(`${RELAY_API_URL}/plant-history?plant_id=${plantNum}&farming_system=${farmingMethod}&metric=${metric}`);
+			const json = await res.json();
+			if(json.success && json.data && json.data.length > 0) {
+				canvas._dateLabels = json.data.map(d => ({
+					iso: d.date,
+					display: new Date(d.date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+				}));
+				canvas._actualData = json.data.map(d => d.value);
+				// No trained prediction model yet – placeholder nulls
+				canvas._predictedData = json.data.map(() => null);
+			} else {
+				canvas._dateLabels = [];
+				canvas._actualData = [];
+				canvas._predictedData = [];
 			}
 		} catch(e) {
-			// ignore
+			console.warn('[PlantGraph] API fetch failed for plant', plantNum, metric, e.message);
+			canvas._dateLabels = [];
+			canvas._actualData = [];
+			canvas._predictedData = [];
 		}
 
-		// attach dateLabels to canvas for x-axis rendering and tooltip use
-		canvas._dateLabels = dateLabels;
-		canvas._actualData = actual;
-		canvas._predictedData = predictedSeries;
+		// Re-compute dynamic Y-axis range after data loaded
+		if(canvas._actualData && canvas._actualData.length > 0) {
+			const vals = canvas._actualData.filter(v => v !== null && Number.isFinite(v));
+			if(vals.length > 0) {
+				const dataMin = Math.min(...vals);
+				const dataMax = Math.max(...vals);
+				const pad = (dataMax - dataMin) * 0.15 || 2;
+				minVal = Math.max(0, Math.floor(dataMin - pad));
+				maxVal = Math.ceil(dataMax + pad);
+			}
+		}
+	}
+
+	// If no data was loaded, show an empty-state message
+	if(!canvas._actualData || canvas._actualData.length === 0) {
+		ctx.fillStyle = '#888';
+		ctx.font = '13px Segoe UI, Arial, sans-serif';
+		ctx.textAlign = 'center';
+		ctx.fillText('No measurement data yet.', w / 2, h / 2);
+		return;
 	}
 
 	const data = canvas._actualData;
@@ -3880,11 +3906,16 @@ function drawPlantGraph(canvasId, metric, plantNum, farmingMethod = 'aeroponics'
 	});
 
 	const predPoints = [];
-	predicted.forEach((val, i) => {
-		const x = leftPad + (i / (predicted.length - 1)) * plotW;
-		const y = topPad + (1 - (val - minVal) / (maxVal - minVal)) * plotH;
-		predPoints.push({x, y, v: val});
-	});
+	const hasPredictions = predicted.some(v => v !== null && Number.isFinite(v));
+	if(hasPredictions) {
+		predicted.forEach((val, i) => {
+			const x = leftPad + (i / (predicted.length - 1)) * plotW;
+			const y = (val !== null && Number.isFinite(val))
+				? topPad + (1 - (val - minVal) / (maxVal - minVal)) * plotH
+				: null;
+			predPoints.push({x, y, v: val});
+		});
+	}
 
 	// Filled area (Actual) if enabled
 	if(canvas._showActual === undefined) canvas._showActual = true;
@@ -3908,22 +3939,25 @@ function drawPlantGraph(canvasId, metric, plantNum, farmingMethod = 'aeroponics'
 		ctx.fill();
 	}
 
-	// Draw predicted (dashed) below actual markers
-	ctx.beginPath();
-	predPoints.forEach((p, i) => {
-		if(i === 0) ctx.moveTo(p.x, p.y);
-		else {
-			const prev = predPoints[i-1];
-			const cpX = (prev.x + p.x) / 2;
-			const cpY = (prev.y + p.y) / 2;
-			ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
-		}
-	});
-	ctx.setLineDash([6,6]);
-	ctx.strokeStyle = '#facc15';
-	ctx.lineWidth = 2.5;
-	if(canvas._showPredicted) ctx.stroke();
-	ctx.setLineDash([]);
+	// Draw predicted (dashed) below actual markers – only if we have a trained model
+	if(hasPredictions && predPoints.length > 0 && canvas._showPredicted) {
+		ctx.beginPath();
+		predPoints.forEach((p, i) => {
+			if(p.y === null) return;
+			if(i === 0 || predPoints[i-1].y === null) ctx.moveTo(p.x, p.y);
+			else {
+				const prev = predPoints[i-1];
+				const cpX = (prev.x + p.x) / 2;
+				const cpY = (prev.y + p.y) / 2;
+				ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
+			}
+		});
+		ctx.setLineDash([6,6]);
+		ctx.strokeStyle = '#facc15';
+		ctx.lineWidth = 2.5;
+		ctx.stroke();
+		ctx.setLineDash([]);
+	}
 
 	// Draw actual line on top
 	ctx.beginPath();
@@ -4054,8 +4088,8 @@ function drawPlantGraph(canvasId, metric, plantNum, farmingMethod = 'aeroponics'
 			tooltip.style.padding = '6px 8px';
 			tooltip.style.borderRadius = '6px';
 			tooltip.innerHTML = `<div style="font-weight:700;">${(canvas._dateLabels && canvas._dateLabels[idx] && canvas._dateLabels[idx].display) || ''}</div>
-								<div style="color:#2b6ef6">Actual: ${actualVal.toFixed(2)}</div>
-								<div style="color:#b8860b">Pred: ${predVal.toFixed(2)}</div>`;
+								<div style="color:#2b6ef6">Actual: ${(actualVal !== null && Number.isFinite(actualVal)) ? actualVal.toFixed(2) : '--'}</div>
+								<div style="color:#b8860b">Pred: ${(predVal !== null && Number.isFinite(predVal)) ? predVal.toFixed(2) : '--'}</div>`;
 			const tHeight = tooltip.offsetHeight || 40;
 			let topPos = (rect.top - parentRect.top) + py - tHeight - 8;
 			// if there's no space above the point, show below

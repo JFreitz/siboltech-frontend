@@ -26,10 +26,14 @@ from db import Base, SensorReading, PlantReading, ActuatorEvent
 from automation import init_controller, get_controller
 
 # === Voltage smoothing buffers (reduce ADC noise before calibration) ===
+# pH needs larger buffer (15 = 30s) because TDS probe excitation current
+# couples into the high-impedance pH probe, causing ~1V voltage swing.
+# TDS/DO are stable so 5-sample buffer (10s) is fine.
 from collections import deque
-_PH_VOLTAGE_BUF = deque(maxlen=10)    # rolling window of pH voltages
-_DO_VOLTAGE_BUF = deque(maxlen=10)    # rolling window of DO voltages
-_TDS_PPM_BUF = deque(maxlen=10)       # rolling window of TDS ppm (filters ADC noise/drops)
+_PH_VOLTAGE_BUF = deque(maxlen=15)    # larger buffer for noisy pH probe
+_DO_VOLTAGE_BUF = deque(maxlen=5)     # rolling window of DO voltages
+_TDS_PPM_BUF = deque(maxlen=5)        # rolling window of TDS ppm (filters ADC noise/drops)
+_TDS_VOLTAGE_BUF = deque(maxlen=5)    # rolling window of raw TDS voltages
 
 def _smoothed_voltage(buf, new_v):
     """Add new voltage to buffer, return the median (robust to outliers)."""
@@ -434,6 +438,49 @@ def ingest():
         return {"ok": False, "error": "invalid readings"}, 400
 
     computed_readings = dict(readings)
+
+    # === Validate BME280 readings (reject I2C error values) ===
+    # BME280 datasheet ranges: temp -40..+85°C, humidity 0..100%
+    # When temp is bad, the ESP32's TDS is ALSO corrupted (temp compensation
+    # uses the bad temp value), so we flag it and recompute from raw voltage.
+    _temp_was_bad = False
+    if "temperature_c" in computed_readings:
+        try:
+            t = float(computed_readings["temperature_c"])
+            import math
+            if math.isnan(t) or math.isinf(t) or t < -40.0 or t > 85.0:
+                print(f"[INGEST] Rejected bad temperature: {t}°C → TDS also flagged")
+                del computed_readings["temperature_c"]
+                _temp_was_bad = True
+        except (ValueError, TypeError):
+            del computed_readings["temperature_c"]
+            _temp_was_bad = True
+
+    if "humidity" in computed_readings:
+        try:
+            h = float(computed_readings["humidity"])
+            import math
+            # Reject NaN/inf, and also 100.0% exactly (BME280 I2C glitch value)
+            if math.isnan(h) or math.isinf(h) or h < 0.0 or h >= 100.0:
+                print(f"[INGEST] Rejected bad humidity: {h}%")
+                del computed_readings["humidity"]
+        except (ValueError, TypeError):
+            del computed_readings["humidity"]
+
+    # When ESP32 temp was bad (180°C spike), its TDS is corrupted because
+    # the temp compensation formula divides voltage by (1 + 0.02*(180-25)) = 4.1.
+    # Fix: recompute TDS from raw voltage (tds_voltage_v) at fixed 25°C.
+    if _temp_was_bad and "tds_ppm" in computed_readings and "tds_voltage_v" in computed_readings:
+        try:
+            raw_v = float(computed_readings["tds_voltage_v"])
+            # Same cubic formula as ESP32 but with comp=1.0 (25°C reference)
+            tds_recomputed = (133.42 * raw_v**3 - 255.86 * raw_v**2 + 857.39 * raw_v) * 0.5
+            print(f"[INGEST] TDS recomputed from raw voltage: {computed_readings['tds_ppm']}→{tds_recomputed:.1f}")
+            computed_readings["tds_ppm"] = tds_recomputed
+        except Exception:
+            # If recompute fails, drop the corrupted TDS entirely
+            del computed_readings["tds_ppm"]
+
     if "ph" not in computed_readings and "ph_voltage_v" in computed_readings:
         try:
             from calibration import calibrate_ph
@@ -456,12 +503,13 @@ def ingest():
         except Exception:
             pass
 
-    # Re-calibrate TDS: smooth first (median filter), then apply linear correction
+    # Apply TDS calibration using ESP32's temperature-compensated value.
+    # ESP32 compensates using BME280 air temp (imperfect but better than no compensation,
+    # since air temp tracks water temp directionally).
     if "tds_ppm" in computed_readings:
         try:
             from calibration import load_calibration
             raw_tds = float(computed_readings["tds_ppm"])
-            # Median-smooth to reject ADC noise drops (0, 200, etc.)
             raw_tds_smooth = _smoothed_voltage(_TDS_PPM_BUF, raw_tds)
             _tds_cal = load_calibration().get("tds", {})
             _tds_slope = _tds_cal.get("slope", 1.0)
@@ -999,8 +1047,12 @@ def _automation_relay_callback(relay_id: int, state: bool):
     if state is None:
         return
     state = bool(state)
-    if OVERRIDE_MODE_ENABLED or CALIBRATION_MODE_ENABLED:
-        return  # Don't change relays in override or calibration mode
+    # Grow lights (relay 6 & 8) are time-based and ALWAYS follow the schedule
+    # regardless of override/calibration mode — they must never flicker
+    GROW_LIGHT_RELAYS = {6, 8}
+    if relay_id not in GROW_LIGHT_RELAYS:
+        if OVERRIDE_MODE_ENABLED or CALIBRATION_MODE_ENABLED:
+            return  # Don't change non-light relays in override or calibration mode
     prev = RELAY_STATES.get(relay_id)
     RELAY_STATES[relay_id] = state
     if prev != state:
@@ -1028,12 +1080,10 @@ RELAY_LABELS = {
 
 
 def _init_relay_states():
-    """Load relay states from DB on startup (only if no automation controller)."""
+    """Load last known relay states from DB on startup.
+    This prevents false toggle events when automation sets the same state
+    that was already active before the restart."""
     global RELAY_STATES
-    # Skip if automation controller is running - it will set the correct states
-    if _automation_controller:
-        print("[API] Skipping DB relay state load - automation controller is active", flush=True)
-        return
     try:
         with Session() as session:
             for i in range(1, 10):  # 9 relays
@@ -1043,8 +1093,11 @@ def _init_relay_states():
                 ).first()
                 if row:
                     RELAY_STATES[i] = row[0] == 1.0
-    except Exception:
-        pass
+        loaded = {i: RELAY_STATES[i] for i in range(1, 10) if RELAY_STATES[i]}
+        if loaded:
+            print(f"[API] Loaded relay states from DB: {loaded}", flush=True)
+    except Exception as e:
+        print(f"[API] Could not load relay states: {e}", flush=True)
 
 
 # Initialize on startup
@@ -1182,6 +1235,56 @@ def save_plant_reading():
     except Exception as e:
         return {"ok": False, "error": str(e)}, 400
 
+# ==================== PLANT HISTORY (per-plant time series) ====================
+@app.route("/api/plant-history")
+def get_plant_history():
+    """Return per-plant measurement time series from plant_readings.
+
+    Query params:
+    - plant_id: 1-6 (required)
+    - farming_system: 'aeroponics' | 'dwc' | 'traditional' (default: 'aeroponics')
+    - metric: 'height' | 'length' | 'leaves' | 'branches' | 'width' (default: 'height')
+
+    Returns: { success, metric, data: [{date, value}, ...] }
+    """
+    plant_id = request.args.get("plant_id", type=int)
+    farming_system = request.args.get("farming_system", "aeroponics").lower()
+    metric = request.args.get("metric", "height").lower()
+
+    if not plant_id:
+        return jsonify({"success": False, "error": "plant_id required"}), 400
+
+    # Map frontend metric names to DB column names
+    metric_col_map = {
+        "height": "height",
+        "length": "length",
+        "leaves": "leaves",
+        "branches": "branches",
+        "width": "weight",   # frontend calls it "width", DB stores "weight"
+    }
+    db_col = metric_col_map.get(metric)
+    if not db_col:
+        return jsonify({"success": False, "error": f"Unknown metric: {metric}"}), 400
+
+    with Session() as session:
+        rows = session.execute(
+            text(f"""
+                SELECT DATE(timestamp) AS day, {db_col} AS value
+                FROM plant_readings
+                WHERE plant_id = :pid
+                  AND farming_system = :fs
+                  AND {db_col} IS NOT NULL
+                ORDER BY day ASC
+            """),
+            {"pid": plant_id, "fs": farming_system},
+        ).fetchall()
+
+    data = [{"date": str(r[0]), "value": round(float(r[1]), 2)} for r in rows]
+
+    return jsonify({"success": True, "metric": metric, "plant_id": plant_id,
+                     "farming_system": farming_system, "data": data})
+
+
 # ==================== ACTUATOR EVENTS ====================
 @app.route("/api/relay-event", methods=["POST"])
 def log_relay_event():
@@ -1254,10 +1357,13 @@ def set_override_mode():
     
     OVERRIDE_MODE_ENABLED = bool(enabled)
     
-    # Always zero all relays on mode change (clean slate)
+    # Zero all relays on mode change EXCEPT grow lights (relay 6 & 8)
+    # Grow lights are time-based (6am-6pm) and must never flicker due to mode changes
+    GROW_LIGHT_RELAYS = {6, 8}
     for i in range(1, 10):
-        RELAY_STATES[i] = False
-    print(f"[OVERRIDE MODE] All relays zeroed", flush=True)
+        if i not in GROW_LIGHT_RELAYS:
+            RELAY_STATES[i] = False
+    print(f"[OVERRIDE MODE] Relays zeroed (grow lights preserved)", flush=True)
     
     # Sync with automation controller
     controller = get_controller()
@@ -1286,6 +1392,18 @@ def automation_status():
 
 
 # ==================== CALIBRATION MODE ====================
+@app.route("/api/flush-buffers", methods=["POST"])
+def flush_buffers():
+    """Clear all smoothing buffers. Call this when switching nutrient solutions
+    so old readings don't contaminate new ones."""
+    _PH_VOLTAGE_BUF.clear()
+    _DO_VOLTAGE_BUF.clear()
+    _TDS_PPM_BUF.clear()
+    _TDS_VOLTAGE_BUF.clear()
+    print("[BUFFERS] All smoothing buffers flushed")
+    return jsonify({"success": True, "message": "All smoothing buffers cleared"})
+
+
 @app.route("/api/calibration-mode", methods=["GET"])
 def get_calibration_mode():
     """Get current calibration mode status."""
