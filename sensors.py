@@ -34,18 +34,56 @@ except Exception as e:
     ads = None
     chan_ph = chan_tds = chan_do = None
 
+import math
+
+# BME280 valid ranges (datasheet)
+_BME_TEMP_MIN, _BME_TEMP_MAX = -40.0, 85.0
+_BME_HUM_MIN, _BME_HUM_MAX = 0.0, 100.0
+_BME_PRESS_MIN, _BME_PRESS_MAX = 300.0, 1100.0
+
+_last_good_bme = {}
+
 def read_bme():
     """Return dict with temperature (C), humidity (%) and pressure (hPa).
 
     Returns empty dict if BME280 not available.
+    Validates readings against BME280 datasheet ranges.
+    Falls back to last known good values on bad reads.
     """
+    global _last_good_bme
     if not bme:
         return {}
-    return {
-        "temperature_c": round(bme.temperature, 3),
-        "humidity": round(bme.relative_humidity, 3),
-        "pressure_hpa": round(bme.pressure, 3),
-    }
+
+    t = bme.temperature
+    h = bme.relative_humidity
+    p = bme.pressure
+
+    result = {}
+
+    # Validate temperature
+    if not (math.isnan(t) or math.isinf(t)) and _BME_TEMP_MIN <= t <= _BME_TEMP_MAX:
+        result["temperature_c"] = round(t, 3)
+        _last_good_bme["temperature_c"] = result["temperature_c"]
+    elif "temperature_c" in _last_good_bme:
+        result["temperature_c"] = _last_good_bme["temperature_c"]
+    else:
+        return {}  # No valid temp ever, skip entire reading
+
+    # Validate humidity
+    if not (math.isnan(h) or math.isinf(h)) and _BME_HUM_MIN <= h <= _BME_HUM_MAX:
+        result["humidity"] = round(h, 3)
+        _last_good_bme["humidity"] = result["humidity"]
+    elif "humidity" in _last_good_bme:
+        result["humidity"] = _last_good_bme["humidity"]
+
+    # Validate pressure
+    if not (math.isnan(p) or math.isinf(p)) and _BME_PRESS_MIN <= p <= _BME_PRESS_MAX:
+        result["pressure_hpa"] = round(p, 3)
+        _last_good_bme["pressure_hpa"] = result["pressure_hpa"]
+    elif "pressure_hpa" in _last_good_bme:
+        result["pressure_hpa"] = _last_good_bme["pressure_hpa"]
+
+    return result
 
 # --- Calibration functions moved to calibration.py ---
 

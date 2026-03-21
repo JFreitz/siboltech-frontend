@@ -65,8 +65,8 @@ TDS_DOSE_ON = 2   # seconds ON (pulse duration, matching manual buttons)
 TDS_DOSE_OFF = 30 # seconds OFF (interval between pulses)
 
 # Misting cycle
-MISTING_ON = 5           # seconds ON
-MISTING_OFF = 15 * 60    # 15 minutes OFF (in seconds)
+MISTING_ON = 10          # seconds ON
+MISTING_OFF = 3 * 60     # 3 minutes OFF (in seconds)
 
 # Grow lights schedule
 LIGHTS_ON_HOUR = 6    # 6 AM
@@ -162,11 +162,12 @@ class AutomationController:
         self.relays = {name: RelayState(id, name) for name, id in RELAY.items()}
         
         # Pulse timers
-        self.misting_last_on = 0
-        self.misting_last_off = 0
+        now = time.time()
+        self.misting_last_on = now
+        self.misting_last_off = now
         self.tds_dosing_active = False
-        self.tds_dose_last_on = 0
-        self.tds_dose_last_off = 0
+        self.tds_dose_last_on = now
+        self.tds_dose_last_off = now
         self.ph_dosing_until = 0
         
         # Periodic state enforcement (push all states to callback every N seconds)
@@ -199,14 +200,20 @@ class AutomationController:
         self.override_mode = override
         print(f"[AUTOMATION] Override mode: {'ON' if override else 'OFF'}", flush=True)
         
+        # Always immediately re-assert grow lights (they're time-based, never affected by override)
+        self._process_grow_lights()
+        
         # When override is turned OFF, immediately run automation to restore proper states
         if was_override and not override:
             print("[AUTOMATION] Override disabled - forcing relay state resync", flush=True)
             try:
                 # Reset internal relay states to force callback execution
-                for relay in self.relays.values():
-                    relay.state = None  # Force state to unknown so next set() will trigger callback
-                    relay.last_change = 0  # Reset debounce timer
+                # EXCEPT grow lights — they were just set correctly above
+                GROW_LIGHT_NAMES = {"GROW_LIGHTS_AERO", "GROW_LIGHTS_DWC"}
+                for name, relay in self.relays.items():
+                    if name not in GROW_LIGHT_NAMES:
+                        relay.state = None  # Force state to unknown so next set() will trigger callback
+                        relay.last_change = 0  # Reset debounce timer
                 self._process_automation()
             except Exception as e:
                 print(f"[AUTOMATION] Error during immediate cycle: {e}", flush=True)
@@ -243,15 +250,19 @@ class AutomationController:
         """Main automation loop."""
         while not self._stop_event.is_set():
             try:
-                # Always process misting cycle (regardless of override mode)
-                # since manual button presses should still pulse correctly
                 now = time.time()
-                self._process_misting(now)
                 
-                # Full automation only when override is OFF
+                # Grow lights are ALWAYS time-based (6am-6pm) regardless of override mode
+                # They must never flicker due to mode changes or manual relay commands
+                self._process_grow_lights()
+                
+                # Full automation (including misting) only when override is OFF
                 if not self.override_mode:
                     self._process_automation()
                     self._enforce_relay_states()
+                else:
+                    # Even in override mode, keep misting running on its schedule
+                    self._process_misting(now)
             except Exception as e:
                 print(f"[AUTOMATION] Error: {e}")
             
@@ -260,14 +271,11 @@ class AutomationController:
     def _enforce_relay_states(self):
         """Periodically push all known relay states to callback.
         This ensures RELAY_STATES in api.py stays in sync even if
-        a callback was missed during startup or race conditions."""
-        now = time.time()
-        if now - self._last_enforce < self._ENFORCE_INTERVAL:
-            return
-        self._last_enforce = now
-        for name, relay in self.relays.items():
-            if relay.state is not None:
-                self.relay_callback(relay.relay_id, relay.state)
+        a callback was missed during startup or race conditions.
+        
+        NOTE: Currently DISABLED to prevent API hammering.
+        The API relay endpoints are handling state directly."""
+        pass
     
     def _process_automation(self):
         """Process all automation rules."""
@@ -335,10 +343,7 @@ class AutomationController:
             self._set_relay("EXHAUST_IN", exhaust_needed)
             self._set_relay("EXHAUST_OUT", exhaust_needed)
         
-        # ===== 5 & 6. GROW LIGHTS (Relays 5 & 6) - Time-based =====
-        lights_on = self._is_daytime()
-        self._set_relay("GROW_LIGHTS_AERO", lights_on)
-        self._set_relay("GROW_LIGHTS_DWC", lights_on)
+        # ===== 5 & 6. GROW LIGHTS - handled in _process_grow_lights() (always runs) =====
         
         # ===== 7. pH UP (Relay 7) - Low pH =====
         if self.filters["ph"].ready():
@@ -368,8 +373,15 @@ class AutomationController:
         if self.filters["tds"].ready():
             self._process_tds_dosing(now, tds)
     
+    def _process_grow_lights(self):
+        """Process grow lights schedule: ON 6am-6pm, OFF otherwise.
+        Always runs regardless of override mode — grow lights must never flicker."""
+        lights_on = self._is_daytime()
+        self._set_relay("GROW_LIGHTS_AERO", lights_on)
+        self._set_relay("GROW_LIGHTS_DWC", lights_on)
+    
     def _process_misting(self, now: float):
-        """Process misting pump cycle: 5s ON, 15min OFF.
+        """Process misting pump cycle: 10s ON, 180s OFF.
         Handles both automatic cycles and manual button presses."""
         relay = self.relays["MISTING"]
         
@@ -385,15 +397,20 @@ class AutomationController:
                 # State just changed to ON - record the time
                 self.misting_last_on = now
             
-            # Check if time to turn OFF (after 5 seconds)
+            # Check if time to turn OFF (after MISTING_ON seconds)
             if now - self.misting_last_on >= MISTING_ON:
                 self._set_relay("MISTING", False, force=True)
                 self.misting_last_off = now
+                print(f"[MISTING] OFF at {now:.1f}, will turn ON at {now + MISTING_OFF:.1f} ({MISTING_OFF}s later)")
         else:
             # Currently OFF - check if time to turn ON for next cycle
-            if now - self.misting_last_off >= MISTING_OFF:
+            time_off = now - self.misting_last_off
+            if time_off >= MISTING_OFF:
                 self._set_relay("MISTING", True, force=True)
                 self.misting_last_on = now
+                print(f"[MISTING] ON at {now:.1f} (was off for {time_off:.1f}s, needed {MISTING_OFF}s)")
+            elif time_off > 0 and int(time_off) % 30 == 0:  # Log every 30 seconds
+                print(f"[MISTING] OFF: {time_off:.1f}s / {MISTING_OFF}s until next cycle")
     
     def _process_tds_dosing(self, now: float, tds: float):
         """Process TDS-based nutrient dosing for leafy green."""

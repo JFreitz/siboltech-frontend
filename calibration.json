@@ -1,14 +1,14 @@
 {
   "ph": {
-    "slope": -10.6394,
-    "offset": 24.0344
+    "slope": 4.24,
+    "offset": -1.46
   },
   "tds": {
-    "slope": 0.7797,
+    "slope": 1627.0,
     "offset": 0.0
   },
   "do": {
-    "slope": 8.31257928063784,
-    "offset": 2.4519
+    "slope": 14.56,
+    "offset": 0.0
   }
 }

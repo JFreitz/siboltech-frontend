@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SibolTech Local Temporary Dashboard</title>
+  <style>
+    :root{--bg:#f3f7f4;--card:#fff;--txt:#1f2937;--muted:#6b7280;--ok:#16a34a;--bad:#dc2626;--pri:#0ea5e9;--border:#e5e7eb}
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--txt)}
+    .wrap{max-width:1200px;margin:0 auto;padding:16px}
+    .top{display:flex;gap:12px;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 16px}
+    .title{font-weight:800;font-size:18px}
+    .chip{display:flex;gap:8px;align-items:center;padding:6px 10px;border-radius:999px;background:#eef2ff;font-size:13px}
+    .dot{width:10px;height:10px;border-radius:50%;background:#9ca3af}
+    .dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)}
+    .tabs{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+    .tabbtn{border:1px solid var(--border);background:#fff;padding:8px 12px;border-radius:10px;cursor:pointer}
+    .tabbtn.active{background:#e0f2fe;border-color:#7dd3fc}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;margin-top:12px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px}
+    .col-6{grid-column:span 6}.col-12{grid-column:span 12}.col-4{grid-column:span 4}
+    @media(max-width:900px){.col-6,.col-4{grid-column:span 12}}
+    .label{font-size:12px;color:var(--muted)} .value{font-weight:700;font-size:20px}
+    .sensor-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+    @media(max-width:900px){.sensor-grid{grid-template-columns:repeat(2,1fr)}}
+    .sensor{padding:10px;border:1px solid var(--border);border-radius:10px;background:#fafafa}
+    .relay-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    @media(max-width:900px){.relay-grid{grid-template-columns:repeat(2,1fr)}}
+    .relay{padding:10px;border:1px solid var(--border);border-radius:10px;background:#fafafa;display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .switch{position:relative;width:44px;height:24px;display:inline-block}
+    .switch input{display:none}
+    .slider{position:absolute;inset:0;background:#d1d5db;border-radius:24px;transition:.2s;cursor:pointer}
+    .slider:before{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:#fff;transition:.2s}
+    input:checked + .slider{background:#22c55e}
+    input:checked + .slider:before{transform:translateX(20px)}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    button{border:1px solid var(--border);background:#fff;padding:8px 10px;border-radius:10px;cursor:pointer}
+    button.primary{background:#0ea5e9;color:#fff;border-color:#0284c7}
+    button.warn{background:#ef4444;color:#fff;border-color:#dc2626}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{border-bottom:1px solid var(--border);padding:8px;text-align:left}
+    .mono{font-family:ui-monospace,monospace}
+    .hidden{display:none}
+    .msg{font-size:12px;color:var(--muted)}
+    input[type="number"],select{padding:6px 8px;border:1px solid var(--border);border-radius:8px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <div class="title">SibolTech Local Temporary Dashboard</div>
+        <div class="msg">Local-only fallback (no Firebase required)</div>
+      </div>
+      <div class="chip"><span id="connDot" class="dot"></span><span id="connText">Connecting...</span></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tabbtn active" data-tab="overview">Overview</button>
+      <button class="tabbtn" data-tab="history">History</button>
+      <button class="tabbtn" data-tab="calibration">Calibration</button>
+    </div>
+
+    <section id="overview" class="tab">
+      <div class="grid">
+        <div class="card col-12">
+          <div class="row" style="justify-content:space-between">
+            <strong>Sensor Readings</strong>
+            <span class="msg">Last update: <span id="lastUpdate">--</span></span>
+          </div>
+          <div class="sensor-grid" id="sensorGrid"></div>
+        </div>
+
+        <div class="card col-12">
+          <div class="row" style="justify-content:space-between">
+            <strong>Relay Control (R1-R9)</strong>
+            <div class="row">
+              <button id="allOn" class="primary">ALL ON</button>
+              <button id="allOff" class="warn">ALL OFF</button>
+            </div>
+          </div>
+          <div class="relay-grid" id="relayGrid"></div>
+          <div class="msg" id="relayMsg">Waiting for relay status...</div>
+        </div>
+
+        <div class="card col-4"><div class="label">API</div><div id="apiStatus" class="value">--</div></div>
+        <div class="card col-4"><div class="label">DB Records</div><div id="dbCount" class="value">--</div></div>
+        <div class="card col-4"><div class="label">Calibration Mode</div><div id="calModeBadge" class="value">--</div></div>
+      </div>
+    </section>
+
+    <section id="history" class="tab hidden">
+      <div class="card">
+        <div class="row" style="margin-bottom:8px">
+          <strong>History</strong>
+          <select id="historyType"><option value="readings">readings (latest hour)</option><option value="history">history endpoint</option></select>
+          <button id="refreshHistory" class="primary">Refresh</button>
+        </div>
+        <div style="overflow:auto;max-height:420px">
+          <table>
+            <thead><tr><th>Timestamp</th><th>Sensor</th><th>Value</th><th>Unit</th></tr></thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="calibration" class="tab hidden">
+      <div class="grid">
+        <div class="card col-6">
+          <div class="row" style="justify-content:space-between;margin-bottom:8px">
+            <strong>Calibration Mode</strong>
+            <button id="toggleCalMode" class="primary">Toggle</button>
+          </div>
+          <div class="msg">Disables actuators while calibrating (if endpoint exists).</div>
+        </div>
+
+        <div class="card col-6">
+          <div class="row" style="justify-content:space-between;margin-bottom:8px"><strong>Voltage Snapshot</strong><button id="readVoltage">Read</button></div>
+          <div id="voltageBox" class="mono msg">No voltage yet</div>
+        </div>
+
+        <div class="card col-12">
+          <div class="row" style="margin-bottom:8px"><strong>Calibration Values</strong><button id="loadCal">Load</button></div>
+          <div id="calForms" class="row"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+<script>
+const API = `${location.protocol}//${location.hostname}:5000/api`;
+const sensors = [
+  {key:'ph', label:'pH'},
+  {key:'do_mg_l', label:'DO'},
+  {key:'tds_ppm', label:'TDS'},
+  {key:'temperature_c', label:'Temp'},
+  {key:'humidity', label:'Humidity'}
+];
+const relayLabels = {1:'Leafy Green',2:'pH Down',3:'pH Up',4:'Misting',5:'Exhaust OUT',6:'Lights Aero',7:'Air Pump',8:'Lights DWC',9:'Exhaust IN'};
+
+function setConn(ok, text='Connected'){
+  const d = document.getElementById('connDot');
+  const t = document.getElementById('connText');
+  d.className = 'dot ' + (ok ? 'ok' : 'bad');
+  t.textContent = text;
+}
+
+function initTabs(){
+  document.querySelectorAll('.tabbtn').forEach(btn=>{
+    btn.onclick=()=>{
+      document.querySelectorAll('.tabbtn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.tab').forEach(s=>s.classList.add('hidden'));
+      document.getElementById(tab).classList.remove('hidden');
+    };
+  });
+}
+
+function initOverviewUI(){
+  const sg = document.getElementById('sensorGrid');
+  sg.innerHTML = sensors.map(s=>`<div class="sensor"><div class="label">${s.label}</div><div id="s_${s.key}" class="value">--</div></div>`).join('');
+
+  const rg = document.getElementById('relayGrid');
+  rg.innerHTML = Array.from({length:9}, (_,i)=>i+1).map(id=>`
+    <div class="relay">
+      <div><div class="label">R${id}</div><div class="msg">${relayLabels[id]||('Relay '+id)}</div></div>
+      <label class="switch"><input id="r_${id}" type="checkbox"><span class="slider"></span></label>
+    </div>
+  `).join('');
+
+  for(let i=1;i<=9;i++){
+    document.getElementById(`r_${i}`).addEventListener('change', async (e)=>{
+      const on = e.target.checked;
+      try{
+        const res = await fetch(`${API}/relay/${i}/${on?'on':'off'}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+        if(!res.ok) throw new Error(await res.text());
+        document.getElementById('relayMsg').textContent = `R${i} ${on?'ON':'OFF'} applied`;
+      }catch(err){
+        e.target.checked = !on;
+        document.getElementById('relayMsg').textContent = `Relay API unavailable: ${err.message}`;
+      }
+    });
+  }
+
+  document.getElementById('allOn').onclick = ()=>setAllRelays(true);
+  document.getElementById('allOff').onclick = ()=>setAllRelays(false);
+}
+
+async function setAllRelays(on){
+  try{
+    const res = await fetch(`${API}/relay/all/${on?'on':'off'}`, {method:'POST'});
+    if(!res.ok) throw new Error(await res.text());
+    await loadRelayStatus();
+  }catch(err){
+    document.getElementById('relayMsg').textContent = `ALL ${on?'ON':'OFF'} failed: ${err.message}`;
+  }
+}
+
+async function loadLatest(){
+  const res = await fetch(`${API}/latest`);
+  if(!res.ok) throw new Error('latest failed');
+  const data = await res.json();
+
+  // Fallback: some local API variants only return temp/humidity in /latest.
+  // If pH/TDS/DO are missing, derive latest values from /readings.
+  const missingCore = ['ph','do_mg_l','tds_ppm'].some(k => data[k] === undefined);
+  if (missingCore) {
+    try {
+      const r2 = await fetch(`${API}/readings`);
+      if (r2.ok) {
+        const rows = await r2.json();
+        const map = {};
+        for (const row of rows) {
+          if (!map[row.sensor]) {
+            map[row.sensor] = {
+              value: row.value,
+              unit: row.unit,
+              timestamp: row.timestamp
+            };
+          }
+        }
+        ['ph','do_mg_l','tds_ppm','temperature_c','humidity'].forEach(k => {
+          if (data[k] === undefined && map[k] !== undefined) data[k] = map[k];
+        });
+      }
+    } catch (_) {}
+  }
+
+  sensors.forEach(s=>{
+    const v = data[s.key]?.value;
+    const u = data[s.key]?.unit || '';
+    document.getElementById(`s_${s.key}`).textContent = (v===undefined?'--':Number(v).toFixed(2)) + (v===undefined?'':` ${u}`);
+  });
+  document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+}
+
+async function loadRelayStatus(){
+  try{
+    const res = await fetch(`${API}/relay/status`);
+    if(!res.ok) throw new Error('relay/status missing');
+    const data = await res.json();
+    const list = data.relays || [];
+    list.forEach(r=>{
+      const el = document.getElementById(`r_${r.id}`);
+      if(el) el.checked = !!r.state;
+    });
+    document.getElementById('relayMsg').textContent = 'Relay status synced';
+  }catch(err){
+    document.getElementById('relayMsg').textContent = 'Relay endpoint not available in current API';
+  }
+}
+
+async function loadDbStatus(){
+  try{
+    const r = await fetch(`${API}/db_status`); const d = await r.json();
+    document.getElementById('apiStatus').textContent = d.db_connected ? 'ONLINE' : 'ERROR';
+    document.getElementById('dbCount').textContent = d.record_count ?? '--';
+  }catch{
+    document.getElementById('apiStatus').textContent='OFFLINE';
+  }
+}
+
+async function loadCalMode(){
+  try{
+    const r = await fetch(`${API}/calibration-mode`); if(!r.ok) throw 0;
+    const d = await r.json();
+    document.getElementById('calModeBadge').textContent = d.enabled ? 'ON' : 'OFF';
+  }catch{
+    document.getElementById('calModeBadge').textContent = 'N/A';
+  }
+}
+
+async function refreshAll(){
+  try{
+    await Promise.all([loadLatest(), loadDbStatus(), loadRelayStatus(), loadCalMode()]);
+    setConn(true,'Connected');
+  }catch(e){
+    setConn(false,'API error');
+  }
+}
+
+async function loadHistory(){
+  const type = document.getElementById('historyType').value;
+  const tbody = document.getElementById('historyBody');
+  tbody.innerHTML = '<tr><td colspan="4">Loading...</td></tr>';
+  try{
+    let rows = [];
+    if(type === 'history'){
+      const r = await fetch(`${API}/history?type=sensor&interval=15min&days=2&limit=100`);
+      const d = await r.json();
+      rows = Array.isArray(d) ? d : (d.rows || []);
+      tbody.innerHTML = rows.slice(0,200).map(x=>`<tr><td>${x.timestamp||x.ts||''}</td><td>${x.sensor||x.key||''}</td><td>${x.value??''}</td><td>${x.unit||''}</td></tr>`).join('') || '<tr><td colspan="4">No data</td></tr>';
+      return;
+    }
+    const r = await fetch(`${API}/readings`);
+    rows = await r.json();
+    tbody.innerHTML = rows.map(x=>`<tr><td>${x.timestamp||''}</td><td>${x.sensor||''}</td><td>${x.value??''}</td><td>${x.unit||''}</td></tr>`).join('') || '<tr><td colspan="4">No data</td></tr>';
+  }catch(err){
+    tbody.innerHTML = `<tr><td colspan="4">History error: ${err.message}</td></tr>`;
+  }
+}
+
+async function initCalibration(){
+  document.getElementById('toggleCalMode').onclick = async ()=>{
+    try{
+      const cur = (document.getElementById('calModeBadge').textContent || '').trim() === 'ON';
+      const r = await fetch(`${API}/calibration-mode`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({enabled: !cur})});
+      if(!r.ok) throw new Error(await r.text());
+      await loadCalMode();
+    }catch(err){ alert('Calibration-mode endpoint unavailable: ' + err.message); }
+  };
+
+  document.getElementById('readVoltage').onclick = async ()=>{
+    try{
+      const r = await fetch(`${API}/voltage`); if(!r.ok) throw new Error(await r.text());
+      const d = await r.json();
+      document.getElementById('voltageBox').textContent = JSON.stringify(d, null, 2);
+    }catch(err){ document.getElementById('voltageBox').textContent = 'Voltage endpoint unavailable: ' + err.message; }
+  };
+
+  document.getElementById('loadCal').onclick = loadCalibrationValues;
+}
+
+async function loadCalibrationValues(){
+  const box = document.getElementById('calForms');
+  try{
+    const r = await fetch(`${API}/calibration`); if(!r.ok) throw new Error(await r.text());
+    const d = await r.json();
+    const sensors = ['ph','tds','do'];
+    box.innerHTML = sensors.map(s=>{
+      const slope = d[s]?.slope ?? '';
+      const offset = d[s]?.offset ?? '';
+      return `<div class="card" style="min-width:260px"><strong>${s.toUpperCase()}</strong><div class="row" style="margin-top:8px"><span class="label">Slope</span><input id="${s}_slope" type="number" step="0.0001" value="${slope}"></div><div class="row"><span class="label">Offset</span><input id="${s}_offset" type="number" step="0.0001" value="${offset}"></div><button class="primary" onclick="saveCal('${s}')">Save ${s.toUpperCase()}</button></div>`;
+    }).join('');
+  }catch(err){
+    box.innerHTML = `<div class='msg'>Calibration endpoint unavailable: ${err.message}</div>`;
+  }
+}
+
+async function saveCal(sensor){
+  const slope = Number(document.getElementById(`${sensor}_slope`).value);
+  const offset = Number(document.getElementById(`${sensor}_offset`).value);
+  try{
+    const r = await fetch(`${API}/calibration`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({sensor, slope, offset})});
+    if(!r.ok) throw new Error(await r.text());
+    alert(`${sensor.toUpperCase()} calibration saved`);
+  }catch(err){ alert('Save failed: ' + err.message); }
+}
+
+(function boot(){
+  initTabs();
+  initOverviewUI();
+  initCalibration();
+  document.getElementById('refreshHistory').onclick = loadHistory;
+  refreshAll();
+  setInterval(refreshAll, 2000);
+})();
+</script>
+</body>
+</html>

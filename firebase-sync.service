@@ -8,8 +8,8 @@ Requires=siboltech-api.service
 Type=simple
 User=username
 WorkingDirectory=/home/username/Despro
-Environment=PATH=/home/username/sensor-venv/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/home/username/sensor-venv/bin/python /home/username/Despro/firebase_sync.py
+Environment=PATH=/home/username/Despro/.venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/username/Despro/.venv/bin/python -u /home/username/Despro/firebase_sync.py
 Restart=always
 RestartSec=10
 

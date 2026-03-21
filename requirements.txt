@@ -8,9 +8,3 @@ python-dotenv
 flask
 sqlite-web
 gunicorn
-pyserial
-paho-mqtt
-scikit-learn
-pandas
-numpy
-firebase-admin

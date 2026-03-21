@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SibolTech - Local Control Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            background: #f0f0f0;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: #22c55e;
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+        }
+
+        .status-dot.disconnected {
+            background: #ef4444;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            color: #333;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* SENSOR READINGS */
+        .sensor-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #f7f7f7;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .sensor-item label {
+            color: #666;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .sensor-item .value {
+            color: #22c55e;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        /* RELAY CONTROLS */
+        .relay-group {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .relay-item {
+            background: #f7f7f7;
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .relay-item label {
+            color: #666;
+            font-size: 13px;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        /* TOGGLE SWITCH */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 28px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #22c55e;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+
+        .relay-item .status-text {
+            font-size: 12px;
+            color: #999;
+            font-weight: 600;
+        }
+
+        .relay-item.on .status-text {
+            color: #22c55e;
+        }
+
+        /* FULL WIDTH CARD */
+        .card.full {
+            grid-column: 1 / -1;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+        }
+
+        .info-item {
+            text-align: center;
+        }
+
+        .info-item .label {
+            color: #999;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .info-item .value {
+            color: #333;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        /* LOADING STATE */
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 12px;
+            border-left: 3px solid #c33;
+        }
+
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 12px;
+            border-left: 3px solid #3c3;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            .relay-group {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .info-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 12px;
+            }
+
+            .card {
+                padding: 16px;
+            }
+
+            .relay-group {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌱 SibolTech Control</h1>
+            <div class="status">
+                <div class="status-dot disconnected" id="statusDot"></div>
+                <span id="statusText">Connecting...</span>
+            </div>
+        </header>
+
+        <div class="grid">
+            <!-- SENSOR READINGS CARD -->
+            <div class="card">
+                <h2>📊 Sensor Readings</h2>
+                <div id="sensorsList">
+                    <div class="sensor-item">
+                        <label>pH Level</label>
+                        <div class="value">--</div>
+                    </div>
+                    <div class="sensor-item">
+                        <label>Dissolved Oxygen</label>
+                        <div class="value">--</div>
+                    </div>
+                    <div class="sensor-item">
+                        <label>TDS (ppm)</label>
+                        <div class="value">--</div>
+                    </div>
+                    <div class="sensor-item">
+                        <label>Temperature</label>
+                        <div class="value">--</div>
+                    </div>
+                    <div class="sensor-item">
+                        <label>Humidity</label>
+                        <div class="value">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RELAY CONTROLS CARD -->
+            <div class="card">
+                <h2>⚡ Relay Controls</h2>
+                <div class="relay-group" id="relaysList">
+                    <!-- Generated by JavaScript -->
+                </div>
+                <div id="relayStatus"></div>
+            </div>
+
+            <!-- STATUS INFO CARD -->
+            <div class="card full">
+                <h2>ℹ️ System Status</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="label">API Status</div>
+                        <div class="value" id="apiStatus">--</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="label">DB Records</div>
+                        <div class="value" id="dbRecords">--</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="label">Last Update</div>
+                        <div class="value" id="lastUpdate">--</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="label">Update Interval</div>
+                        <div class="value">2s</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000/api`;
+        const UPDATE_INTERVAL = 2000; // 2 seconds
+        const RELAY_LABELS = {
+            1: 'Leafy Green',
+            2: 'pH Down',
+            3: 'pH Up',
+            4: 'Misting',
+            5: 'Exhaust OUT',
+            6: 'Lights Aero',
+            7: 'Air Pump',
+            8: 'Lights DWC',
+            9: 'Exhaust IN'
+        };
+
+        let relayStates = {};
+        let isConnected = false;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeRelays();
+            updateData();
+            setInterval(updateData, UPDATE_INTERVAL);
+        });
+
+        function initializeRelays() {
+            const relaysList = document.getElementById('relaysList');
+            for (let i = 1; i <= 9; i++) {
+                const relay = document.createElement('div');
+                relay.className = 'relay-item';
+                relay.innerHTML = `
+                    <label>${RELAY_LABELS[i] || `Relay ${i}`}</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" data-relay="${i}">
+                        <span class="slider"></span>
+                    </label>
+                    <span class="status-text">OFF</span>
+                `;
+
+                const checkbox = relay.querySelector('input');
+                checkbox.addEventListener('change', (e) => toggleRelay(i, e.target.checked));
+                relaysList.appendChild(relay);
+            }
+        }
+
+        async function toggleRelay(relayNum, state) {
+            try {
+                // Try the full API endpoint first
+                const endpoint = state 
+                    ? `/api/relay/${relayNum}/on`
+                    : `/api/relay/${relayNum}/off`;
+                
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(error || 'Failed to toggle relay');
+                }
+                
+                const data = await response.json();
+                showNotification(`Relay ${RELAY_LABELS[relayNum]} turned ${state ? 'ON' : 'OFF'}`, 'success');
+                
+                // Update UI after successful toggle
+                relayStates[relayNum] = state;
+                updateRelayUI();
+            } catch (error) {
+                console.error('Relay error:', error);
+                showNotification(`Error: ${error.message}`, 'error');
+                // Revert checkbox
+                document.querySelector(`input[data-relay="${relayNum}"]`).checked = !state;
+            }
+        }
+
+        async function updateData() {
+            try {
+                // Fetch latest sensor data
+                const response = await fetch(`${API_BASE}/latest`);
+                if (!response.ok) throw new Error('API error');
+
+                const data = await response.json();
+                updateSensorDisplay(data);
+                updateStatus(true);
+                updateTimestamp();
+
+                // Fetch DB status
+                try {
+                    const statusResponse = await fetch(`${API_BASE}/db_status`);
+                    if (statusResponse.ok) {
+                        const status = await statusResponse.json();
+                        document.getElementById('dbRecords').textContent = status.record_count?.toLocaleString() || '--';
+                        document.getElementById('apiStatus').textContent = '✅ Connected';
+                    }
+                } catch (e) {
+                    console.log('DB status unavailable');
+                }
+
+                // Try to fetch relay status
+                try {
+                    const relayResponse = await fetch(`${API_BASE}/relay/status`);
+                    if (relayResponse.ok) {
+                        const relayData = await relayResponse.json();
+                        if (relayData.relays) {
+                            relayStates = relayData.relays;
+                            updateRelayUI();
+                        }
+                    }
+                } catch (e) {
+                    console.log('Relay status unavailable');
+                }
+            } catch (error) {
+                console.error('Update error:', error);
+                updateStatus(false);
+                document.getElementById('apiStatus').textContent = '❌ Disconnected';
+            }
+        }
+
+        function updateRelayUI() {
+            for (let i = 1; i <= 9; i++) {
+                const checkbox = document.querySelector(`input[data-relay="${i}"]`);
+                const statusText = checkbox.parentElement.parentElement.querySelector('.status-text');
+                const relayItem = checkbox.parentElement.parentElement;
+                
+                const isOn = relayStates[i] || false;
+                checkbox.checked = isOn;
+                statusText.textContent = isOn ? 'ON' : 'OFF';
+                
+                if (isOn) {
+                    relayItem.classList.add('on');
+                } else {
+                    relayItem.classList.remove('on');
+                }
+            }
+        }
+
+        function updateSensorDisplay(data) {
+            const sensors = {
+                'ph': 'pH Level',
+                'do_mg_l': 'Dissolved Oxygen',
+                'tds_ppm': 'TDS (ppm)',
+                'temperature_c': 'Temperature',
+                'humidity': 'Humidity'
+            };
+
+            const sensorsList = document.getElementById('sensorsList');
+            let html = '';
+
+            for (const [key, label] of Object.entries(sensors)) {
+                const sensorData = data[key];
+                let value = '--';
+                let unit = '';
+
+                if (sensorData) {
+                    value = typeof sensorData.value === 'number'
+                        ? sensorData.value.toFixed(2)
+                        : sensorData.value;
+                    unit = sensorData.unit || '';
+                }
+
+                html += `
+                    <div class="sensor-item">
+                        <label>${label}</label>
+                        <div class="value">${value} ${unit}</div>
+                    </div>
+                `;
+            }
+
+            sensorsList.innerHTML = html;
+        }
+
+        function updateStatus(connected) {
+            isConnected = connected;
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+
+            if (connected) {
+                dot.className = 'status-dot connected';
+                text.textContent = 'Connected';
+            } else {
+                dot.className = 'status-dot disconnected';
+                text.textContent = 'Disconnected';
+            }
+        }
+
+        function updateTimestamp() {
+            const now = new Date();
+            const time = now.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('lastUpdate').textContent = time;
+        }
+
+        function showNotification(message, type) {
+            const div = document.createElement('div');
+            div.className = type === 'error' ? 'error' : 'success';
+            div.textContent = message;
+
+            const container = document.querySelector('.container');
+            container.insertBefore(div, container.firstChild);
+
+            setTimeout(() => div.remove(), 3000);
+        }
+    </script>
+</body>
+</html>

@@ -3054,6 +3054,53 @@ body.sidebar-collapsed .brand{
 	gap:16px;
 }
 
+/* Connection Status Indicator */
+.connection-status {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 12px;
+	border-radius: 20px;
+	background: rgba(255, 255, 255, 0.1);
+	backdrop-filter: blur(10px);
+	font-size: 12px;
+	font-weight: 600;
+	transition: all 0.3s ease;
+}
+
+.connection-dot {
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: #9aa49a;
+	transition: background 0.4s ease, box-shadow 0.4s ease;
+}
+
+.connection-dot.connected {
+	background: #22c55e;
+	box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+}
+
+.connection-dot.disconnected {
+	background: #ef4444;
+	box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+	animation: blink-dot 1.5s infinite;
+}
+
+.connection-label {
+	color: #9aa49a;
+	transition: color 0.3s ease;
+}
+
+.connection-label.connected {
+	color: #22c55e;
+}
+
+.connection-label.disconnected {
+	color: #ef4444;
+}
+
 /* Connection Status Dot (pseudo-element on time) */
 .topbar-time::before {
 	content: '';
