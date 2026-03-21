@@ -25,7 +25,10 @@ function isStaticHosting() {
 // Initialize - Firebase will handle data via the module in index.html
 async function initializeAPIUrl() {
     if (isLocalAccess()) {
-        RELAY_API_URL = window.location.origin + '/api';
+        // For local network, API is on port 5000
+        const protocol = window.location.protocol;
+        const hostname = window.location.hostname;
+        RELAY_API_URL = `${protocol}//${hostname}:5000/api`;
         API_BASE_URL = RELAY_API_URL;
         console.log('Local access detected, API URL:', RELAY_API_URL);
     } else {
@@ -48,7 +51,10 @@ async function waitForAPIUrl() {
     return Promise.resolve();
 }
 
-// Initialize on page load
+// Initialize API URL immediately (before polling starts)
+initializeAPIUrl();
+
+// Initialize on page load for backup
 document.addEventListener('DOMContentLoaded', () => {
     initializeAPIUrl();
 });
@@ -274,10 +280,19 @@ if (isStaticHosting()) {
 
 // === Connection Status Indicator ===
 function updateConnectionStatus(isConnected) {
-    const el = document.getElementById('topbarTime');
+    const el = document.getElementById('connectionStatus');
     if (!el) return;
-    el.classList.remove('connected', 'disconnected');
-    el.classList.add(isConnected ? 'connected' : 'disconnected');
+    
+    const dot = el.querySelector('.connection-dot');
+    const label = el.querySelector('.connection-label');
+    
+    if (dot) {
+        dot.className = 'connection-dot ' + (isConnected ? 'connected' : 'disconnected');
+    }
+    if (label) {
+        label.textContent = isConnected ? 'Connected' : 'Disconnected';
+        label.className = 'connection-label ' + (isConnected ? 'connected' : 'disconnected');
+    }
 }
 
 // Stale-data watchdog: if no data for 15s, mark disconnected
@@ -2074,9 +2089,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			name: 'Total Dissolved Solids',
 			unit: 'ppm',
 			ranges: {
-				neutral: [[600, 1000]], // Hydroponics vegetative stage
-				normal: [[300, 600], [1000, 1400]], // Seedlings to flowering
-				dangerous: [[-Infinity, 300], [1400, Infinity]] // Too low or too high
+				neutral: [[400, 700]], // Hydroponics vegetative stage
+				normal: [[200, 400], [700, 1000]], // Seedlings to flowering (adjusted to 0-1000 spec)
+				dangerous: [[-Infinity, 200], [1000, Infinity]] // Too low or too high (max 1000 per spec)
 			}
 		}
 	};
@@ -2534,11 +2549,37 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	});
 
 	// Override toggle: ON = manual mode (user controls), OFF = auto mode (sensors control)
-	// Starts ON to prevent actuators from going crazy on page load
+	// Fetch actual state from backend instead of hardcoding to ON
 	const overrideToggle = document.getElementById('actuatorOverrideToggle');
 	if(overrideToggle){
-		// Set checkbox to checked on page load (override ON = manual mode)
-		overrideToggle.checked = true;
+		// Fetch the actual override state from backend on page load
+		const fetchOverrideState = async () => {
+			try {
+				const resp = await fetch(`${RELAY_API_URL}/override-mode`, {
+					signal: AbortSignal.timeout(2000)
+				});
+				if (resp.ok) {
+					const data = await resp.json();
+					overrideToggle.checked = data.enabled || false;
+					console.log(`[Override] Initial state from backend: ${overrideToggle.checked}`);
+					// Update UI after setting the state
+					if (overrideToggle.closest('.toggle-switch')) {
+						const textEl = overrideToggle.closest('.toggle-switch').querySelector('.toggle-text');
+						if (textEl) textEl.textContent = overrideToggle.checked ? 'ON' : 'OFF';
+					}
+				} else {
+					console.warn('[Override] Failed to fetch state, defaulting to OFF');
+					overrideToggle.checked = false;
+				}
+			} catch (e) {
+				console.warn('[Override] Could not fetch state from backend:', e.message);
+				// Default to OFF (auto mode) for safety
+				overrideToggle.checked = false;
+			}
+		};
+		
+		// Fetch override state before setting up listener
+		fetchOverrideState();
 		
 		const updateOverrideState = async (isInitial = false) => {
 			const label = overrideToggle.closest('.toggle-switch');
@@ -3849,8 +3890,7 @@ async function drawPlantGraph(canvasId, metric, plantNum, farmingMethod = 'aerop
 					display: new Date(d.date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 				}));
 				canvas._actualData = json.data.map(d => d.value);
-				// No trained prediction model yet – placeholder nulls
-				canvas._predictedData = json.data.map(() => null);
+				canvas._predictedData = json.data.map(() => null);  // Will be filled with ML predictions
 			} else {
 				canvas._dateLabels = [];
 				canvas._actualData = [];
@@ -3861,6 +3901,43 @@ async function drawPlantGraph(canvasId, metric, plantNum, farmingMethod = 'aerop
 			canvas._dateLabels = [];
 			canvas._actualData = [];
 			canvas._predictedData = [];
+		}
+
+		// ── Fetch ML predictions from /api/predict ──
+		try {
+			const predRes = await fetch(`${RELAY_API_URL}/predict?plant_aero=101&plant_dwc=1`);
+			const predJson = await predRes.json();
+			if(predJson.success) {
+				// Map metric name to model output key
+				const metricKey = metric === 'width' ? 'weight' : metric;  // API uses 'weight' not 'width'
+				
+				// Get prediction from appropriate farming method
+				let prediction = null;
+				if(farmingMethod === 'aeroponics' && predJson.aeroponics) {
+					prediction = predJson.aeroponics[metricKey];
+				} else if(farmingMethod === 'dwc' && predJson.dwc) {
+					prediction = predJson.dwc[metricKey];
+				}
+				
+				// Add prediction to end of predicted data array
+				if(prediction !== null && Number.isFinite(prediction)) {
+					const predData = canvas._predictedData || [];
+					// Add new prediction point
+					if(predData.length < canvas._actualData.length) {
+						// Pad with nulls if needed
+						while(predData.length < canvas._actualData.length - 1) {
+							predData.push(null);
+						}
+						predData.push(prediction);
+					} else {
+						// Replace last point with newest prediction
+						predData[predData.length - 1] = prediction;
+					}
+					canvas._predictedData = predData;
+				}
+			}
+		} catch(e) {
+			console.warn('[PlantGraph] Prediction fetch failed:', e.message);
 		}
 
 		// Re-compute dynamic Y-axis range after data loaded
