@@ -17,10 +17,14 @@
 			<span></span>
 		</button>
 		<div class="brand">
-			<img src="./STLogoFinal2.png" alt="SibolTech" class="brand-logo">
+			<img src="../STLogoFinal2.png" alt="SibolTech" class="brand-logo">
 		</div>
 		
 		<div class="topbar-right">
+			<div id="connectionStatus" class="connection-status" title="System status">
+				<span class="connection-dot"></span>
+				<span class="connection-label">Connecting…</span>
+			</div>
 			<div id="topbarClock" class="topbar-clock" aria-live="polite">
 				<div id="topbarTime" class="topbar-time">--:--:--</div>
 				<div id="topbarDate" class="topbar-date">----</div>
@@ -31,10 +35,10 @@
 	<aside id="sidebar" class="sidebar">
 		<nav>
 			<ul>
-				<li><a href="#" data-tab="home"><span class="icon"><img src="./dashboardicon.png" alt="Dashboard"></span><span>Dashboard</span></a></li>
-				<li><a href="#" data-tab="training"><span class="icon"><img src="./trainingicon.png" alt="Training"></span><span>Training</span></a></li>
+				<li><a href="#" data-tab="home"><span class="icon"><img src="../dashboardicon.png" alt="Dashboard"></span><span>Dashboard</span></a></li>
+				<li><a href="#" data-tab="training"><span class="icon"><img src="../trainingicon.png" alt="Training"></span><span>Training</span></a></li>
                 <li class="sidebar-dropdown">
-                <a href="#" id="predictiontab" data-tab="predicting"><span class="icon"><img src="./predictionicon.png" alt="Prediction"></span><span>Prediction</span>
+                <a href="#" id="predictiontab" data-tab="predicting"><span class="icon"><img src="../predictionicon.png" alt="Prediction"></span><span>Prediction</span>
                 <span class="caret">▾</span>
 				</a>
 				<ul class="dropdown-menu" id="predictionMenu">
@@ -45,12 +49,12 @@
 					<li><a href="#" class="prediction-option" data-metric="branches">No. of Branches</a></li>
 					</ul>
                 </li>	
-				<li><a href="#" data-tab="sensors"><span class="icon"><img src="./sensorreadingsicon.png" alt="Sensor Readings"></span><span>Sensor Readings</span></a></li>
-				<li><a href="#" data-tab="growth-state"><span class="icon"><img src="./growthstateicon.png" alt="Growth State"></span><span>Growth State</span></a></li>
-				<li><a href="#" data-tab="calibrate"><span class="icon"><img src="./calibrateicon.png" alt="Calibrate"></span><span>Calibrate</span></a></li>
-				<li><a href="#" data-tab="manual"><span class="icon"><img src="./manualicon.png" alt="Manual"></span><span>Manual</span></a></li>
+				<li><a href="#" data-tab="sensors"><span class="icon"><img src="../sensorreadingsicon.png" alt="Sensor Readings"></span><span>Sensor Readings</span></a></li>
+				<li><a href="#" data-tab="growth-state"><span class="icon"><img src="../growthstateicon.png" alt="Growth State"></span><span>Growth State</span></a></li>
+				<li><a href="#" data-tab="calibrate"><span class="icon"><img src="../Calibrateicon.png" alt="Calibrate"></span><span>Calibrate</span></a></li>
+				<li><a href="#" data-tab="manual"><span class="icon"><img src="../manualicon.png" alt="Manual"></span><span>Manual</span></a></li>
 				<li class="sidebar-dropdown1">
-                <a href="#" id="historytab" data-tab="history"><span class="icon"><img src="./historicon.png" alt="History"></span><span>History</span>
+                <a href="#" id="historytab" data-tab="history"><span class="icon"><img src="../historicon.png" alt="History"></span><span>History</span>
                 <span class="caret">▾</span>
 				</a>
 				<ul class="dropdown-menu1" id="historyMenu">
@@ -58,8 +62,13 @@
 					<li><a href="#" class="history" data-metric="Actuatorbtn">Actuator</a></li>
 					</ul>
                 </li>
-				<li><a href="#" data-tab="logout"><span class="icon"><img src="./logoutlogo.png" alt="Logout"></span><span>Logout</span></a></li>
-				
+				<li><a href="#" data-tab="logout"><span class="icon"><img src="../logoutlogo.png" alt="Logout"></span><span>Logout</span></a></li>
+				<li style="border-top: 1px solid #ccc; padding-top: 10px; margin-top: 10px;">
+					<button id="downloadMLTraining" style="width: 100%; padding: 8px; margin-bottom: 8px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">⬇ ML Training CSV</button>
+				</li>
+				<li>
+					<button id="downloadSensorActuator" style="width: 100%; padding: 8px; background-color: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">⬇ Sensor+Actuator CSV</button>
+				</li>
 			</ul>
 		</nav>
 	</aside>
@@ -73,35 +82,35 @@
 						<div class="sensor" data-key="ph">
 							<div class="label">
 								<span>pH Level</span>
-								<img src="./informationicon.png" alt="Info" class="info-icon" data-sensor="ph">
+								<img src="../informationicon.png" alt="Info" class="info-icon" data-sensor="ph">
 							</div>
                         <div class="value" id="val-ph"></div>
 						<div class="alert" id="alert-ph"></div></div>
 						<div class="sensor" data-key="do">
 							<div class="label">
 								<span>Dissolved Oxygen</span>
-								<img src="./informationicon.png" alt="Info" class="info-icon" data-sensor="do">
+								<img src="../informationicon.png" alt="Info" class="info-icon" data-sensor="do">
 							</div>
                         <div class="value" id="val-do"></div>
 						<div class="alert" id="alert-do"></div></div>
 						<div class="sensor" data-key="temp">
 							<div class="label">
 								<span>Temperature</span>
-								<img src="./informationicon.png" alt="Info" class="info-icon" data-sensor="temp">
+								<img src="../informationicon.png" alt="Info" class="info-icon" data-sensor="temp">
 							</div>
                         <div class="value" id="val-temp"></div>
 						<div class="alert" id="alert-temp"></div></div>
 						<div class="sensor" data-key="hum">
 							<div class="label">
 								<span>Humidity</span>
-								<img src="./informationicon.png" alt="Info" class="info-icon" data-sensor="hum">
+								<img src="../informationicon.png" alt="Info" class="info-icon" data-sensor="hum">
 							</div>
                         <div class="value" id="val-hum"></div>
 						<div class="alert" id="alert-hum"></div></div>
 						<div class="sensor" data-key="tds">
 							<div class="label">
 								<span>Total Dissolved Solids</span>
-								<img src="./informationicon.png" alt="Info" class="info-icon" data-sensor="tds">
+								<img src="../informationicon.png" alt="Info" class="info-icon" data-sensor="tds">
 							</div>
                         <div class="value" id="val-tds"></div>
 						<div class="alert" id="alert-tds"></div></div>
@@ -933,8 +942,6 @@
 					<div class="history-frequency" >
 						<button class="history-chip active">Daily</button>
 						<button class="history-chip">15-min</button>
-						<button id="downloadMLTraining" class="history-chip history-download-chip">⬇ ML Training CSV</button>
-						<button id="downloadSensorActuator" class="history-chip history-download-chip">⬇ Sensor+Actuator CSV</button>
 					</div>
 				</div>
 
@@ -1047,6 +1054,35 @@
 				</div>
 			</div>
 		</section>
+
+		<section id="manual" class="tab-content">
+			<div class="serial-console-card">
+				<div class="serial-console-header">
+					<h2>🖥️ ESP32 Serial Monitor</h2>
+					<div class="serial-controls">
+						<span id="serialStatus" class="serial-status disconnected">● Disconnected</span>
+						<button id="serialPauseBtn" class="serial-btn" title="Pause/Resume">⏸️</button>
+						<button id="serialClearBtn" class="serial-btn" title="Clear">🗑️</button>
+						<label class="serial-autoscroll">
+							<input type="checkbox" id="serialAutoScroll" checked> Auto-scroll
+						</label>
+					</div>
+				</div>
+				<div id="serialOutput" class="serial-output"></div>
+				<div class="serial-input-row">
+					<input type="text" id="serialCmdInput" class="serial-cmd-input" placeholder="Type command (STATUS, HELP, R1 ON, R2 OFF, ALL ON...)" autocomplete="off">
+					<button id="serialSendBtn" class="serial-send-btn">Send</button>
+				</div>
+				<div class="serial-quick-cmds">
+					<span class="quick-cmd-label">Quick:</span>
+					<button class="serial-quick-btn" data-cmd="STATUS">STATUS</button>
+					<button class="serial-quick-btn" data-cmd="HELP">HELP</button>
+					<button class="serial-quick-btn" data-cmd="ALL ON">ALL ON</button>
+					<button class="serial-quick-btn" data-cmd="ALL OFF">ALL OFF</button>
+				</div>
+			</div>
+		</section>
+
 		<!-- Logout Confirmation Modal -->
 		<div id="logoutModal" class="logout-modal" style="display: none;">
 			<div class="logout-modal-content">
@@ -1127,96 +1163,16 @@
 			</div>
 		</div>
 
-		<!-- API Settings Modal -->
-		<div id="apiSettingsModal" class="api-settings-modal" style="display:none;">
-			<div class="api-settings-content">
-				<div class="api-settings-header">
-					<h3>🔥 Connection Info</h3>
-					<button class="api-settings-close" onclick="closeApiSettings()">&times;</button>
-				</div>
-				<div class="api-settings-body">
-					<p style="font-size:16px;margin-bottom:15px;"><strong>Cloud Access:</strong> Firebase Firestore</p>
-					<p style="color:#4CAF50;">✓ Real-time sync enabled via Firebase</p>
-					<p style="color:#4CAF50;">✓ No tunnel configuration required</p>
-					<hr style="margin:15px 0;border:none;border-top:1px solid #ddd;">
-					<p><strong>Local LAN Access:</strong></p>
-					<p style="font-size:12px;color:#666;"><code>http://192.168.100.72:5000</code></p>
-				</div>
-				<div class="api-settings-footer">
-					<button onclick="closeApiSettings()" style="padding:10px 20px;background:#4CAF50;color:white;border:none;border-radius:5px;cursor:pointer;">OK</button>
-				</div>
-			</div>
-		</div>
+		<!-- Chart.js - hosted locally to avoid Firefox tracking prevention blocks -->
+		<script src="chart.min.js?v=1.0"></script>
 		
-		<style>
-		.api-settings-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;}
-		.api-settings-content{background:white;border-radius:15px;padding:25px;max-width:500px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.3);}
-		.api-settings-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;}
-		.api-settings-header h3{margin:0;color:#333;}
-		.api-settings-close{background:none;border:none;font-size:28px;cursor:pointer;color:#999;}
-		.api-settings-close:hover{color:#333;}
-		.api-settings-body p{margin:10px 0;color:#555;}
-		.api-settings-body code{background:#f0f0f0;padding:2px 6px;border-radius:3px;font-size:11px;}
-		.api-settings-footer{margin-top:20px;text-align:right;}
-		#apiSettingsBtn{position:fixed;bottom:20px;right:20px;width:50px;height:50px;border-radius:50%;background:#4CAF50;color:white;border:none;font-size:24px;cursor:pointer;box-shadow:0 4px 15px rgba(0,0,0,0.3);z-index:9999;}
-		#apiSettingsBtn:hover{background:#45a049;transform:scale(1.1);}
-		#apiSettingsBtn.error{background:#f44336;animation:pulse 1s infinite;}
-		@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.6;}}
-		</style>
+		<!-- Load main app JS first -->
+		<script src="index.js?v=1.0"></script>
 		
-		<button id="apiSettingsBtn" onclick="openApiSettings()" title="API Settings">⚙️</button>
-
-		<!-- Chart.js CDN for growth parameters chart -->
-		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-		<script src="index.js"></script>
-
-		
+		<!-- Firebase SDK - load after index.js so listeners are ready -->
 		<script type="module">
 			import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-			import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-			
-			const firebaseConfig = {
-				apiKey: "AIzaSyCSuJ4kVaxq7uKllRnrt-EaCxIGmMTNI30",
-				authDomain: "siboltech.firebaseapp.com",
-				projectId: "siboltech",
-				storageBucket: "siboltech.firebasestorage.app",
-				messagingSenderId: "101056247860",
-				appId: "1:101056247860:web:d5aa77df309a650ba07261"
-			};
-			
-			const app = initializeApp(firebaseConfig);
-			const db = getFirestore(app);
-			console.log("Firebase initialized");
-			
-			const docRef = doc(db, "sensors", "latest");
-			onSnapshot(docRef, (docSnap) => {
-				if (docSnap.exists()) {
-					const data = docSnap.data();
-					
-					const phVal = (data.ph && data.ph.value !== undefined) ? parseFloat(data.ph.value).toFixed(2) : "--";
-					const doVal = (data.do_mg_l && data.do_mg_l.value !== undefined) ? parseFloat(data.do_mg_l.value).toFixed(2) + " mg/L" : "-- mg/L";
-					const tempVal = (data.temperature_c && data.temperature_c.value !== undefined) ? parseFloat(data.temperature_c.value).toFixed(1) + " C" : "-- C";
-					const humVal = (data.humidity && data.humidity.value !== undefined) ? parseFloat(data.humidity.value).toFixed(1) + " %" : "-- %";
-					const tdsVal = (data.tds_ppm && data.tds_ppm.value !== undefined) ? parseFloat(data.tds_ppm.value).toFixed(0) + " ppm" : "-- ppm";
-
-					document.querySelectorAll("#val-ph, [data-sensor='ph'] .value").forEach(el => { if (el) el.textContent = phVal; });
-					document.querySelectorAll("#val-do, [data-sensor='do'] .value").forEach(el => { if (el) el.textContent = doVal; });
-					document.querySelectorAll("#val-temp, [data-sensor='temp'] .value").forEach(el => { if (el) el.textContent = tempVal; });
-					document.querySelectorAll("#val-hum, [data-sensor='hum'] .value").forEach(el => { if (el) el.textContent = humVal; });
-					document.querySelectorAll("#val-tds, [data-sensor='tds'] .value").forEach(el => { if (el) el.textContent = tdsVal; });
-					
-					window.firebaseListenerActive = true;
-				}
-			}, (error) => {
-				console.error("Firebase error:", error);
-			});
-		</script>
-
-		
-				<!-- Firebase SDK - load after index.js so listeners are ready -->
-		<script type="module">
-			import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-			import { getFirestore, doc, onSnapshot, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+			import { getFirestore, doc, onSnapshot, collection, query, orderBy, limit, getDocs, where, addDoc, setDoc, serverTimestamp, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 			
 			const firebaseConfig = {
 				apiKey: "AIzaSyCSuJ4kVaxq7uKllRnrt-EaCxIGmMTNI30",
@@ -1230,35 +1186,183 @@
 			const app = initializeApp(firebaseConfig);
 			const db = getFirestore(app);
 			
-			// Make Firebase available globally for index.js
+			// Make Firebase available globally
 			window.firebaseDB = db;
 			window.firebaseDoc = doc;
+			window.firebaseGetDoc = getDoc;
 			window.firebaseOnSnapshot = onSnapshot;
 			window.firebaseCollection = collection;
-			window.firebaseAddDoc = addDoc;
-			window.firebaseGetDocs = getDocs;
 			window.firebaseQuery = query;
 			window.firebaseOrderBy = orderBy;
 			window.firebaseLimit = limit;
-			window.firebaseServerTimestamp = serverTimestamp;
-				window.firebaseSetDoc = setDoc;
-				window.firebaseGetDoc = getDoc;
 			window.firebaseReady = true;
 			
-			console.log('✅ Firebase initialized');
+			// Load plant history from Firebase
+			window.loadPlantHistory = async function(farmingSystem, maxResults = 100) {
+				try {
+					const plantReadingsRef = collection(db, 'plant_readings');
+					let q;
+					if (farmingSystem) {
+						q = query(plantReadingsRef, where('farming_system', '==', farmingSystem), limit(maxResults));
+					} else {
+						q = query(plantReadingsRef, limit(maxResults));
+					}
+					const snapshot = await getDocs(q);
+					const readings = [];
+					snapshot.forEach(doc => {
+						readings.push({ id: doc.id, ...doc.data() });
+					});
+					// Sort by created_at descending (newest first)
+					readings.sort((a, b) => {
+						const dateA = a.created_at?.toDate?.() || new Date(a.created_at);
+						const dateB = b.created_at?.toDate?.() || new Date(b.created_at);
+						return dateB - dateA;
+					});
+					return readings;
+				} catch (error) {
+					console.error('Error loading plant history:', error);
+					return [];
+				}
+			};
 			
-			// ===== SENSOR READINGS (real-time) =====
-			const sensorDocRef = doc(db, 'sensors', 'latest');
-			onSnapshot(sensorDocRef, (docSnap) => {
+			// Save plant reading to Firebase
+			window.savePlantReadingFirebase = async function(data) {
+				try {
+					const plantReadingsRef = collection(db, 'plant_readings');
+					await addDoc(plantReadingsRef, {
+						...data,
+						created_at: new Date()
+					});
+					console.log('✅ Plant reading saved to Firebase');
+					return true;
+				} catch (error) {
+					console.error('Error saving plant reading:', error);
+					return false;
+				}
+			};
+
+			// Load actuator history from Firebase (for Vercel/static hosting)
+			window.loadActuatorHistory = async function(maxResults = 500) {
+				try {
+					const eventsRef = collection(db, 'actuators', 'history', 'events');
+					const q = query(eventsRef, orderBy('timestamp', 'desc'), limit(maxResults));
+					const snapshot = await getDocs(q);
+					const events = [];
+					snapshot.forEach(docSnap => {
+						events.push({ id: docSnap.id, ...docSnap.data() });
+					});
+					return events;
+				} catch (error) {
+					console.error('Error loading actuator history:', error);
+					return [];
+				}
+			};
+
+			// Load sensor history from Firebase
+			window.loadSensorHistory = async function(maxResults = 200) {
+				try {
+					const readingsRef = collection(db, 'sensors', 'history', 'readings');
+					const q = query(readingsRef, orderBy('timestamp', 'desc'), limit(maxResults));
+					const snapshot = await getDocs(q);
+					const readings = [];
+					snapshot.forEach(docSnap => {
+						readings.push({ id: docSnap.id, ...docSnap.data() });
+					});
+					return readings;
+				} catch (error) {
+					console.error('Error loading sensor history:', error);
+					return [];
+				}
+			};
+			
+			// Send relay command via Firebase (for Vercel/static hosting)
+			window.sendRelayCommandFirebase = async function(relay, action) {
+				try {
+					const commandsRef = collection(db, 'relay_commands');
+					await addDoc(commandsRef, {
+						relay: relay,
+						action: action.toLowerCase(),
+						status: 'pending',
+						source: 'dashboard',
+						created_at: serverTimestamp()
+					});
+					console.log(`🔌 Firebase relay command: ${relay} ${action}`);
+					return true;
+				} catch (error) {
+					console.error('Error sending relay command via Firebase:', error);
+					return false;
+				}
+			};
+			
+			// Send override mode via Firebase (for Vercel/static hosting)
+			window.sendOverrideModeFirebase = async function(enabled) {
+				try {
+					const overrideRef = doc(db, 'settings', 'override_mode');
+					await setDoc(overrideRef, {
+						enabled: enabled,
+						source: 'dashboard',
+						updated_at: serverTimestamp()
+					});
+					console.log(`🔒 Firebase override mode: ${enabled ? 'ON (manual)' : 'OFF (auto)'}`);
+					return true;
+				} catch (error) {
+					console.error('Error sending override mode via Firebase:', error);
+					return false;
+				}
+			};
+			
+			console.log('✅ Firebase initialized, starting listener...');
+			
+			// Listen for relay status updates from RPi
+			const relayDocRef = doc(db, 'actuators', 'relays');
+			onSnapshot(relayDocRef, (docSnap) => {
 				if (docSnap.exists()) {
 					const data = docSnap.data();
-					console.log('📡 Sensors:', Object.keys(data).filter(k => !k.startsWith('_')).join(', '));
+					const status = data.status || {};
+					const relayToActuator = {
+						'R7': 'act-air',
+						'R9': 'act-fan-in',
+						'R5': 'act-fan-out',
+						'R6': 'act-lights-aerponics',
+						'R8': 'act-lights-dwc'
+					};
+					const parts = [];
+					for (const [rKey, actId] of Object.entries(relayToActuator)) {
+						const state = status[rKey];
+						if (state !== undefined) {
+							parts.push(`${rKey}:${state}`);
+							const cb = document.getElementById(actId);
+							if (cb) {
+								const isOn = (state === 'ON');
+								cb.checked = isOn;
+								const label = cb.closest('.toggle-switch');
+								const txt = label ? label.querySelector('.toggle-text') : null;
+								if (txt) txt.textContent = isOn ? 'ON' : 'OFF';
+							}
+						}
+					}
+					if (parts.length) console.log('🔌 Relays:', parts.join(', '));
+				}
+			}, (error) => {
+				console.error('Firebase relay listener error:', error);
+			});
+			
+			// Directly start the real-time sensor listener here
+			const docRef = doc(db, 'sensors', 'latest');
+			onSnapshot(docRef, (docSnap) => {
+				if (docSnap.exists()) {
+					const data = docSnap.data();
+					console.log('📡 Firebase update:', Object.keys(data).filter(k => !k.startsWith('_')).join(', '));
 					
-					const phVal = (data.ph && data.ph.value !== undefined) ? parseFloat(data.ph.value).toFixed(2) : '--';
-					const doVal = (data.do_mg_l && data.do_mg_l.value !== undefined) ? parseFloat(data.do_mg_l.value).toFixed(2) + ' mg/L' : '-- mg/L';
-					const tempVal = (data.temperature_c && data.temperature_c.value !== undefined) ? parseFloat(data.temperature_c.value).toFixed(1) + ' °C' : '-- °C';
-					const humVal = (data.humidity && data.humidity.value !== undefined) ? parseFloat(data.humidity.value).toFixed(1) + ' %' : '-- %';
-					const tdsVal = (data.tds_ppm && data.tds_ppm.value !== undefined) ? parseFloat(data.tds_ppm.value).toFixed(0) + ' ppm' : '-- ppm';
+					// Store latest sensor data globally for history tab to use
+					window.latestSensorData = data;
+					
+					// Update sensor displays directly
+					const phVal = (data.ph && data.ph.value !== undefined) ? parseFloat(data.ph.value).toFixed(2) : '0.00';
+					const doVal = (data.do_mg_l && data.do_mg_l.value !== undefined) ? parseFloat(data.do_mg_l.value).toFixed(2) + ' mg/L' : '0.00 mg/L';
+					const tempVal = (data.temperature_c && data.temperature_c.value !== undefined) ? parseFloat(data.temperature_c.value).toFixed(1) + ' °C' : '0.0 °C';
+					const humVal = (data.humidity && data.humidity.value !== undefined) ? parseFloat(data.humidity.value).toFixed(1) + ' %' : '0.0 %';
+					const tdsVal = (data.tds_ppm && data.tds_ppm.value !== undefined) ? parseFloat(data.tds_ppm.value).toFixed(0) + ' ppm' : '0 ppm';
 
 					document.querySelectorAll('#val-ph, [data-sensor="ph"] .value').forEach(el => { if (el) el.textContent = phVal; });
 					document.querySelectorAll('#val-do, [data-sensor="do"] .value').forEach(el => { if (el) el.textContent = doVal; });
@@ -1266,192 +1370,11 @@
 					document.querySelectorAll('#val-hum, [data-sensor="hum"] .value').forEach(el => { if (el) el.textContent = humVal; });
 					document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => { if (el) el.textContent = tdsVal; });
 					
-					window.latestSensorData = data;
 					window.firebaseListenerActive = true;
 				}
 			}, (error) => {
-				console.error('Firebase sensor error:', error.message);
+				console.error('Firebase error:', error);
 			});
-			
-			// ===== ACTUATOR/RELAY STATUS (real-time) =====
-			const relayDocRef = doc(db, 'actuators', 'relays');
-			onSnapshot(relayDocRef, (docSnap) => {
-				if (docSnap.exists()) {
-					const data = docSnap.data();
-					const status = data.status || {};
-					console.log('🔌 Relays:', Object.entries(status).map(([k,v]) => `${k}:${v}`).join(', '));
-					
-					// Map relay numbers to actuator IDs
-					const RELAY_TO_ACTUATOR = {
-						4: 'act-water',
-						7: 'act-air',
-						9: 'act-fan-in',
-						5: 'act-fan-out',
-						6: 'act-lights-aerponics',
-						8: 'act-lights-dwc'
-					};
-					
-					for (const [relay, state] of Object.entries(status)) {
-						const relayNum = parseInt(relay.replace('R', ''));
-						const actId = RELAY_TO_ACTUATOR[relayNum];
-						if (actId) {
-							const checkbox = document.getElementById(actId);
-							if (checkbox) {
-								const isOn = state === 'ON';
-								checkbox.checked = isOn;
-								const textEl = checkbox.closest('.toggle-switch')?.querySelector('.toggle-text');
-								if (textEl) textEl.textContent = isOn ? 'ON' : 'OFF';
-							}
-						}
-					}
-					window.relayStatus = status;
-				}
-			}, (error) => {
-				console.error('Firebase relay error:', error.message);
-			});
-			
-			// ===== SEND RELAY COMMAND (via Firebase) =====
-			window.sendRelayCommandFirebase = async function(relay, action) {
-				try {
-					const commandsRef = collection(db, 'relay_commands');
-					await addDoc(commandsRef, {
-						relay: relay,
-						action: action,
-						status: 'pending',
-						created_at: serverTimestamp()
-					});
-					console.log(`📤 Command sent: ${relay} ${action}`);
-					return true;
-				} catch (error) {
-					console.error('Failed to send command:', error);
-					return false;
-				}
-			};
-
-					// ===== SEND OVERRIDE MODE (via Firebase) =====
-					window.sendOverrideModeFirebase = async function(enabled) {
-						try {
-							const overrideRef = doc(db, 'settings', 'override_mode');
-							await setDoc(overrideRef, {
-								enabled: enabled,
-								source: 'dashboard',
-								updated_at: serverTimestamp()
-							});
-							console.log(`🔒 Override mode: ${enabled ? 'ON (manual)' : 'OFF (auto)'}`); 
-							return true;
-						} catch (error) {
-							console.error('Failed to send override mode:', error);
-							return false;
-						}
-					};
-			
-			// ===== LOAD CALIBRATION =====
-			const calDocRef = doc(db, 'settings', 'calibration');
-			onSnapshot(calDocRef, (docSnap) => {
-				if (docSnap.exists()) {
-					const data = docSnap.data();
-					window.firebaseCalibration = data.sensors || {};
-					console.log('📐 Calibration loaded:', Object.keys(window.firebaseCalibration).join(', '));
-				}
-			}, (error) => {
-				console.error('Firebase calibration error:', error.message);
-			});
-			
-
-			// ===== SAVE CALIBRATION TO FIREBASE =====
-			window.saveCalibrationFirebase = async function(sensor, slope, offset) {
-				try {
-					const calDocRef = doc(db, 'settings', 'calibration');
-					const docSnap = await getDoc(calDocRef);
-					let sensors = {};
-					if (docSnap.exists()) {
-						sensors = docSnap.data().sensors || {};
-					}
-					sensors[sensor] = { slope, offset, updated_at: new Date().toISOString() };
-					await setDoc(calDocRef, { sensors }, { merge: true });
-					console.log('Calibration saved for ' + sensor);
-					return true;
-				} catch (error) {
-					console.error('Failed to save calibration:', error);
-					return false;
-				}
-			};
-
-			// ===== LOAD HISTORY (for charts) =====
-			window.loadSensorHistory = async function(limitCount = 100) {
-				try {
-					const historyRef = collection(db, 'sensors', 'history', 'readings');
-					const q = query(historyRef, orderBy('timestamp', 'desc'), limit(limitCount));
-					const snapshot = await getDocs(q);
-					const history = [];
-					snapshot.forEach(doc => {
-						history.push({ id: doc.id, ...doc.data() });
-					});
-					console.log(`📊 Loaded ${history.length} history records`);
-					return history.reverse(); // Oldest first
-				} catch (error) {
-					console.error('Failed to load history:', error);
-					return [];
-				}
-			};
-			
-			// ===== SAVE PLANT READING (training data) =====
-			window.savePlantReadingFirebase = async function(plantData) {
-				try {
-					const readingsRef = collection(db, 'plant_readings');
-					await addDoc(readingsRef, {
-						...plantData,
-						created_at: serverTimestamp()
-					});
-					console.log('🌱 Plant reading saved:', plantData.plant_id);
-					return true;
-				} catch (error) {
-					console.error('Failed to save plant reading:', error);
-					return false;
-				}
-			};
-			
-			// ===== LOAD PLANT HISTORY =====
-			window.loadPlantHistory = async function(farmingSystem, limitCount = 100) {
-				try {
-					const readingsRef = collection(db, 'plant_readings');
-					const q = query(readingsRef, orderBy('created_at', 'desc'), limit(limitCount));
-					const snapshot = await getDocs(q);
-					const readings = [];
-					snapshot.forEach(doc => {
-						const data = doc.data();
-						if (!farmingSystem || data.farming_system === farmingSystem) {
-							readings.push({ id: doc.id, ...data });
-						}
-					});
-					console.log('🌱 Loaded ' + readings.length + ' plant readings');
-					return readings.reverse();
-				} catch (error) {
-					console.error('Failed to load plant history:', error);
-					return [];
-				}
-			};
-			
-			// Dispatch event when Firebase is ready
-
-                        // ===== LOAD ACTUATOR HISTORY =====
-                        window.loadActuatorHistory = async function(maxResults = 500) {
-                                try {
-                                        const eventsRef = collection(db, 'actuators', 'history', 'events');
-                                        const q = query(eventsRef, orderBy('timestamp', 'desc'), limit(maxResults));
-                                        const snapshot = await getDocs(q);
-                                        const events = [];
-                                        snapshot.forEach(docSnap => {
-                                                events.push({ id: docSnap.id, ...docSnap.data() });
-                                        });
-                                        console.log('⚡ Loaded ' + events.length + ' actuator events');
-                                        return events;
-                                } catch (error) {
-                                        console.error('Failed to load actuator history:', error);
-                                        return [];
-                                }
-                        };
-			window.dispatchEvent(new Event('firebaseReady'));
 		</script>
 </body>
 

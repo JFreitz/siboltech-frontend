@@ -3882,11 +3882,17 @@ async function drawPlantGraph(canvasId, metric, plantNum, farmingMethod = 'aerop
 	if(!canvas._actualData || !canvas._predictedData) {
 		// ── Fetch real data from Firebase (predictions/latest/plants) ──
 		try {
-			const docId = `${farmingMethod}_${plantNum}`;
-			const doc = await db.collection("predictions").document("latest").collection("plants").document(docId).get();
+			// Check if Firebase is initialized
+			if(!window.firebaseDB || !window.firebaseDoc || !window.firebaseGetDoc) {
+				throw new Error('Firebase not initialized');
+			}
 			
-			if(doc.exists) {
-				const data = doc.data();
+			const docId = `${farmingMethod}_${plantNum}`;
+			const docRef = window.firebaseDoc(window.firebaseDB, "predictions", "latest", "plants", docId);
+			const docSnap = await window.firebaseGetDoc(docRef);
+			
+			if(docSnap.exists()) {
+				const data = docSnap.data();
 				const actual = data.actual || {};
 				const predicted = data.predicted || {};
 				
