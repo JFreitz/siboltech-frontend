@@ -1,0 +1,5 @@
+bblanchon/ArduinoJson@^7.0.0
+adafruit/Adafruit BusIO
+adafruit/Adafruit BME280 Library
+adafruit/Adafruit Unified Sensor
+knolleary/PubSubClient@^2.8

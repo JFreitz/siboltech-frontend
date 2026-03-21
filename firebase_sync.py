@@ -822,6 +822,118 @@ def sync_actuator_events_to_firebase(db: firestore.Client, session, last_actuato
     return latest_ts
 
 
+def sync_plant_predictions_to_firebase(db: firestore.Client, session):
+    """Sync ML plant predictions and historical plant measurements to Firebase."""
+    try:
+        # Query latest plant measurements
+        from sqlalchemy import desc
+        plant_data = (
+            session.query(
+                "plant_id",
+                "farming_system",
+                "timestamp",
+                "height_cm",
+                "weight_g",
+                "leaf_count",
+                "branch_count"
+            )
+            .from_statement(
+                """SELECT DISTINCT 
+                    plant_id, farming_system, MAX(timestamp) as timestamp,
+                    height_cm, weight_g, leaf_count, branch_count
+                FROM plant_measurements
+                GROUP BY plant_id, farming_system
+                ORDER BY timestamp DESC"""
+            )
+            .all()
+        )
+        
+        if not plant_data:
+            return
+        
+        # Get latest sensor readings for predictions
+        try:
+            sensor_data = {}
+            sensor_rows = session.execute(
+                """SELECT sensor, value FROM sensor_readings 
+                   WHERE sensor IN ('ph', 'do', 'tds', 'temperature', 'humidity')
+                   ORDER BY timestamp DESC LIMIT 5"""
+            ).fetchall()
+            for sensor, value in sensor_rows:
+                if sensor not in sensor_data:
+                    sensor_data[sensor] = float(value)
+        except:
+            sensor_data = {}
+        
+        # Try to load ML models and generate predictions
+        predictions = {}
+        try:
+            import sys
+            import importlib.util
+            ml_file = Path(__file__).parent / "ML_MODEL_SUMMARY" / "05_predict_new_data.py"
+            if ml_file.exists():
+                spec = importlib.util.spec_from_file_location("predictor", ml_file)
+                predictor_mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(predictor_mod)
+                
+                predictor = predictor_mod.PlantGrowthPredictor()
+                
+                # Generate predictions for each farming system
+                for system in ["dwc", "aeroponics"]:
+                    plant_ids = [1, 2, 3, 4, 5, 6] if system == "dwc" else [101, 102, 103, 104, 105, 106]
+                    for plant_id in plant_ids:
+                        pred = predictor.predict(
+                            ph=sensor_data.get('ph', 7.0),
+                            do=sensor_data.get('do', 8.0),
+                            tds=sensor_data.get('tds', 800),
+                            temperature=sensor_data.get('temperature', 25),
+                            humidity=sensor_data.get('humidity', 60),
+                            plant_id=plant_id
+                        )
+                        if pred:
+                            predictions[f"{system}_{plant_id}"] = pred
+        except Exception as e:
+            print(f"  ⚠️ Warning: Could not load ML models: {e}")
+        
+        # Sync to Firebase
+        batch = db.batch()
+        batch_count = 0
+        
+        # Sync plant measurements to predictions/latest
+        for row in plant_data:
+            try:
+                plant_id, farming_system, ts, height, weight, leaves, branches = row
+                pred_key = f"{farming_system}_{plant_id}"
+                pred = predictions.get(pred_key, {})
+                
+                doc_ref = db.collection("predictions").document("latest").collection("plants").document(f"{farming_system}_{plant_id}")
+                doc_data = {
+                    "plant_id": plant_id,
+                    "farming_system": farming_system,
+                    "timestamp": ts.isoformat() if hasattr(ts, 'isoformat') else str(ts),
+                    "actual": {
+                        "height_cm": float(height) if height else 0,
+                        "weight_g": float(weight) if weight else 0,
+                        "leaf_count": int(leaves) if leaves else 0,
+                        "branch_count": int(branches) if branches else 0,
+                    },
+                    "predicted": pred,
+                    "sensors": sensor_data,
+                    "synced_at": datetime.now(timezone.utc).isoformat(),
+                }
+                batch.set(doc_ref, doc_data)
+                batch_count += 1
+            except Exception as e:
+                print(f"  ⚠️ Error syncing plant {row[0]}: {e}")
+        
+        if batch_count > 0:
+            batch.commit(timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
+            print(f"  🌱 Synced {batch_count} plant predictions to Firebase")
+    
+    except Exception as e:
+        print(f"  ⚠️ Error syncing plant predictions: {e}")
+
+
 def load_last_sync_ts() -> datetime:
     """Load last sync timestamp from file."""
     ts_file = Path(__file__).parent / ".firebase_last_sync_ts"
@@ -1065,6 +1177,8 @@ def main():
                     new_act_ts = sync_actuator_events_to_firebase(db, session, last_actuator_sync_ts)
                     if new_act_ts > last_actuator_sync_ts:
                         last_actuator_sync_ts = new_act_ts
+                    # Also sync plant predictions on this cycle
+                    sync_plant_predictions_to_firebase(db, session)
                 except Exception as e:
                     print(f"  ⚠️ History sync error: {e}")
                     if _is_quota_error(e) or "Timeout" in str(e):

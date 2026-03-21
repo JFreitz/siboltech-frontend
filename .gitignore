@@ -38,3 +38,4 @@ temp_log.txt
 
 # OS
 .DS_Store
+firebase-service-account.json

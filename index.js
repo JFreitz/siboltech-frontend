@@ -3880,64 +3880,44 @@ async function drawPlantGraph(canvasId, metric, plantNum, farmingMethod = 'aerop
 	
 	// Prepare or reuse datasets for this canvas so toggles/redraws use consistent series
 	if(!canvas._actualData || !canvas._predictedData) {
-		// ── Fetch real data from /api/plant-history ──
+		// ── Fetch real data from Firebase (predictions/latest/plants) ──
 		try {
-			const res = await fetch(`${RELAY_API_URL}/plant-history?plant_id=${plantNum}&farming_system=${farmingMethod}&metric=${metric}`);
-			const json = await res.json();
-			if(json.success && json.data && json.data.length > 0) {
-				canvas._dateLabels = json.data.map(d => ({
-					iso: d.date,
-					display: new Date(d.date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-				}));
-				canvas._actualData = json.data.map(d => d.value);
-				canvas._predictedData = json.data.map(() => null);  // Will be filled with ML predictions
+			const docId = `${farmingMethod}_${plantNum}`;
+			const doc = await db.collection("predictions").document("latest").collection("plants").document(docId).get();
+			
+			if(doc.exists) {
+				const data = doc.data();
+				const actual = data.actual || {};
+				const predicted = data.predicted || {};
+				
+				// Map metric to the correct key
+				const metricKey = metric === 'width' ? 'weight_g' : 
+								   metric === 'leaves' ? 'leaf_count' : 
+								   metric === 'branches' ? 'branch_count' : 
+								   `${metric}_cm`;
+				
+				const actualValue = actual[metricKey] || null;
+				const predictedValue = predicted[metricKey] || null;
+				
+				// Create simple date labels (today's date)
+				const today = new Date();
+				const dateStr = today.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+				
+				canvas._dateLabels = [
+					{ iso: today.toISOString().split('T')[0], display: dateStr }
+				];
+				canvas._actualData = [actualValue];
+				canvas._predictedData = [predictedValue];
 			} else {
 				canvas._dateLabels = [];
 				canvas._actualData = [];
 				canvas._predictedData = [];
 			}
 		} catch(e) {
-			console.warn('[PlantGraph] API fetch failed for plant', plantNum, metric, e.message);
+			console.warn('[PlantGraph] Firebase fetch failed for plant', plantNum, metric, e.message);
 			canvas._dateLabels = [];
 			canvas._actualData = [];
 			canvas._predictedData = [];
-		}
-
-		// ── Fetch ML predictions from /api/predict ──
-		try {
-			const predRes = await fetch(`${RELAY_API_URL}/predict?plant_aero=101&plant_dwc=1`);
-			const predJson = await predRes.json();
-			if(predJson.success) {
-				// Map metric name to model output key
-				const metricKey = metric === 'width' ? 'weight' : metric;  // API uses 'weight' not 'width'
-				
-				// Get prediction from appropriate farming method
-				let prediction = null;
-				if(farmingMethod === 'aeroponics' && predJson.aeroponics) {
-					prediction = predJson.aeroponics[metricKey];
-				} else if(farmingMethod === 'dwc' && predJson.dwc) {
-					prediction = predJson.dwc[metricKey];
-				}
-				
-				// Add prediction to end of predicted data array
-				if(prediction !== null && Number.isFinite(prediction)) {
-					const predData = canvas._predictedData || [];
-					// Add new prediction point
-					if(predData.length < canvas._actualData.length) {
-						// Pad with nulls if needed
-						while(predData.length < canvas._actualData.length - 1) {
-							predData.push(null);
-						}
-						predData.push(prediction);
-					} else {
-						// Replace last point with newest prediction
-						predData[predData.length - 1] = prediction;
-					}
-					canvas._predictedData = predData;
-				}
-			}
-		} catch(e) {
-			console.warn('[PlantGraph] Prediction fetch failed:', e.message);
 		}
 
 		// Re-compute dynamic Y-axis range after data loaded
