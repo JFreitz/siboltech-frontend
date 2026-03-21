@@ -825,37 +825,31 @@ def sync_actuator_events_to_firebase(db: firestore.Client, session, last_actuato
 def sync_plant_predictions_to_firebase(db: firestore.Client, session):
     """Sync ML plant predictions and historical plant measurements to Firebase."""
     try:
-        # Query latest plant measurements
-        plant_data = (
-            session.query(
-                "plant_id",
-                "timestamp",
-                "height_cm",
-                "weight_g",
-                "leaf_count",
-                "branch_count"
-            )
-            .from_statement(
-                """SELECT 
-                    plant_id, MAX(timestamp) as timestamp,
-                    height_cm, weight_g, leaf_count, branch_count
-                FROM plant_measurements
-                GROUP BY plant_id
-                ORDER BY plant_id ASC"""
-            )
-            .all()
-        )
+        # Query latest plant measurements using a simple query
+        from sqlalchemy import text
+        plant_data_raw = session.execute(
+            text("""SELECT 
+                plant_id, 
+                MAX(timestamp) as timestamp,
+                MAX(CASE WHEN height_cm IS NOT NULL THEN height_cm ELSE 0 END) as height_cm,
+                MAX(CASE WHEN weight_g IS NOT NULL THEN weight_g ELSE 0 END) as weight_g,
+                MAX(CASE WHEN leaf_count IS NOT NULL THEN leaf_count ELSE 0 END) as leaf_count,
+                MAX(CASE WHEN branch_count IS NOT NULL THEN branch_count ELSE 0 END) as branch_count
+            FROM plant_measurements
+            GROUP BY plant_id
+            ORDER BY plant_id ASC""")
+        ).fetchall()
         
-        if not plant_data:
+        if not plant_data_raw:
             return
         
         # Get latest sensor readings for predictions
         try:
             sensor_data = {}
             sensor_rows = session.execute(
-                """SELECT sensor, value FROM sensor_readings 
+                text("""SELECT sensor, value FROM sensor_readings 
                    WHERE sensor IN ('ph', 'do', 'tds', 'temperature', 'humidity')
-                   ORDER BY timestamp DESC LIMIT 5"""
+                   ORDER BY timestamp DESC LIMIT 5""")
             ).fetchall()
             for sensor, value in sensor_rows:
                 if sensor not in sensor_data:
@@ -898,7 +892,7 @@ def sync_plant_predictions_to_firebase(db: firestore.Client, session):
         batch_count = 0
         
         # Sync plant measurements to predictions/latest
-        for row in plant_data:
+        for row in plant_data_raw:
             try:
                 plant_id, ts, height, weight, leaves, branches = row
                 # Derive farming system from plant_id: 1-6 = DWC, 101-106 = Aeroponics
