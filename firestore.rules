@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Sensors - read only from dashboard
+    match /sensors/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+    
+    // Actuators/Relays - read only from dashboard
+    match /actuators/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+    
+    // Predictions (ML model outputs) - read only from dashboard
+    match /predictions/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+    
+    // Relay commands - dashboard can create
+    match /relay_commands/{document=**} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if false;
+    }
+    
+    // Settings (calibration) - dashboard can update
+    match /settings/{document=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Plant readings (training data) - dashboard can create and read
+    match /plant_readings/{document=**} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if false;
+    }
+  }
+}

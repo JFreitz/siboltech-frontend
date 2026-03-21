@@ -826,11 +826,9 @@ def sync_plant_predictions_to_firebase(db: firestore.Client, session):
     """Sync ML plant predictions and historical plant measurements to Firebase."""
     try:
         # Query latest plant measurements
-        from sqlalchemy import desc
         plant_data = (
             session.query(
                 "plant_id",
-                "farming_system",
                 "timestamp",
                 "height_cm",
                 "weight_g",
@@ -838,12 +836,12 @@ def sync_plant_predictions_to_firebase(db: firestore.Client, session):
                 "branch_count"
             )
             .from_statement(
-                """SELECT DISTINCT 
-                    plant_id, farming_system, MAX(timestamp) as timestamp,
+                """SELECT 
+                    plant_id, MAX(timestamp) as timestamp,
                     height_cm, weight_g, leaf_count, branch_count
                 FROM plant_measurements
-                GROUP BY plant_id, farming_system
-                ORDER BY timestamp DESC"""
+                GROUP BY plant_id
+                ORDER BY plant_id ASC"""
             )
             .all()
         )
@@ -902,13 +900,17 @@ def sync_plant_predictions_to_firebase(db: firestore.Client, session):
         # Sync plant measurements to predictions/latest
         for row in plant_data:
             try:
-                plant_id, farming_system, ts, height, weight, leaves, branches = row
+                plant_id, ts, height, weight, leaves, branches = row
+                # Derive farming system from plant_id: 1-6 = DWC, 101-106 = Aeroponics
+                plant_id_int = int(plant_id)
+                farming_system = "aeroponics" if plant_id_int >= 100 else "dwc"
+                
                 pred_key = f"{farming_system}_{plant_id}"
                 pred = predictions.get(pred_key, {})
                 
                 doc_ref = db.collection("predictions").document("latest").collection("plants").document(f"{farming_system}_{plant_id}")
                 doc_data = {
-                    "plant_id": plant_id,
+                    "plant_id": str(plant_id),
                     "farming_system": farming_system,
                     "timestamp": ts.isoformat() if hasattr(ts, 'isoformat') else str(ts),
                     "actual": {
