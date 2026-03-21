@@ -1163,8 +1163,8 @@
 			</div>
 		</div>
 
-		<!-- Chart.js - hosted locally to avoid Firefox tracking prevention blocks -->
-		<script src="chart.min.js?v=1.0"></script>
+		<!-- Chart.js from CDN (UMD bundle, no ES6 imports) -->
+		<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 		
 		<!-- Load main app JS first -->
 		<script src="index.js?v=1.0"></script>
@@ -1195,6 +1195,8 @@
 			window.firebaseQuery = query;
 			window.firebaseOrderBy = orderBy;
 			window.firebaseLimit = limit;
+			window.firebaseSetDoc = setDoc;
+			window.firebaseServerTimestamp = serverTimestamp;
 			window.firebaseReady = true;
 			
 			// Load plant history from Firebase
@@ -1297,11 +1299,11 @@
 			// Send override mode via Firebase (for Vercel/static hosting)
 			window.sendOverrideModeFirebase = async function(enabled) {
 				try {
-					const overrideRef = doc(db, 'settings', 'override_mode');
-					await setDoc(overrideRef, {
+					const overrideRef = window.firebaseDoc(window.firebaseDB, 'settings', 'override_mode');
+					await window.firebaseSetDoc(overrideRef, {
 						enabled: enabled,
 						source: 'dashboard',
-						updated_at: serverTimestamp()
+						updated_at: window.firebaseServerTimestamp()
 					});
 					console.log(`🔒 Firebase override mode: ${enabled ? 'ON (manual)' : 'OFF (auto)'}`);
 					return true;

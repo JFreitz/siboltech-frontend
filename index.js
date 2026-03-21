@@ -2552,27 +2552,35 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	// Fetch actual state from backend instead of hardcoding to ON
 	const overrideToggle = document.getElementById('actuatorOverrideToggle');
 	if(overrideToggle){
-		// Fetch the actual override state from backend on page load
+		// Fetch the actual override state from Firebase on page load
 		const fetchOverrideState = async () => {
 			try {
-				const resp = await fetch(`${RELAY_API_URL}/override-mode`, {
-					signal: AbortSignal.timeout(2000)
-				});
-				if (resp.ok) {
-					const data = await resp.json();
+				// Use Firebase to read override state
+				if (!window.firebaseDB || !window.firebaseDoc || !window.firebaseGetDoc) {
+					console.warn('[Override] Firebase not initialized, defaulting to OFF');
+					overrideToggle.checked = false;
+					return;
+				}
+				
+				const settingsRef = window.firebaseDoc(window.firebaseDB, 'settings', 'override_mode');
+				const settingsSnap = await window.firebaseGetDoc(settingsRef);
+				
+				if (settingsSnap.exists()) {
+					const data = settingsSnap.data();
 					overrideToggle.checked = data.enabled || false;
-					console.log(`[Override] Initial state from backend: ${overrideToggle.checked}`);
-					// Update UI after setting the state
-					if (overrideToggle.closest('.toggle-switch')) {
-						const textEl = overrideToggle.closest('.toggle-switch').querySelector('.toggle-text');
-						if (textEl) textEl.textContent = overrideToggle.checked ? 'ON' : 'OFF';
-					}
+					console.log(`[Override] Initial state from Firebase: ${overrideToggle.checked}`);
 				} else {
-					console.warn('[Override] Failed to fetch state, defaulting to OFF');
+					console.warn('[Override] No override_mode doc in Firebase, defaulting to OFF');
 					overrideToggle.checked = false;
 				}
+				
+				// Update UI after setting the state
+				if (overrideToggle.closest('.toggle-switch')) {
+					const textEl = overrideToggle.closest('.toggle-switch').querySelector('.toggle-text');
+					if (textEl) textEl.textContent = overrideToggle.checked ? 'ON' : 'OFF';
+				}
 			} catch (e) {
-				console.warn('[Override] Could not fetch state from backend:', e.message);
+				console.warn('[Override] Could not fetch state from Firebase:', e.message);
 				// Default to OFF (auto mode) for safety
 				overrideToggle.checked = false;
 			}
