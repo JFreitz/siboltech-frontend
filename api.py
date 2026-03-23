@@ -244,6 +244,14 @@ def ingest():
             computed["do_mg_l"] = do_val  # compatibility alias
     except Exception:
         pass
+    try:
+        # If TDS voltage is present, prefer calibrated TDS from local calibration.
+        # This keeps live values aligned with calibration.json even when device sends raw/uncalibrated tds_ppm.
+        if "tds_voltage_v" in computed:
+            from calibration import calibrate_tds
+            computed["tds_ppm"] = float(calibrate_tds(float(computed["tds_voltage_v"])))
+    except Exception:
+        pass
 
     allowed = {
         "temperature_c", "humidity", "tds_ppm",
