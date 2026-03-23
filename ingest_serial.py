@@ -101,27 +101,29 @@ def ingest_json(session, json_data):
         logger.info(f"Ingested readings from ESP32")
         
         # Sync to Firebase if available
-        if firebase_db:
-            try:
-                latest_data = {}
-                for sensor in ["temperature_c", "humidity", "tds_ppm", "ph", "do_mg_per_l"]:
-                    result = session.execute(
-                        text("SELECT value, unit, timestamp FROM sensor_readings WHERE sensor = :sensor ORDER BY timestamp DESC LIMIT 1"),
-                        {"sensor": sensor}
-                    ).fetchone()
-                    if result:
-                        ts = result[2]
-                        # Handle both datetime and string timestamps
-                        ts_str = ts.isoformat() if hasattr(ts, 'isoformat') else str(ts)
-                        latest_data[sensor] = {"value": result[0], "unit": result[1], "timestamp": ts_str}
-                
-                if latest_data:
-                    latest_data["_updated"] = datetime.now(timezone.utc).isoformat()
-                    latest_data["_source"] = "rpi-collector"
-                    firebase_db.collection("sensors").document("latest").set(latest_data, merge=True)
-                    logger.debug(f"Synced {len(latest_data)} sensors to Firebase")
-            except Exception as e:
-                logger.warning(f"Firebase sync failed: {e}")
+        # DISABLED: firebase_sync.py now handles this more efficiently (every 30s)
+        # Having two places sync to Firebase with every reading caused quota exhaustion
+        # if firebase_db:
+        #     try:
+        #         latest_data = {}
+        #         for sensor in ["temperature_c", "humidity", "tds_ppm", "ph", "do_mg_per_l"]:
+        #             result = session.execute(
+        #                 text("SELECT value, unit, timestamp FROM sensor_readings WHERE sensor = :sensor ORDER BY timestamp DESC LIMIT 1"),
+        #                 {"sensor": sensor}
+        #             ).fetchone()
+        #             if result:
+        #                 ts = result[2]
+        #                 # Handle both datetime and string timestamps
+        #                 ts_str = ts.isoformat() if hasattr(ts, 'isoformat') else str(ts)
+        #                 latest_data[sensor] = {"value": result[0], "unit": result[1], "timestamp": ts_str}
+        #         
+        #         if latest_data:
+        #             latest_data["_updated"] = datetime.now(timezone.utc).isoformat()
+        #             latest_data["_source"] = "rpi-collector"
+        #             firebase_db.collection("sensors").document("latest").set(latest_data, merge=True)
+        #             logger.debug(f"Synced {len(latest_data)} sensors to Firebase")
+        #     except Exception as e:
+        #         logger.warning(f"Firebase sync failed: {e}")
         
     except json.JSONDecodeError as e:
         logger.debug(f"Invalid JSON: {e}")

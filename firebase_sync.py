@@ -1011,6 +1011,23 @@ def main():
 
             print(f"[{ts_str}] Sync #{sync_count}...")
             
+            # === PRIORITY 0: Sync latest sensor readings (every 2 cycles = ~30s) ===
+            # Critical for real-time dashboard display! But must throttle to respect quota.
+            # Sync frequency: Every ~30s = ~2,880 writes/day (well within 20k quota)
+            # Each write updates one "latest" doc with all 5 sensors + metadata
+            if sync_count % 2 == 0 and not quota.should_skip("latest"):
+                try:
+                    success = sync_latest_to_firebase(db, session)
+                    if success:
+                        quota.success("latest")
+                    else:
+                        # No data to sync, still consider it success (avoid backoff)
+                        quota.success("latest")
+                except Exception as e:
+                    print(f"  ⚠️ Latest sync error: {e}")
+                    if _is_quota_error(e) or "Timeout" in str(e):
+                        quota.fail("latest", e)
+            
             # === PRIORITY 1: Relay commands (every 2 cycles, ~30s) ===
             # ~5,760 checks/day (~3% of quota if commands present)
             # DISABLED temporarily while quota recovers - relay commands can wait until quota resets
@@ -1028,9 +1045,6 @@ def main():
             #             quota.fail("relay", e)
             #         elif "Timeout" in str(e):
             #             quota.fail("relay", e)  # timeout likely means 429-throttled
-            
-            # NOTE: Latest readings pushed directly by api.py on ingest (every 30s)
-            # Removed redundant backup push from here to save Firebase writes quota
             
             # === LOW PRIORITY: Override mode every 8th cycle (~120s) ===
             if sync_count % 8 == 0 and not quota.should_skip("override"):
