@@ -862,12 +862,72 @@ def predict_plant_growth():
                         "error_percent": pct_error
                     }
         
+        # Save prediction to database
+        try:
+            from db import MLPrediction
+            with Session() as session:
+                pred_record = MLPrediction(
+                    prediction_date=date_str,
+                    plant_id=plant_id,
+                    farming_system=farming_system,
+                    sensor_data=sensor_data,
+                    predictions=predictions,
+                    actual_values=actual_values if actual_values else None,
+                    comparison=result.get("comparison")
+                )
+                session.add(pred_record)
+                session.commit()
+        except Exception as e:
+            print(f"[API] Failed to save prediction to DB: {e}", flush=True)
+            # Don't fail the API call if we can't save, just log it
+        
         return jsonify(result)
     
     except Exception as e:
         print(f"[API] Prediction error: {e}", flush=True)
         import traceback
         traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/predictions/history", methods=["GET"])
+def get_prediction_history():
+    """Get all previous predictions, optionally filtered by plant_id."""
+    try:
+        from db import MLPrediction
+        plant_id = request.args.get('plant_id', type=int)
+        limit = request.args.get('limit', default=50, type=int)
+        
+        with Session() as session:
+            query = session.query(MLPrediction).order_by(MLPrediction.timestamp.desc())
+            
+            if plant_id:
+                query = query.filter(MLPrediction.plant_id == plant_id)
+            
+            predictions = query.limit(limit).all()
+            
+            result = []
+            for pred in predictions:
+                result.append({
+                    "id": pred.id,
+                    "timestamp": pred.timestamp.isoformat() if pred.timestamp else None,
+                    "prediction_date": pred.prediction_date,
+                    "plant_id": pred.plant_id,
+                    "farming_system": pred.farming_system,
+                    "sensor_data": pred.sensor_data,
+                    "predictions": pred.predictions,
+                    "actual_values": pred.actual_values,
+                    "comparison": pred.comparison
+                })
+            
+            return jsonify({
+                "success": True,
+                "count": len(result),
+                "predictions": result
+            })
+    
+    except Exception as e:
+        print(f"[API] History error: {e}", flush=True)
         return jsonify({"success": False, "error": str(e)}), 500
 
 

@@ -54,6 +54,18 @@ class ActuatorEvent(Base):
     state = Column(Integer, nullable=False)  # 0 = OFF, 1 = ON
     meta = Column(JSON)  # Extra info like triggering condition
 
+class MLPrediction(Base):
+    __tablename__ = "ml_predictions"
+    id = Column(Integer, primary_key=True)
+    timestamp = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+    prediction_date = Column(Text, nullable=False)  # YYYY-MM-DD format
+    plant_id = Column(Integer, nullable=False)
+    farming_system = Column(Text, nullable=False)
+    sensor_data = Column(JSON)  # { ave_ph, ave_do, ave_tds, ave_temp, ave_humidity }
+    predictions = Column(JSON)  # { height, length, weight, leaves, branches }
+    actual_values = Column(JSON)  # Optional: { height, length, weight, leaves, branches }
+    comparison = Column(JSON)  # Optional: error metrics
+
 def init_db():
     Base.metadata.create_all(bind=engine)
 

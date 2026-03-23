@@ -498,43 +498,55 @@
 	
 		<section id="predicting" class="tab-content">
 		<div class="pred-header">
-			<h2>🌱 Plant Growth Prediction</h2>
-			<p class="pred-subtitle">Select plant, date & system to get AI predictions</p>
+			<h2>🤖 AI Plant Predictor</h2>
+			<p class="pred-subtitle">🌱 See how big your plants will grow!</p>
 		</div>
 		
-		<div class="pred-main-container">
-			<!-- Left Column: Input Panel -->
-			<div class="pred-left-panel">
+		<!-- Tab Selector -->
+		<div class="pred-tabs">
+			<button class="pred-tab-btn active" data-tab="new-prediction">
+				<span class="pred-tab-icon">➕</span> New Prediction
+			</button>
+			<button class="pred-tab-btn" data-tab="history">
+				<span class="pred-tab-icon">📜</span> All Predictions
+			</button>
+		</div>
+		
+		<!-- NEW PREDICTION TAB -->
+		<div id="new-prediction" class="pred-tab-content active">
+			<div class="pred-main-container">
+				<!-- Left Column: Input Panel -->
+				<div class="pred-left-panel">
 				<div class="pred-form-card">
-					<h3>Step 1: Basic Settings</h3>
+					<h3>⚙️ Choose Settings</h3>
 					<div class="pred-form-grid">
 						<!-- Plant ID Selector -->
 						<div class="form-group">
-							<label>Plant No. <span class="required">*</span></label>
+							<label>🌿 Plant No. <span class="required">*</span></label>
 							<select id="predPlantId" class="form-input">
-								<option value="">Select Plant</option>
-								<option value="1">Plant 1</option>
-								<option value="2">Plant 2</option>
-								<option value="3">Plant 3</option>
-								<option value="4">Plant 4</option>
-								<option value="5">Plant 5</option>
-								<option value="6">Plant 6</option>
+								<option value="">🔽 Pick a plant</option>
+								<option value="1">🌱 Plant 1</option>
+								<option value="2">🌱 Plant 2</option>
+								<option value="3">🌱 Plant 3</option>
+								<option value="4">🌱 Plant 4</option>
+								<option value="5">🌱 Plant 5</option>
+								<option value="6">🌱 Plant 6</option>
 							</select>
 						</div>
 						
 						<!-- Farming System Selector -->
 						<div class="form-group">
-							<label>System Type <span class="required">*</span></label>
+							<label>💧 Growing Method <span class="required">*</span></label>
 							<select id="predFarmingSystem" class="form-input">
-								<option value="">Select System</option>
-								<option value="dwc">Deep Water Culture</option>
-								<option value="aeroponics">Aeroponics</option>
+								<option value="">🔽 Pick a method</option>
+								<option value="dwc">💧 Water Culture (DWC)</option>
+								<option value="aeroponics">💨 Misting System (Aeroponics)</option>
 							</select>
 						</div>
 						
 						<!-- Date Picker -->
 						<div class="form-group">
-							<label>Prediction Date <span class="required">*</span></label>
+							<label>📅 Which day? <span class="required">*</span></label>
 							<input type="date" id="predDate" class="form-input" />
 						</div>
 					</div>
@@ -542,42 +554,42 @@
 
 				<!-- Optional Actual Values Section -->
 				<div class="pred-form-card">
-					<h3>Step 2: Actual Values <span class="optional">(Optional)</span></h3>
+					<h3>📏 What did you MEASURE? <span class="optional">(Not Required)</span></h3>
+					<p class="helper-text">😊 If you measured the plants, write the real numbers here!</p>
 					<div class="actual-values-grid">
 						<div class="input-field">
-							<label>Height (cm)</label>
-							<input type="number" id="actualHeight" step="0.1" placeholder="Leave blank to skip" />
+							<label>📏 Height (how tall in cm)</label>
+							<input type="number" id="actualHeight" step="0.1" placeholder="👉 skip if you don't have it" />
 						</div>
 						<div class="input-field">
-							<label>Length (cm)</label>
-							<input type="number" id="actualLength" step="0.1" placeholder="Leave blank to skip" />
+							<label>📏 Length (how wide in cm)</label>
+							<input type="number" id="actualLength" step="0.1" placeholder="👉 skip if you don't have it" />
 						</div>
 						<div class="input-field">
-							<label>Weight (g)</label>
-							<input type="number" id="actualWeight" step="0.1" placeholder="Leave blank to skip" />
+							<label>⚖️ Weight (in grams)</label>
+							<input type="number" id="actualWeight" step="0.1" placeholder="👉 skip if you don't have it" />
 						</div>
 						<div class="input-field">
-							<label>Leaves (count)</label>
-							<input type="number" id="actualLeaves" step="1" placeholder="Leave blank to skip" />
+							<label>🍃 Leaves (how many)</label>
+							<input type="number" id="actualLeaves" step="1" placeholder="👉 skip if you don't have it" />
 						</div>
 						<div class="input-field">
-							<label>Branches (count)</label>
-							<input type="number" id="actualBranches" step="1" placeholder="Leave blank to skip" />
+							<label>🌿 Branches (how many)</label>
+							<input type="number" id="actualBranches" step="1" placeholder="👉 skip if you don't have it" />
 						</div>
 					</div>
-					<p class="helper-text">💡 Add actual values to compare against predictions and see accuracy</p>
 				</div>
 
 				<!-- Run Button -->
-				<button class="btn btn-success btn-large" id="runPredictionBtn">🚀 Get Predictions</button>
+				<button class="btn btn-success btn-large" id="runPredictionBtn">🚀 PREDICT NOW!</button>
 			</div>
 
 			<!-- Right Column: Results -->
 			<div class="pred-right-panel">
 				<div id="predictionResults" class="pred-results-section">
 					<!-- Sensor Data Used -->
-					<div class="results-card">
-						<h3>📊 Sensor Data Used</h3>
+					<div class="results-card results-card-sensor">
+						<h3>🔬 What the Sensors Found</h3>
 						<div class="sensor-data-grid">
 							<div class="sensor-data-item">
 								<span class="data-label">pH</span>
@@ -603,18 +615,18 @@
 					</div>
 					
 					<!-- Predictions vs Actual Metrics Table -->
-					<div class="results-card">
-						<h3>📈 Prediction Results</h3>
+					<div class="results-card results-card-metrics">
+						<h3>🎯 AI's Prediction vs Your Measurement</h3>
 						<div class="table-responsive">
 							<table class="results-table">
 								<thead>
 									<tr>
-										<th>Metric</th>
+										<th>What We Measure</th>
 										<th>Unit</th>
-										<th class="actual-col">Actual</th>
-										<th class="predicted-col">Predicted</th>
+										<th class="actual-col">📏 You Got</th>
+										<th class="predicted-col">🤖 AI Says</th>
 										<th>Difference</th>
-										<th>Error %</th>
+										<th>% Off</th>
 									</tr>
 								</thead>
 								<tbody id="resultsTableBody">
@@ -628,25 +640,47 @@
 				<!-- Charts Section -->
 				<div id="chartsSection" class="charts-container">
 					<div class="chart-card">
-						<h4>Height (cm)</h4>
+						<h4>📊 Height (cm)</h4>
 						<canvas id="chartHeight"></canvas>
 					</div>
 					<div class="chart-card">
-						<h4>Length (cm)</h4>
+						<h4>📊 Length (cm)</h4>
 						<canvas id="chartLength"></canvas>
 					</div>
 					<div class="chart-card">
-						<h4>Weight (g)</h4>
+						<h4>⚖️ Weight (g)</h4>
 						<canvas id="chartWeight"></canvas>
 					</div>
 					<div class="chart-card">
-						<h4>Leaves (count)</h4>
+						<h4>🍃 Leaves (count)</h4>
 						<canvas id="chartLeaves"></canvas>
 					</div>
 					<div class="chart-card">
-						<h4>Branches (count)</h4>
+						<h4>🌿 Branches (count)</h4>
 						<canvas id="chartBranches"></canvas>
 					</div>
+				</div>
+			</div>
+		</div>
+		</div>
+
+		<!-- HISTORY TAB -->
+		<div id="history" class="pred-tab-content">
+			<div class="history-container">
+				<h3>📜 All Your Predictions</h3>
+				<p class="history-subtitle">Click any prediction to see the details!</p>
+				<div id="historyList" class="history-list">
+					<p class="loading-text">📥 Loading your predictions...</p>
+				</div>
+			</div>
+		</div>
+
+		<!-- Prediction Detail Modal -->
+		<div id="predictionDetailModal" class="modal-overlay" style="display: none;">
+			<div class="prediction-detail-card">
+				<button class="modal-close-btn" id="closePredDetail">&times;</button>
+				<div id="predDetailContent">
+					<!-- Filled dynamically -->
 				</div>
 			</div>
 		</div>

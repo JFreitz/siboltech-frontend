@@ -5251,6 +5251,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
 		// Run prediction button
 		document.getElementById('runPredictionBtn').addEventListener('click', runPrediction);
+
+		// Tab switching
+		document.querySelectorAll('.pred-tab-btn').forEach(btn => {
+			btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
+		});
+
+		// History modal close
+		document.getElementById('closePredDetail').addEventListener('click', closeDetailModal);
+
+		// Load history when tab becomes visible
+		setTimeout(loadPredictionHistory, 500);
+	}
+
+	function switchTab(tabName) {
+		// Hide all tabs
+		document.querySelectorAll('.pred-tab-content').forEach(tab => {
+			tab.classList.remove('active');
+		});
+		document.querySelectorAll('.pred-tab-btn').forEach(btn => {
+			btn.classList.remove('active');
+		});
+
+		// Show selected tab
+		document.getElementById(tabName).classList.add('active');
+		document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+
+		// Reload history if switching to history tab
+		if (tabName === 'history') {
+			loadPredictionHistory();
+		}
 	}
 
 	function getActualValues() {
@@ -5433,6 +5463,172 @@ document.addEventListener('DOMContentLoaded', () => {
 		resultsSection.classList.remove('active');
 		alert('❌ ' + message);
 	}
+
+	async function loadPredictionHistory() {
+		try {
+			const response = await fetch(`${API_BASE}/api/predictions/history?limit=100`);
+			const data = await response.json();
+
+			const historyList = document.getElementById('historyList');
+
+			if (!data.success || !data.predictions || data.predictions.length === 0) {
+				historyList.innerHTML = '<p class="loading-text">📭 No predictions yet. Make one above!</p>';
+				return;
+			}
+
+			historyList.innerHTML = '';
+			data.predictions.forEach(pred => {
+				const card = createHistoryCard(pred);
+				historyList.appendChild(card);
+			});
+		} catch (error) {
+			console.error('[Prediction] History load error:', error);
+			document.getElementById('historyList').innerHTML = '<p class="loading-text">❌ Could not load history</p>';
+		}
+	}
+
+	function createHistoryCard(pred) {
+		const card = document.createElement('div');
+		card.className = 'history-card';
+
+		const systemLabel = pred.farming_system === 'dwc' ? '💧 DWC' : '💨 Aeroponics';
+		const dateObj = new Date(pred.prediction_date);
+		const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+		let metricsHTML = '';
+		const predictions = pred.predictions || {};
+		['height', 'length', 'weight', 'leaves', 'branches'].forEach((metric, idx) => {
+			if (idx < 4) { // Show first 4 metrics in card
+				const value = predictions[metric];
+				const unit = metric === 'height' || metric === 'length' ? 'cm' : (metric === 'weight' ? 'g' : '');
+				const displayValue = value ? (unit ? `${value.toFixed(1)}${unit}` : `${Math.round(value)}`) : '-';
+				metricsHTML += `<div class="metric-mini"><span class="metric-mini-label">${metric}</span><span class="metric-mini-value">${displayValue}</span></div>`;
+			}
+		});
+
+		card.innerHTML = `
+			<div class="history-card-header">
+				<div class="history-card-date">📅 ${dateStr}</div>
+				<div class="history-card-plant">🌱 Plant ${pred.plant_id}</div>
+			</div>
+			<div class="history-card-system">${systemLabel}</div>
+			<div class="history-card-metrics">
+				${metricsHTML}
+			</div>
+		`;
+
+		card.addEventListener('click', () => showPredictionDetail(pred));
+		return card;
+	}
+
+	function showPredictionDetail(pred) {
+		const modal = document.getElementById('predictionDetailModal');
+		const content = document.getElementById('predDetailContent');
+
+		const systemLabel = pred.farming_system === 'dwc' ? '💧 Deep Water Culture' : '💨 Aeroponics';
+		const dateObj = new Date(pred.prediction_date);
+		const dateStr = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+		const predictions = pred.predictions || {};
+		const actual = pred.actual_values || {};
+		const comparison = pred.comparison || {};
+
+		let metricsHTML = '';
+		['height', 'length', 'weight', 'leaves', 'branches'].forEach(metric => {
+			const pred_val = predictions[metric];
+			const act_val = actual[metric];
+			const comp = comparison[metric];
+
+			const hasActual = act_val !== null && act_val !== undefined;
+			const unit = metric === 'height' || metric === 'length' ? 'cm' : (metric === 'weight' ? 'g' : '');
+			const metricLabel = metric.charAt(0).toUpperCase() + metric.slice(1);
+
+			metricsHTML += `
+				<div class="detail-metric-box ${hasActual ? 'has-actual' : ''}">
+					<div class="detail-metric-name">📊 ${metricLabel}</div>
+					<div class="detail-metric-row">
+						<span>🤖 AI Predicts:</span>
+						<strong>${pred_val ? `${pred_val.toFixed(1)}${unit}` : '-'}</strong>
+					</div>
+					${hasActual ? `
+						<div class="detail-metric-row">
+							<span>📏 You Measured:</span>
+							<strong style="color: #f39c12;">${act_val.toFixed(1)}${unit}</strong>
+						</div>
+						${comp ? `
+							<div class="detail-metric-row" style="color: #e74c3c;">
+								<span>Difference:</span>
+								<strong>${comp.error.toFixed(1)}${unit} (${comp.error_percent.toFixed(0)}%)</strong>
+							</div>
+						` : ''}
+					` : ''}
+				</div>
+			`;
+		});
+
+		const sensorData = pred.sensor_data || {};
+		const sensorHTML = `
+			<div class="detail-metrics-grid">
+				<div class="detail-metric-box">
+					<div class="detail-metric-name">🧪 pH</div>
+					<div class="detail-metric-row"><strong>${sensorData.ave_ph ? sensorData.ave_ph.toFixed(2) : '-'}</strong></div>
+				</div>
+				<div class="detail-metric-box">
+					<div class="detail-metric-name">💧 DO (mg/L)</div>
+					<div class="detail-metric-row"><strong>${sensorData.ave_do ? sensorData.ave_do.toFixed(2) : '-'}</strong></div>
+				</div>
+				<div class="detail-metric-box">
+					<div class="detail-metric-name">🧂 TDS (ppm)</div>
+					<div class="detail-metric-row"><strong>${sensorData.ave_tds ? sensorData.ave_tds.toFixed(1) : '-'}</strong></div>
+				</div>
+				<div class="detail-metric-box">
+					<div class="detail-metric-name">🌡️ Temp (°C)</div>
+					<div class="detail-metric-row"><strong>${sensorData.ave_temp ? sensorData.ave_temp.toFixed(1) : '-'}</strong></div>
+				</div>
+				<div class="detail-metric-box">
+					<div class="detail-metric-name">💨 Humidity (%)</div>
+					<div class="detail-metric-row"><strong>${sensorData.ave_humidity ? sensorData.ave_humidity.toFixed(1) : '-'}</strong></div>
+				</div>
+			</div>
+		`;
+
+		content.innerHTML = `
+			<div class="detail-header">
+				<h2>🎯 Prediction Details</h2>
+				<div class="detail-meta">
+					<span class="detail-badge">📅 ${dateStr}</span>
+					<span class="detail-badge">🌱 Plant ${pred.plant_id}</span>
+					<span class="detail-badge">${systemLabel}</span>
+				</div>
+			</div>
+
+			<div class="detail-section">
+				<h3>🔬 Sensor Reading at that Time</h3>
+				${sensorHTML}
+			</div>
+
+			<div class="detail-section">
+				<h3>📊 Predicted vs Actual Measurements</h3>
+				<div class="detail-metrics-grid">
+					${metricsHTML}
+				</div>
+			</div>
+		`;
+
+		modal.style.display = 'flex';
+	}
+
+	function closeDetailModal() {
+		document.getElementById('predictionDetailModal').style.display = 'none';
+	}
+
+	// Close modal when clicking outside
+	document.addEventListener('click', (e) => {
+		const modal = document.getElementById('predictionDetailModal');
+		if (modal && e.target === modal) {
+			closeDetailModal();
+		}
+	});
 
 	// Initialize when DOM is ready
 	if (document.readyState === 'loading') {
