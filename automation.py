@@ -200,6 +200,18 @@ class AutomationController:
         self.override_mode = override
         print(f"[AUTOMATION] Override mode: {'ON' if override else 'OFF'}", flush=True)
 
+        # When override is turned ON, force all relays OFF immediately.
+        # This gives a safe/manual baseline; user can then turn specific relays ON manually.
+        if override and not was_override:
+            print("[AUTOMATION] Override enabled - forcing all relays OFF", flush=True)
+            try:
+                for name, relay in self.relays.items():
+                    relay.state = None  # force callback even if already OFF
+                    relay.last_change = 0
+                    self._set_relay(name, False, force=True)
+            except Exception as e:
+                print(f"[AUTOMATION] Error while forcing relays OFF: {e}", flush=True)
+
         # When override is turned OFF, immediately run automation to restore proper states
         if was_override and not override:
             print("[AUTOMATION] Override disabled - forcing relay state resync", flush=True)

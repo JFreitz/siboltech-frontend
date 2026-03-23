@@ -991,49 +991,55 @@ def main():
     
     sync_count = 0
     
-    # Initialize and start automation controller
-    print("[DEBUG] Starting automation controller initialization...")
-    try:
-        from automation import init_controller
-        print("[DEBUG] Successfully imported init_controller")
-        
-        def relay_callback(relay_id: int, state: bool):
-            """Callback to set relay state via API with retry."""
-            try:
-                import requests as _req
-                action = "on" if state else "off"
-                # Increased timeout to 5s + retry logic for resilience
-                for attempt in range(2):
-                    try:
-                        _resp = _req.post(f"http://localhost:5000/api/relay/{relay_id}/{action}", timeout=5)
-                        if _resp.ok:
-                            return  # Success
-                        elif _resp.status_code == 504:  # Deadline exceeded, retry
-                            if attempt == 0:
+    # IMPORTANT: API already runs automation controller.
+    # Running another controller here causes relay conflicts (especially with override/manual mode).
+    # Keep disabled by default; can be re-enabled only for debugging.
+    enable_sync_automation = os.getenv("ENABLE_SYNC_AUTOMATION", "0") == "1"
+    if enable_sync_automation:
+        print("[DEBUG] Starting automation controller initialization...")
+        try:
+            from automation import init_controller
+            print("[DEBUG] Successfully imported init_controller")
+
+            def relay_callback(relay_id: int, state: bool):
+                """Callback to set relay state via API with retry."""
+                try:
+                    import requests as _req
+                    action = "on" if state else "off"
+                    # Increased timeout to 5s + retry logic for resilience
+                    for attempt in range(2):
+                        try:
+                            _resp = _req.post(f"http://localhost:5000/api/relay/{relay_id}/{action}", timeout=5)
+                            if _resp.ok:
+                                return  # Success
+                            elif _resp.status_code == 504:  # Deadline exceeded, retry
+                                if attempt == 0:
+                                    import time as _t
+                                    _t.sleep(0.1)
+                                    continue
+                            else:
+                                print(f"⚠️ Relay {relay_id} set failed: {_resp.status_code}")
+                                return
+                        except Exception as e:
+                            if attempt == 0 and "timeout" in str(e).lower():
                                 import time as _t
                                 _t.sleep(0.1)
                                 continue
-                        else:
-                            print(f"⚠️ Relay {relay_id} set failed: {_resp.status_code}")
-                            return
-                    except Exception as e:
-                        if attempt == 0 and "timeout" in str(e).lower():
-                            import time as _t
-                            _t.sleep(0.1)
-                            continue
-                        raise
-            except Exception as e:
-                print(f"⚠️ Relay {relay_id} callback error: {e}")
-        
-        print("[DEBUG] Creating automation controller...")
-        controller = init_controller(relay_callback)
-        print("[DEBUG] Starting automation controller thread...")
-        controller.start()
-        print("✅ Automation controller started")
-    except Exception as e:
-        import traceback
-        print(f"⚠️ Failed to start automation controller: {e}")
-        traceback.print_exc()
+                            raise
+                except Exception as e:
+                    print(f"⚠️ Relay {relay_id} callback error: {e}")
+
+            print("[DEBUG] Creating automation controller...")
+            controller = init_controller(relay_callback)
+            print("[DEBUG] Starting automation controller thread...")
+            controller.start()
+            print("✅ Automation controller started")
+        except Exception as e:
+            import traceback
+            print(f"⚠️ Failed to start automation controller: {e}")
+            traceback.print_exc()
+    else:
+        print("[DEBUG] Skipping firebase_sync automation controller (API automation is authoritative)")
     
     print("[DEBUG] About to enter main sync loop...")
     
