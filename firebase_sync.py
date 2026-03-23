@@ -46,6 +46,7 @@ SERVICE_ACCOUNT_FILE = os.getenv(
 )
 SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "2"))  # seconds - very fast live sync; quota-safe guards still apply
 BATCH_SIZE = 10  # Keep small to stay within Spark plan (20k writes/day)
+RELAY_COMMAND_TTL_SEC = int(os.getenv("RELAY_COMMAND_TTL_SEC", "30"))  # ignore stale pending commands older than this
 
 # Time-based task cadence (converted to cycles from SYNC_INTERVAL)
 RELAY_CHECK_CYCLES = max(1, int(round(5 / max(SYNC_INTERVAL, 1))))        # ~5s for responsive manual relay commands
@@ -449,11 +450,33 @@ def process_relay_commands(db: firestore.Client):
     pending = commands_ref.where(filter=FieldFilter("status", "==", "pending")).limit(10).stream(timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
     
     had_commands = False
+    now_utc = datetime.now(timezone.utc)
     for doc in pending:
         had_commands = True
         cmd_data = doc.to_dict()
         relay = cmd_data.get("relay", "").upper()  # e.g., "R1"
         action = cmd_data.get("action", "").lower()  # "on" or "off"
+
+        # Drop stale pending commands so old queue entries don't fight current manual control.
+        try:
+            created_at = cmd_data.get("created_at")
+            created_dt = None
+            if isinstance(created_at, datetime):
+                created_dt = created_at if created_at.tzinfo else created_at.replace(tzinfo=timezone.utc)
+            elif hasattr(created_at, "timestamp"):
+                created_dt = datetime.fromtimestamp(created_at.timestamp(), tz=timezone.utc)
+
+            if created_dt is not None:
+                age_s = (now_utc - created_dt).total_seconds()
+                if age_s > RELAY_COMMAND_TTL_SEC:
+                    doc.reference.update({
+                        "status": "expired",
+                        "response": f"Expired (age={int(age_s)}s > ttl={RELAY_COMMAND_TTL_SEC}s)",
+                        "executed_at": firestore.SERVER_TIMESTAMP,
+                    }, timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
+                    continue
+        except Exception:
+            pass
         
         # Extract relay number (R1 -> 1)
         try:
@@ -1127,23 +1150,19 @@ def main():
                     if _is_quota_error(e) or "Timeout" in str(e):
                         quota.fail("latest", e)
             
-            # === PRIORITY 1: Relay commands (every ~30s) ===
-            # ~5,760 checks/day (~3% of quota if commands present)
-            # DISABLED temporarily while quota recovers - relay commands can wait until quota resets
-            # if sync_count % RELAY_CHECK_CYCLES == 0 and not quota.should_skip("relay"):
-            #     try:
-            #         had_commands = process_relay_commands(db)
-            #         quota.success("relay")
-            #         # Don't sync relay status after every command - too many writes!
-            #         # Will be synced in history updates (every 15 min)
-            #         # if had_commands:
-            #         #     sync_relay_status_to_firebase(db)
-            #     except Exception as e:
-            #         print(f"  ⚠️ Relay error: {e}")
-            #         if _is_quota_error(e):
-            #             quota.fail("relay", e)
-            #         elif "Timeout" in str(e):
-            #             quota.fail("relay", e)  # timeout likely means 429-throttled
+            # === PRIORITY 1: Relay commands (every ~5s) ===
+            # Needed for manual relay control from dashboard (override mode).
+            if sync_count % RELAY_CHECK_CYCLES == 0 and not quota.should_skip("relay"):
+                try:
+                    process_relay_commands(db)
+                    quota.success("relay")
+                    # Keep relay status sync lightweight; skip per-command status writes.
+                except Exception as e:
+                    print(f"  ⚠️ Relay error: {e}")
+                    if _is_quota_error(e):
+                        quota.fail("relay", e)
+                    elif "Timeout" in str(e):
+                        quota.fail("relay", e)  # timeout likely means 429-throttled
             
             # === LOW PRIORITY: Override mode every ~120s ===
             if sync_count % OVERRIDE_CHECK_CYCLES == 0 and not quota.should_skip("override"):
