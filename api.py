@@ -715,32 +715,40 @@ def predict_plant_growth():
         except Exception as e:
             return jsonify({"success": False, "error": f"Invalid date format: {e}"}), 400
         
-        # Fetch average sensor readings for that date
-        date_start = date_obj.replace(hour=0, minute=0, second=0, microsecond=0)
-        date_end = date_obj.replace(hour=23, minute=59, second=59, microsecond=999999)
-        
+        # Fetch average sensor readings for that date from local DB.
+        # Use date(timestamp)=:date to handle stored timestamp formats consistently.
+        date_only = date_obj.strftime("%Y-%m-%d")
+
         sensor_data = {}
         sensor_map = {
-            'ave_ph': 'ph',
-            'ave_do': 'do_mg_per_l',
-            'ave_tds': 'tds_ppm',
-            'ave_temp': 'temperature_c',
-            'ave_humidity': 'humidity'
+            'ave_ph': ['ph'],
+            'ave_do': ['do_mg_per_l', 'do_mg_l'],
+            'ave_tds': ['tds_ppm'],
+            'ave_temp': ['temperature_c'],
+            'ave_humidity': ['humidity']
         }
-        
+
         with Session() as session:
-            for key, sensor_name in sensor_map.items():
-                result = session.execute(text("""
-                    SELECT AVG(value) FROM sensor_readings 
-                    WHERE sensor = :sensor 
-                    AND timestamp >= :start 
-                    AND timestamp <= :end
-                """), {
-                    "sensor": sensor_name,
-                    "start": date_start.isoformat(),
-                    "end": date_end.isoformat()
-                }).fetchone()
-                
+            for key, sensor_names in sensor_map.items():
+                if key == 'ave_do':
+                    # Support both historical naming conventions for DO sensor
+                    result = session.execute(text("""
+                        SELECT AVG(value)
+                        FROM sensor_readings
+                        WHERE date(timestamp) = :date_only
+                          AND sensor IN ('do_mg_per_l', 'do_mg_l')
+                    """), {"date_only": date_only}).fetchone()
+                else:
+                    result = session.execute(text("""
+                        SELECT AVG(value)
+                        FROM sensor_readings
+                        WHERE date(timestamp) = :date_only
+                          AND sensor = :sensor_name
+                    """), {
+                        "date_only": date_only,
+                        "sensor_name": sensor_names[0]
+                    }).fetchone()
+
                 if result and result[0] is not None:
                     sensor_data[key] = float(result[0])
         
