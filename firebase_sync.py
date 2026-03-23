@@ -44,7 +44,7 @@ SERVICE_ACCOUNT_FILE = os.getenv(
     "FIREBASE_SERVICE_ACCOUNT", 
     str(Path(__file__).parent / "firebase-service-account.json")
 )
-SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "10"))  # seconds - balanced real-time vs quota
+SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "8"))  # seconds - faster real-time, still quota-safe
 BATCH_SIZE = 10  # Keep small to stay within Spark plan (20k writes/day)
 
 # Time-based task cadence (converted to cycles from SYNC_INTERVAL)
@@ -151,7 +151,7 @@ _SERIAL_KEY_MAP = {
     "do_v": "do_voltage_v",
     "tds_v": "tds_voltage_v",
 }
-_serial_ingest_interval = 5  # POST to /api/ingest every 5s (not every line)
+_serial_ingest_interval = 3  # POST to /api/ingest every 3s for quicker live updates
 _last_serial_ingest_ts = 0
 _last_serial_readings = {}  # latest parsed readings from serial
 
