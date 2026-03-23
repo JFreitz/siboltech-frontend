@@ -568,6 +568,7 @@ def sync_calibration_to_firebase(db: firestore.Client):
 
 _last_processed_override_ts = None  # Track last processed override command timestamp
 _OVERRIDE_PROCESSED_FILE = Path(__file__).parent / ".last_override_processed"
+_last_seen_override_doc_version = None  # Prevent stale override docs from being re-applied
 
 def _load_last_override_processed():
     """Load the last processed override state from local file."""
@@ -592,6 +593,7 @@ def _save_override_processed(enabled: bool):
 def check_override_mode(db: firestore.Client, last_override_state: bool) -> bool:
     """Check if override mode was changed from dashboard via Firebase.
     Returns the current override state."""
+    global _last_seen_override_doc_version
     import requests
     
     try:
@@ -602,15 +604,50 @@ def check_override_mode(db: firestore.Client, last_override_state: bool) -> bool
             data = doc.to_dict()
             enabled = data.get("enabled", False)
             source = data.get("source", "")
+            updated_at = data.get("updated_at")
+
+            # Build a stable doc version marker so we only act on new dashboard writes.
+            if hasattr(updated_at, "isoformat"):
+                updated_key = updated_at.isoformat()
+            elif updated_at is not None:
+                updated_key = str(updated_at)
+            else:
+                updated_key = "no-updated-at"
+            doc_version = f"{enabled}|{source}|{updated_key}"
             
             # Only act on dashboard-originated changes
             if source == "dashboard":
+                # Prime cache on first read to avoid applying stale values at startup.
+                if _last_seen_override_doc_version is None:
+                    _last_seen_override_doc_version = doc_version
+                    return last_override_state
+
+                # If dashboard document did not change, do nothing.
+                if doc_version == _last_seen_override_doc_version:
+                    return last_override_state
+
+                _last_seen_override_doc_version = doc_version
+
                 # Check if we already processed this same state locally
                 # This prevents re-applying stale commands when quota blocks
                 # the Firebase doc_ref.update(source="rpi-synced") call
                 prev_enabled, _ = _load_last_override_processed()
                 if prev_enabled == enabled:
                     return last_override_state  # Already processed this exact state
+
+                # Read live API state to avoid overwriting recent local/LAN changes.
+                current_api_state = last_override_state
+                try:
+                    api_state_resp = requests.get("http://localhost:5000/api/override-mode", timeout=2)
+                    if api_state_resp.ok:
+                        api_data = api_state_resp.json() or {}
+                        current_api_state = bool(api_data.get("enabled", api_data.get("override_mode", last_override_state)))
+                except Exception:
+                    pass
+
+                if current_api_state == enabled:
+                    _save_override_processed(enabled)
+                    return current_api_state
                 
                 print(f"  🔒 Override mode changed from dashboard: {'ON' if enabled else 'OFF'}")
                 try:
