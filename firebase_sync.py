@@ -44,8 +44,16 @@ SERVICE_ACCOUNT_FILE = os.getenv(
     "FIREBASE_SERVICE_ACCOUNT", 
     str(Path(__file__).parent / "firebase-service-account.json")
 )
-SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "15"))  # seconds - increased from 5s to reduce quota
+SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "10"))  # seconds - balanced real-time vs quota
 BATCH_SIZE = 10  # Keep small to stay within Spark plan (20k writes/day)
+
+# Time-based task cadence (converted to cycles from SYNC_INTERVAL)
+RELAY_CHECK_CYCLES = max(1, int(round(30 / max(SYNC_INTERVAL, 1))))       # ~30s
+OVERRIDE_CHECK_CYCLES = max(1, int(round(120 / max(SYNC_INTERVAL, 1))))   # ~2 min
+CALMODE_CHECK_CYCLES = max(1, int(round(300 / max(SYNC_INTERVAL, 1))))    # ~5 min
+HISTORY_SYNC_CYCLES = max(1, int(round(900 / max(SYNC_INTERVAL, 1))))     # ~15 min
+CAL_UPDATE_CYCLES = max(1, int(round(600 / max(SYNC_INTERVAL, 1))))       # ~10 min
+FAST_FIRST_HISTORY_CYCLE = max(2, int(round(30 / max(SYNC_INTERVAL, 1)))) # ~30s after start
 
 # Auto-detect serial port (prefer ttyUSB1 which is more stable on this system)
 def _auto_detect_serial():
@@ -364,12 +372,53 @@ def get_latest_readings(session) -> dict:
     return result
 
 
+_last_latest_signature = None
+_last_latest_sync_ts = 0.0
+
+
+def _build_latest_signature(readings: dict):
+    """Build a compact, stable signature for latest sensor payload.
+
+    Ignores volatile fields like server timestamps and rounds sensor values
+    to avoid writing for insignificant float noise.
+    """
+    sig = {}
+    for key, val in readings.items():
+        if str(key).startswith("_"):
+            continue
+
+        if isinstance(val, dict):
+            value = val.get("value")
+            try:
+                value = round(float(value), 4)
+            except Exception:
+                pass
+
+            raw_v = val.get("raw_voltage")
+            try:
+                raw_v = round(float(raw_v), 4)
+            except Exception:
+                pass
+
+            sig[key] = (value, val.get("unit"), raw_v)
+        else:
+            sig[key] = val
+    return sig
+
+
 def sync_latest_to_firebase(db: firestore.Client, session):
     """Sync the latest sensor readings to Firebase."""
+    global _last_latest_signature, _last_latest_sync_ts
     session.expire_all()  # Force fresh read from DB (avoid stale cache)
     readings = get_latest_readings(session)
     
     if not readings:
+        return False
+
+    # Quota-saver: skip write when payload hasn't changed recently.
+    now_ts = time.time()
+    current_sig = _build_latest_signature(readings)
+    if _last_latest_signature == current_sig and (now_ts - _last_latest_sync_ts) < 60:
         return False
     
     # Update the "latest" document with all current readings
@@ -380,6 +429,8 @@ def sync_latest_to_firebase(db: firestore.Client, session):
     readings["_source"] = "rpi-collector"
     
     doc_ref.set(readings, merge=True, timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
+    _last_latest_signature = current_sig
+    _last_latest_sync_ts = now_ts
     return True
 
 
@@ -1011,9 +1062,9 @@ def main():
 
             print(f"[{ts_str}] Sync #{sync_count}...")
             
-            # === PRIORITY 0: Sync latest sensor readings (every cycle = ~15s) ===
+            # === PRIORITY 0: Sync latest sensor readings (every cycle) ===
             # Critical for real-time dashboard display! But must throttle to respect quota.
-            # Sync frequency: Every ~15s = ~5,760 writes/day (well within 20k quota)
+            # Sync frequency default: every ~10s = ~8,640 writes/day max before skip-unchanged optimization.
             # Each write updates one "latest" doc with all 5 sensors + metadata
             if not quota.should_skip("latest"):
                 try:
@@ -1028,10 +1079,10 @@ def main():
                     if _is_quota_error(e) or "Timeout" in str(e):
                         quota.fail("latest", e)
             
-            # === PRIORITY 1: Relay commands (every 2 cycles, ~30s) ===
+            # === PRIORITY 1: Relay commands (every ~30s) ===
             # ~5,760 checks/day (~3% of quota if commands present)
             # DISABLED temporarily while quota recovers - relay commands can wait until quota resets
-            # if sync_count % 2 == 0 and not quota.should_skip("relay"):
+            # if sync_count % RELAY_CHECK_CYCLES == 0 and not quota.should_skip("relay"):
             #     try:
             #         had_commands = process_relay_commands(db)
             #         quota.success("relay")
@@ -1046,8 +1097,8 @@ def main():
             #         elif "Timeout" in str(e):
             #             quota.fail("relay", e)  # timeout likely means 429-throttled
             
-            # === LOW PRIORITY: Override mode every 8th cycle (~120s) ===
-            if sync_count % 8 == 0 and not quota.should_skip("override"):
+            # === LOW PRIORITY: Override mode every ~120s ===
+            if sync_count % OVERRIDE_CHECK_CYCLES == 0 and not quota.should_skip("override"):
                 try:
                     last_override_state = check_override_mode(db, last_override_state)
                     quota.success("override")
@@ -1055,8 +1106,8 @@ def main():
                     if _is_quota_error(e) or "Timeout" in str(e):
                         quota.fail("override", e)
             
-            # === LOW PRIORITY: Cal mode every 20th cycle (~300s = 5 min) ===
-            if sync_count % 20 == 0 and not quota.should_skip("calmode"):
+            # === LOW PRIORITY: Cal mode every ~5 min ===
+            if sync_count % CALMODE_CHECK_CYCLES == 0 and not quota.should_skip("calmode"):
                 try:
                     last_cal_mode_state = check_calibration_mode(db, last_cal_mode_state)
                     quota.success("calmode")
@@ -1064,11 +1115,11 @@ def main():
                     if _is_quota_error(e) or "Timeout" in str(e):
                         quota.fail("calmode", e)
             
-            # === History sync every 180th cycle (~15min), skip if paused or quota bad ===
+            # === History sync every ~15min, skip if paused or quota bad ===
             # Uses 15-min aggregated averages — typically ≤1 new bucket per sync
             # (~96 writes/day steady state, up to 48 for initial catch-up)
-            # Also run on cycle 6 (30s after start) for a fast first sync
-            if ((sync_count % 180 == 0 or sync_count == 6)
+            # Also run once shortly after start for a fast first sync
+            if ((sync_count % HISTORY_SYNC_CYCLES == 0 or sync_count == FAST_FIRST_HISTORY_CYCLE)
                     and quota.quota_ok
                     and os.getenv("FIREBASE_PAUSE_HISTORY", "0") != "1"):
                 try:
@@ -1084,8 +1135,8 @@ def main():
                     if _is_quota_error(e) or "Timeout" in str(e):
                         quota.fail("history", e)
             
-            # === Calibration updates every 40th cycle (~10 min) ===
-            if sync_count % 40 == 0 and not quota.should_skip("cal_update"):
+            # === Calibration updates every ~10 min ===
+            if sync_count % CAL_UPDATE_CYCLES == 0 and not quota.should_skip("cal_update"):
                 try:
                     last_cal_check = check_calibration_updates(db, last_cal_check)
                     quota.success("cal_update")
