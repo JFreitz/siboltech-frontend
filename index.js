@@ -931,9 +931,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	const sidebar = document.getElementById('sidebar');
 	const tabs = document.querySelectorAll('[data-tab]');
 	const contents = document.querySelectorAll('.tab-content');
+	const predictionOnlyMode = window.location.hash === '#prediction-only';
 	const logoutModal = document.getElementById('logoutModal');
 	const logoutCancel = document.getElementById('logoutCancel');
 	const logoutConfirm = document.getElementById('logoutConfirm');
+
+	if (predictionOnlyMode) {
+		document.body.classList.add('prediction-only-mode');
+		contents.forEach(c => c.classList.remove('active'));
+		const predictionSection = document.getElementById('predicting');
+		if (predictionSection) predictionSection.classList.add('active');
+	}
 
 	// Logout handler - special click handler just for logout
 	const logoutTab = document.querySelector('[data-tab="logout"]');

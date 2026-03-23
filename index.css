@@ -1425,6 +1425,25 @@ body.sidebar-collapsed .brand{
 	display: inline-block;
 }
 
+/* Prediction-only page mode */
+body.prediction-only-mode .topbar,
+body.prediction-only-mode .sidebar {
+	display: none !important;
+}
+
+body.prediction-only-mode .main {
+	margin-left: 0 !important;
+	padding: 16px !important;
+}
+
+body.prediction-only-mode .tab-content {
+	display: none !important;
+}
+
+body.prediction-only-mode #predicting.tab-content {
+	display: block !important;
+}
+
 .sidebar.collapsed .local-dashboard-inline-item {
 	display: none;
 }
