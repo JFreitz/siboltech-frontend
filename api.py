@@ -497,10 +497,24 @@ def export_ml_training():
                 sensor,
                 ROUND(AVG(value), 4) AS avg_value
             FROM sensor_readings
-            WHERE sensor IN ('ph','do_mg_per_l','tds_ppm','temperature_c','humidity')
+            WHERE sensor IN ('ph','tds_ppm','temperature_c','humidity')
             AND timestamp >= :cutoff
             GROUP BY time_bucket, sensor
-            ORDER BY time_bucket
+            
+            UNION ALL
+            
+            -- DO sensor: use do_mg_l for old data (before Mar 21) and do_mg_per_l for new data
+            SELECT
+                strftime('%Y-%m-%d %H:', timestamp) ||
+                    SUBSTR('0' || CAST((CAST(strftime('%M', timestamp) AS INTEGER) / 15) * 15 AS TEXT), -2, 2) AS time_bucket,
+                'do_mg_per_l' as sensor,
+                ROUND(AVG(value), 4) AS avg_value
+            FROM sensor_readings
+            WHERE (sensor = 'do_mg_l' OR sensor = 'do_mg_per_l')
+            AND timestamp >= :cutoff
+            GROUP BY time_bucket
+            
+            ORDER BY time_bucket, sensor
         """), {"cutoff": cutoff}).fetchall()
         
         # All plant readings
@@ -627,10 +641,24 @@ def export_sensor_actuator():
                 sensor,
                 ROUND(AVG(value), 4) AS avg_value
             FROM sensor_readings
-            WHERE sensor IN ('ph','do_mg_per_l','tds_ppm','temperature_c','humidity')
+            WHERE sensor IN ('ph','tds_ppm','temperature_c','humidity')
             AND timestamp >= :cutoff
             GROUP BY time_bucket, sensor
-            ORDER BY time_bucket
+            
+            UNION ALL
+            
+            -- DO sensor: use do_mg_l for old data (before Mar 21) and do_mg_per_l for new data
+            SELECT
+                strftime('%Y-%m-%d %H:', timestamp) ||
+                    SUBSTR('0' || CAST((CAST(strftime('%M', timestamp) AS INTEGER) / 15) * 15 AS TEXT), -2, 2) AS time_bucket,
+                'do_mg_per_l' as sensor,
+                ROUND(AVG(value), 4) AS avg_value
+            FROM sensor_readings
+            WHERE (sensor = 'do_mg_l' OR sensor = 'do_mg_per_l')
+            AND timestamp >= :cutoff
+            GROUP BY time_bucket
+            
+            ORDER BY time_bucket, sensor
         """), {"cutoff": cutoff}).fetchall()
         
         # All actuator events
@@ -666,7 +694,11 @@ def export_sensor_actuator():
         
         relay_id = row[1]
         state = row[2]
-        relay_state[relay_id] = (state == 1 or state.lower() == 'on')
+        # state is either 1 (ON) or 0 (OFF), or possibly a string
+        if isinstance(state, str):
+            relay_state[relay_id] = (state.lower() == 'on' or state == '1')
+        else:
+            relay_state[relay_id] = (state == 1)
         
         if bucket_key not in relay_events_per_bucket:
             relay_events_per_bucket[bucket_key] = {}
