@@ -5242,7 +5242,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // ==================== ML PREDICTION MODULE ====================
 (function() {
 	const API_BASE = window.location.origin;
-	let storedActualValues = {};
 
 	// Initialize prediction UI
 	function initPrediction() {
@@ -5250,46 +5249,25 @@ document.addEventListener('DOMContentLoaded', () => {
 		const today = new Date().toISOString().split('T')[0];
 		document.getElementById('predDate').value = today;
 
-		// Event listeners for actual values modal
-		document.getElementById('addActualValuesBtn').addEventListener('click', openActualValuesModal);
-		document.getElementById('closeActualModal').addEventListener('click', closeActualValuesModal);
-		document.getElementById('cancelActualBtn').addEventListener('click', closeActualValuesModal);
-		document.getElementById('saveActualBtn').addEventListener('click', saveActualValues);
-
 		// Run prediction button
 		document.getElementById('runPredictionBtn').addEventListener('click', runPrediction);
 	}
 
-	function openActualValuesModal() {
-		const modal = document.getElementById('actualValuesModal');
-		modal.style.display = 'flex';
+	function getActualValues() {
+		const values = {};
+		const height = document.getElementById('actualHeight').value;
+		const length = document.getElementById('actualLength').value;
+		const weight = document.getElementById('actualWeight').value;
+		const leaves = document.getElementById('actualLeaves').value;
+		const branches = document.getElementById('actualBranches').value;
 
-		// Pre-fill with stored values if they exist
-		if (storedActualValues.height) document.getElementById('actualHeight').value = storedActualValues.height;
-		if (storedActualValues.length) document.getElementById('actualLength').value = storedActualValues.length;
-		if (storedActualValues.weight) document.getElementById('actualWeight').value = storedActualValues.weight;
-		if (storedActualValues.leaves) document.getElementById('actualLeaves').value = storedActualValues.leaves;
-		if (storedActualValues.branches) document.getElementById('actualBranches').value = storedActualValues.branches;
-	}
-
-	function closeActualValuesModal() {
-		document.getElementById('actualValuesModal').style.display = 'none';
-	}
-
-	function saveActualValues() {
-		storedActualValues = {
-			height: parseFloat(document.getElementById('actualHeight').value) || null,
-			length: parseFloat(document.getElementById('actualLength').value) || null,
-			weight: parseFloat(document.getElementById('actualWeight').value) || null,
-			leaves: parseInt(document.getElementById('actualLeaves').value) || null,
-			branches: parseInt(document.getElementById('actualBranches').value) || null
-		};
-
-		// Remove null values
-		Object.keys(storedActualValues).forEach(k => storedActualValues[k] === null && delete storedActualValues[k]);
-
-		closeActualValuesModal();
-		console.log('[Prediction] Actual values saved:', storedActualValues);
+		// Only add values if they were provided
+		if (height) values.height = parseFloat(height);
+		if (length) values.length = parseFloat(length);
+		if (weight) values.weight = parseFloat(weight);
+		if (leaves) values.leaves = parseInt(leaves);
+		if (branches) values.branches = parseInt(branches);
+		return Object.keys(values).length > 0 ? values : null;
 	}
 
 	async function runPrediction() {
@@ -5297,15 +5275,16 @@ document.addEventListener('DOMContentLoaded', () => {
 		const farmingSystem = document.getElementById('predFarmingSystem').value;
 		const plantId = parseInt(document.getElementById('predPlantId').value);
 
-		if (!date) {
-			alert('Please select a date');
+		// Validate inputs
+		if (!date || !farmingSystem || !plantId) {
+			alert('❌ Please fill in Plant No., System Type, and Prediction Date');
 			return;
 		}
 
 		try {
 			const btn = document.getElementById('runPredictionBtn');
 			btn.disabled = true;
-			btn.textContent = 'Running...';
+			btn.textContent = '⏳ Running...';
 
 			const response = await fetch(`${API_BASE}/api/predict`, {
 				method: 'POST',
@@ -5314,7 +5293,7 @@ document.addEventListener('DOMContentLoaded', () => {
 					date: date,
 					plant_id: plantId,
 					farming_system: farmingSystem,
-					actual_values: Object.keys(storedActualValues).length > 0 ? storedActualValues : null
+					actual_values: getActualValues()
 				})
 			});
 
@@ -5327,11 +5306,11 @@ document.addEventListener('DOMContentLoaded', () => {
 			}
 
 			btn.disabled = false;
-			btn.textContent = 'Run Prediction';
+			btn.textContent = '🚀 Get Predictions';
 		} catch (error) {
 			showError('Error: ' + error.message);
 			document.getElementById('runPredictionBtn').disabled = false;
-			document.getElementById('runPredictionBtn').textContent = 'Run Prediction';
+			document.getElementById('runPredictionBtn').textContent = '🚀 Get Predictions';
 		}
 	}
 
@@ -5363,32 +5342,32 @@ document.addEventListener('DOMContentLoaded', () => {
 			row.innerHTML = `
 				<td><strong>${metric.charAt(0).toUpperCase() + metric.slice(1)}</strong></td>
 				<td>${units[metric]}</td>
-				<td>${actual !== null ? actual.toFixed(2) : '-'}</td>
-				<td>${predicted !== null ? predicted.toFixed(2) : '-'}</td>
+				<td>${actual !== null && actual !== undefined ? actual.toFixed(2) : '-'}</td>
+				<td>${predicted !== null && predicted !== undefined ? predicted.toFixed(2) : '-'}</td>
 				<td>${comparison ? comparison.error.toFixed(2) : '-'}</td>
 				<td>${comparison ? comparison.error_percent.toFixed(1) + '%' : '-'}</td>
 			`;
 			tbody.appendChild(row);
 
 			// Prepare chart data
-			if (actual !== null || predicted !== null) {
-				chartData[metric] = {
-					actual: actual || 0,
-					predicted: predicted || 0
-				};
-			}
+			chartData[metric] = {
+				actual: actual || 0,
+				predicted: predicted || 0
+			};
 		});
 
 		// Draw charts
 		drawCharts(chartData);
 
-		// Show results
-		resultsSection.style.display = 'block';
-		resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		// Show results section
+		resultsSection.classList.add('active');
+		setTimeout(() => {
+			resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		}, 100);
 	}
 
 	function drawCharts(chartData) {
-		const metrics = Object.keys(chartData);
+		const metrics = ['height', 'length', 'weight', 'leaves', 'branches'];
 
 		metrics.forEach(metric => {
 			const canvasId = `chart${metric.charAt(0).toUpperCase() + metric.slice(1)}`;
@@ -5451,9 +5430,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	function showError(message) {
 		const resultsSection = document.getElementById('predictionResults');
-		resultsSection.innerHTML = `<div class="error-message">❌ ${message}</div>`;
-		resultsSection.style.display = 'block';
-		resultsSection.scrollIntoView({ behavior: 'smooth' });
+		resultsSection.classList.remove('active');
+		alert('❌ ' + message);
 	}
 
 	// Initialize when DOM is ready

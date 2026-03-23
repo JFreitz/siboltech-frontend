@@ -11,12 +11,36 @@ WARNING: This is a development server. Do not use it in a production deployment.
  * Running on http://127.0.0.1:5000
  * Running on http://192.168.100.72:5000
 Press CTRL+C to quit
-192.168.100.175 - - [23/Mar/2026 13:39:49] "GET /api/relay/pending HTTP/1.1" 200 -
-192.168.100.175 - - [23/Mar/2026 13:39:49] "GET /api/relay/pending HTTP/1.1" 200 -
-127.0.0.1 - - [23/Mar/2026 13:39:49] "POST /api/ingest HTTP/1.1" 200 -
-127.0.0.1 - - [23/Mar/2026 13:39:49] "POST /api/ingest HTTP/1.1" 200 -
-192.168.100.175 - - [23/Mar/2026 13:39:49] "GET /api/relay/pending HTTP/1.1" 200 -
-192.168.100.175 - - [23/Mar/2026 13:39:49] "GET /api/relay/pending HTTP/1.1" 200 -
-192.168.100.175 - - [23/Mar/2026 13:39:49] "POST /api/ingest HTTP/1.1" 200 -
-192.168.100.175 - - [23/Mar/2026 13:39:49] "GET /api/relay/pending HTTP/1.1" 200 -
-192.168.100.175 - - [23/Mar/2026 13:39:50] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:19] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:19] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:19] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:20] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:20] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:20] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:20] "POST /api/ingest HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:20] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:20] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:21] "GET /api/relay/pending HTTP/1.1" 200 -
+127.0.0.1 - - [23/Mar/2026 13:52:21] "POST /api/ingest HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:21] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:21] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:21] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:21] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:22] "GET /api/relay/pending HTTP/1.1" 200 -
+127.0.0.1 - - [23/Mar/2026 13:52:22] "POST /api/ingest HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:22] "GET /api/relay/pending HTTP/1.1" 200 -
+127.0.0.1 - - [23/Mar/2026 13:52:22] "POST /api/relay/7/on HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:22] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:22] "POST /api/ingest HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:22] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:22] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:23] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:23] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:23] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:23] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:23] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:24] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:24] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:24] "GET /api/relay/pending HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:24] "POST /api/ingest HTTP/1.1" 200 -
+192.168.100.175 - - [23/Mar/2026 13:52:24] "GET /api/relay/pending HTTP/1.1" 200 -
