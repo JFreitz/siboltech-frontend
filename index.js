@@ -5241,22 +5241,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ==================== ML PREDICTION MODULE ====================
 (function() {
-	// Use global API_BASE_URL for proper routing
-	// Waits for initialization to complete before using
-	async function getAPIBase() {
-		// First wait a moment for API_BASE_URL to be initialized
-		if (!API_BASE_URL || API_BASE_URL === window.location.origin + '/api') {
-			// Not yet initialized, try waiting for local access or Firebase setup
-			for (let i = 0; i < 50; i++) {
-				if (API_BASE_URL && API_BASE_URL !== window.location.origin + '/api') {
-					return API_BASE_URL.replace('/api', '');
-				}
-				await new Promise(r => setTimeout(r, 100));
-			}
-		}
-		// Return current API_BASE_URL or construct from environment
+	// Get the API base URL - uses global API_BASE_URL that's initialized at page load
+	// On local network: points to localhost:5000
+	// On Vercel: points to configured Firebase API endpoint
+	function getAPIBase() {
 		const base = API_BASE_URL || (window.location.origin + '/api');
-		return base.replace('/api', '');
+		// Remove /api suffix if present to avoid duplication
+		return base.endsWith('/api') ? base.slice(0, -4) : base;
 	}
 
 	// Initialize prediction UI
