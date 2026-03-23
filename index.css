@@ -7237,7 +7237,49 @@ body.sidebar-collapsed .brand{
 	background: linear-gradient(135deg, #f5f9f7, #eef3eb) !important;
 }
 
+/* Local dashboard quick access (Home tab) */
+.local-dashboard-cta {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+	padding: 14px 16px;
+	margin-bottom: 12px;
+	border: 1px solid #d9e7ff;
+	background: linear-gradient(90deg, #f7fbff 0%, #eef6ff 100%);
+}
+
+.local-dashboard-cta-text {
+	font-weight: 600;
+	color: #1f3f70;
+}
+
+.local-dashboard-cta-btn {
+	display: inline-block;
+	padding: 10px 14px;
+	background: #1976d2;
+	color: #fff;
+	text-decoration: none;
+	border-radius: 8px;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.local-dashboard-cta-btn:hover {
+	background: #125aa3;
+}
+
 @media (max-width: 768px) {
+	.local-dashboard-cta {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	.local-dashboard-cta-btn {
+		width: 100%;
+		text-align: center;
+	}
+
 	.history-list {
 		grid-template-columns: 1fr;
 	}
