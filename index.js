@@ -5241,7 +5241,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ==================== ML PREDICTION MODULE ====================
 (function() {
-	const API_BASE = window.location.origin;
+	// Use global API_BASE_URL for proper routing
+	// Waits for initialization to complete before using
+	async function getAPIBase() {
+		// First wait a moment for API_BASE_URL to be initialized
+		if (!API_BASE_URL || API_BASE_URL === window.location.origin + '/api') {
+			// Not yet initialized, try waiting for local access or Firebase setup
+			for (let i = 0; i < 50; i++) {
+				if (API_BASE_URL && API_BASE_URL !== window.location.origin + '/api') {
+					return API_BASE_URL.replace('/api', '');
+				}
+				await new Promise(r => setTimeout(r, 100));
+			}
+		}
+		// Return current API_BASE_URL or construct from environment
+		const base = API_BASE_URL || (window.location.origin + '/api');
+		return base.replace('/api', '');
+	}
 
 	// Initialize prediction UI
 	function initPrediction() {
@@ -5279,7 +5295,8 @@ document.addEventListener('DOMContentLoaded', () => {
 	async function showHistoryModal() {
 		// Load and display history as list of cards in modal
 		try {
-			const response = await fetch(`${API_BASE}/api/predictions/history?limit=100`);
+			const apiBase = getAPIBase();
+			const response = await fetch(`${apiBase}/api/predictions/history?limit=100`);
 			const data = await response.json();
 
 			const modal = document.getElementById('predictionDetailModal');
@@ -5354,7 +5371,8 @@ document.addEventListener('DOMContentLoaded', () => {
 			btn.disabled = true;
 			btn.textContent = '⏳ Running...';
 
-			const response = await fetch(`${API_BASE}/api/predict`, {
+			const apiBase = getAPIBase();
+			const response = await fetch(`${apiBase}/api/predict`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -5504,7 +5522,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	async function loadPredictionHistory() {
 		try {
-			const response = await fetch(`${API_BASE}/api/predictions/history?limit=100`);
+			const apiBase = getAPIBase();
+			const response = await fetch(`${apiBase}/api/predictions/history?limit=100`);
 			const data = await response.json();
 
 			const historyList = document.getElementById('historyList');
