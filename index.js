@@ -5217,7 +5217,8 @@ document.addEventListener('DOMContentLoaded', () => {
 	function stopPolling() {
 		if (pollInterval) {
 			clearInterval(pollInterval);
-		pollInterval = null;
+			pollInterval = null;
+		}
 	}
 
 	// Watch for tab switches

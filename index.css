@@ -4221,9 +4221,10 @@ body.sidebar-collapsed .brand{
 		transform: translateY(0);
 		opacity: 1;
 	}
+}
 
-	/* Prediction UI additions */
-	.plant-graph-card {
+/* Prediction UI additions */
+.plant-graph-card {
 		background: #ffffff;
 		border-radius: 8px;
 		box-shadow: 0 1px 4px rgba(0,0,0,0.06);
@@ -4276,7 +4277,6 @@ body.sidebar-collapsed .brand{
 	.btn.submit-pred-btn{background:#ffffff;border:2px solid #7fb86f;padding:8px 20px;border-radius:26px;font-weight:800;color:#153d16}
 	.canvas-legend{margin-top:8px;display:flex;gap:12px}
 	.canvas-hover-tooltip{z-index:9999}
-}
 
 	/* Prediction cards: paired metric layout */
 	.paired-row {
@@ -4417,8 +4417,6 @@ body.sidebar-collapsed .brand{
 
 .notification:hover {
 	box-shadow: 0 16px 38px rgba(0, 0, 0, 0.16);
-}
-
 }
 
 /* Simple Success Modal - Glassmorphism */
