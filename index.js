@@ -1011,12 +1011,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
 						contents.forEach(c=>c.classList.remove('active'));
 						const target = document.getElementById(t);
 						if(target) target.classList.add('active');
-						// Auto-navigate to height metric with default farming method
-						const selectedMethod = window.selectedFarmingMethod || 'aeroponics';
-						generatePlantGraphs('height', selectedMethod);
+						// Auto-navigate to height metric with default farming method (ML removed)
+						// const selectedMethod = window.selectedFarmingMethod || 'aeroponics';
+						// generatePlantGraphs('height', selectedMethod);
 						// Mark height as active
 						document.querySelectorAll('.prediction-option').forEach(opt => opt.classList.remove('active'));
-						document.querySelector('.prediction-option[data-metric="height"]')?.classList.add('active');
+						// document.querySelector('.prediction-option[data-metric="height"]')?.classList.add('active');
 					}
 				}
 				return;
@@ -1767,24 +1767,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		});
 	})();
 
-	// Prediction dropdown option click handlers
-	document.querySelectorAll('.prediction-option').forEach(option => {
-		option.addEventListener('click', (e) => {
-			e.preventDefault();
-			const metric = option.getAttribute('data-metric');
-			// Update active state
-			document.querySelectorAll('.prediction-option').forEach(opt => opt.classList.remove('active'));
-			option.classList.add('active');
-			
-			// Generate graphs immediately with current farming method
-			const selectedMethod = window.selectedFarmingMethod || 'aeroponics';
-			generatePlantGraphs(metric, selectedMethod);
-			
-			// Close mobile sidebar if open
-			if(window.innerWidth <= 900) sidebar.classList.remove('open');
-		});
-	});
-
 	// Farming method selector button handlers
 	document.querySelectorAll('.farming-method-btn').forEach(btn => {
 		btn.addEventListener('click', (e) => {
@@ -1806,7 +1788,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			// Get active metric from sidebar dropdown
 			const activeMetricOption = document.querySelector('.prediction-option.active');
 			const metric = activeMetricOption ? activeMetricOption.getAttribute('data-metric') : 'height';
-			generatePlantGraphs(metric, method);
+			// generatePlantGraphs(metric, method); // ML removed
 		});
 	});
 
@@ -1831,7 +1813,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			// Get active metric from sidebar dropdown
 			const activeMetricOption = document.querySelector('.prediction-option.active');
 			const metric = activeMetricOption ? activeMetricOption.getAttribute('data-metric') : 'height';
-			generatePlantGraphs(metric, method);
+			// generatePlantGraphs(metric, method); // ML removed
 		});
 	});
 
@@ -1843,9 +1825,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			// Update active state
 			document.querySelectorAll('.metric-btn').forEach(b => b.classList.remove('active'));
 			btn.classList.add('active');
-			// Generate graphs for selected metric with current farming method
-			const selectedMethod = window.selectedFarmingMethod || 'aeroponics';
-			generatePlantGraphs(metric, selectedMethod);
+			// Generate graphs for selected metric with current farming method (ML removed)
+			// const selectedMethod = window.selectedFarmingMethod || 'aeroponics';
+			// generatePlantGraphs(metric, selectedMethod);
 		});
 	});
 
@@ -3511,41 +3493,7 @@ setTimeout(() => {
 
 });
 
-// Metric info configuration (global)
-const metricInfo = {
-	leaves: { 
-		label: 'Number of Leaves', 
-		unit: 'leaves', 
-		range: [30, 500], 
-		description: 'Predicted leaf count based on growth model for all plants.'
-	},
-	width: { 
-		label: 'Weight', 
-		unit: 'g', 
-		range: [5, 55], 
-		description: 'Measured plant weight over time for all plants.'
-	},
-	height: { 
-		label: 'Height', 
-		unit: 'cm', 
-		range: [15, 50], 
-		description: 'Predicted plant height progression for all plants.'
-	},
-	length: { 
-		label: 'Length', 
-		unit: 'cm', 
-		range: [15, 75], 
-		description: 'Expected stem/vine length for all plants.'
-	},
-	branches: { 
-		label: 'Number of Branches', 
-		unit: 'branches', 
-		range: [5, 55], 
-		description: 'Forecasted branch count for all plants.'
-	}
-};
-
-// Helper: deterministic pseudo-random predicted value per metric/plant/day
+/* ML prediction graph generation removed - to be replaced with new approach */
 function computePredictedValue(metric, plantNum, dateStr) {
 	const info = metricInfo[metric];
 	if(!info) return 0;
@@ -3617,644 +3565,9 @@ document.addEventListener('click', function(e) {
 	// otherwise allow existing handlers (if any) to proceed
 });
 
-function generatePlantGraphs(metric, farmingMethod = 'aeroponics') {
-	const containerId = farmingMethod === 'aeroponics' ? 'plantsGraphsContainer-aeroponics' : 'plantsGraphsContainer-dwc';
-	const container = document.getElementById(containerId);
-	if(!container) return;
-	
-	// Clear existing graphs
-	container.innerHTML = '';
-	
-	const info = metricInfo[metric];
-	if(!info) return;
-	
-	// Determine number of plants based on farming method and what data was submitted
-	// Get the plant data from the training section
-	let plantCount = 0;
-	let plantData = [];
-	
-	if(farmingMethod === 'aeroponics') {
-		const aeroPlantsContainer = document.getElementById('aeroponicsPlantsList');
-		if(aeroPlantsContainer) {
-			const plantRows = aeroPlantsContainer.querySelectorAll('.sensor-input-card1');
-			plantCount = plantRows.length;
-			plantData = Array.from(plantRows).map((row, idx) => ({
-				plantNum: idx + 1,
-				method: 'aeroponics'
-			}));
-		}
-	} else if(farmingMethod === 'dwc') {
-		const dwcPlantsContainer = document.getElementById('dwcPlantsList');
-		if(dwcPlantsContainer) {
-			const plantRows = dwcPlantsContainer.querySelectorAll('.sensor-input-card1');
-			plantCount = plantRows.length;
-			plantData = Array.from(plantRows).map((row, idx) => ({
-				plantNum: idx + 1,
-				method: 'dwc'
-			}));
-		}
-	}
-	
-	// Ensure exactly 6 plants are shown
-	if(plantCount <= 0) {
-		plantCount = 6;
-		for(let i = 1; i <= plantCount; i++) {
-			plantData.push({ plantNum: i, method: farmingMethod });
-		}
-	} else {
-		// Trim or pad to 6 plants
-		if(plantCount > 6) {
-			plantData = plantData.slice(0, 6);
-			plantCount = 6;
-		} else if(plantCount < 6) {
-			const start = plantCount + 1;
-			for(let i = start; i <= 6; i++) {
-				plantData.push({ plantNum: i, method: farmingMethod });
-			}
-			plantCount = 6;
-		}
-	}
-	
-	// Create plant graph cards
-	plantData.forEach(plant => {
-		const card = document.createElement('div');
-		card.className = 'plant-graph-card';
+/* ML prediction graph generation removed - to be replaced with new approach */
 
-		const header = document.createElement('div');
-		header.className = 'card-header';
-		header.textContent = `Plant ${plant.plantNum}`;
-
-		// Metrics row (side-by-side predicted and actual)
-		const metricsRow = document.createElement('div');
-		metricsRow.className = 'metrics-row metrics-row-sidebyside';
-
-		// Show only the currently selected metric on the card/input panel
-		const metricsList = [metric];
-		const todayStr = new Date().toISOString().slice(0,10);
-		const plantKey = `${farmingMethod}-${plant.plantNum}`;
-		const frozenKey = `plant_${plantKey}_frozenPreds`;
-		const submittedKey = `plant_${plantKey}_${metric}_submittedDate`;
-		const metricKeys = ['leaves','branches','height','width','length'];
-
-		// If there was a submission on a previous date, clear the saved actuals so inputs reset next day
-		const prevSubmitted = localStorage.getItem(submittedKey);
-		if(prevSubmitted && prevSubmitted !== todayStr) {
-			localStorage.removeItem(`plant_${plantKey}_actuals`);
-			metricKeys.forEach(m => localStorage.removeItem(`plant_${plantKey}_${m}_actual`));
-			localStorage.removeItem(submittedKey);
-		}
-
-		let frozenPreds = null;
-		try { frozenPreds = JSON.parse(localStorage.getItem(frozenKey)); } catch(e) { frozenPreds = null; }
-
-		// Create side-by-side predicted and actual layout
-		metricsList.forEach(m => {
-			// No trained ML model yet – show "--" for predicted
-			let predVal = null;
-			if(frozenPreds && typeof frozenPreds[m] !== 'undefined') predVal = frozenPreds[m];
-			// (when a trained model is available, fetch from /api/predict here)
-
-			// Predicted card
-			const predCard = document.createElement('div');
-			predCard.className = 'metric-card metric-predicted';
-			const predLabel = document.createElement('div');
-			predLabel.className = 'metric-label';
-			predLabel.textContent = `PREDICTED ${(metricInfo[m] ? metricInfo[m].label : m).toUpperCase()}`;
-			const predValue = document.createElement('div');
-			predValue.className = 'metric-value';
-			predValue.textContent = (predVal !== null && Number.isFinite(predVal)) ? formatPred(predVal) : '--';
-			predValue.setAttribute('data-metric', m);
-			predValue.setAttribute('data-value', predVal !== null ? predVal : '');
-			predCard.appendChild(predLabel);
-			predCard.appendChild(predValue);
-
-			// Actual card with input
-			const actualCard = document.createElement('div');
-			actualCard.className = 'metric-card metric-actual';
-			const actualLabel = document.createElement('div');
-			actualLabel.className = 'metric-label';
-			actualLabel.textContent = `ACTUAL ${(metricInfo[m] ? metricInfo[m].label : m).toUpperCase()}`;
-			const actualInput = document.createElement('input');
-			actualInput.type = 'number';
-			actualInput.step = '0.1';
-			actualInput.className = 'metric-input prediction-input';
-			actualInput.setAttribute('data-metric', m);
-			actualInput.id = `actual-${plantKey}-${m}`;
-			actualInput.placeholder = '0.0';
-			
-			// preload previously submitted actuals
-			const actualsKey = `plant_${plantKey}_actuals`;
-			const metricKey = `plant_${plantKey}_${m}_actual`;
-			let storedActuals = null;
-			let metricVal = null;
-			try { storedActuals = JSON.parse(localStorage.getItem(actualsKey)); } catch(e) { storedActuals = null; }
-			const metricStored = localStorage.getItem(metricKey);
-			if(metricStored !== null && metricStored !== undefined) {
-				const parsed = parseFloat(metricStored);
-				if(Number.isFinite(parsed)) metricVal = parsed;
-			} else if(storedActuals && typeof storedActuals[m] !== 'undefined') {
-				metricVal = storedActuals[m];
-			}
-			if(Number.isFinite(metricVal)) actualInput.value = metricVal;
-			
-			actualCard.appendChild(actualLabel);
-			actualCard.appendChild(actualInput);
-
-			metricsRow.appendChild(predCard);
-			metricsRow.appendChild(actualCard);
-		});
-
-		// Canvas area
-		const canvas = document.createElement('canvas');
-		canvas.className = 'plant-graph-canvas';
-		canvas.id = `plant-${plant.plantNum}-${farmingMethod}-graph`;
-		canvas.width = 600;
-		canvas.height = 250;
-
-		// Legend panel below graph
-		const legendPanel = document.createElement('div');
-		legendPanel.className = 'canvas-legend';
-		legendPanel.innerHTML = `
-			<div class="legend-item"><span class="legend-swatch actual"></span><span>Actual</span></div>
-			<div class="legend-item"><span class="legend-swatch predicted"></span><span>Predicted</span></div>
-		`;
-
-		card.appendChild(header);
-		card.appendChild(metricsRow);
-		card.appendChild(canvas);
-		card.appendChild(legendPanel);
-
-		// Add "Show all" button to the card (bottom-right)
-		const showAllBtn = document.createElement('button');
-		showAllBtn.className = 'btn show-all-btn';
-		showAllBtn.setAttribute('aria-label', 'Show all data');
-		showAllBtn.textContent = 'Show all';
-		showAllBtn.addEventListener('click', () => {
-			openShowAllModal(plant.plantNum, farmingMethod, metric);
-		});
-		card.appendChild(showAllBtn);
-		container.appendChild(card);
-
-		// If submitted today, disable inputs
-		const submittedDate = localStorage.getItem(submittedKey);
-		if(submittedDate === todayStr) {
-			// disable inputs
-			const inputs = card.querySelectorAll('.prediction-input');
-			inputs.forEach(i => i.disabled = true);
-		}
-
-		// Store plant key and metric for later submission
-		card.setAttribute('data-plant-key', plantKey);
-		card.setAttribute('data-metric', metric);
-
-		// Draw graph for this plant
-		setTimeout(async () => {
-			await drawPlantGraph(canvas.id, metric, plant.plantNum, farmingMethod);
-		}, 50);
-	});
-}
-
-async function drawPlantGraph(canvasId, metric, plantNum, farmingMethod = 'aeroponics') {
-	const canvas = document.getElementById(canvasId);
-	if(!canvas || !canvas.getContext) return;
-	
-	const ctx = canvas.getContext('2d');
-	ctx.imageSmoothingEnabled = true;
-	ctx.imageSmoothingQuality = 'high';
-	
-	const w = canvas.width, h = canvas.height;
-	ctx.clearRect(0, 0, w, h);
-	
-	const info = metricInfo[metric];
-	if(!info) return;
-	
-	const leftPad = 50, rightPad = 20, topPad = 20, bottomPad = 40;
-	// Auto-scale from data if available, otherwise use metricInfo defaults
-	let minVal, maxVal;
-	if(canvas._actualData && canvas._actualData.length > 0) {
-		const vals = canvas._actualData.filter(v => v !== null && Number.isFinite(v));
-		if(vals.length > 0) {
-			const dataMin = Math.min(...vals);
-			const dataMax = Math.max(...vals);
-			const pad = (dataMax - dataMin) * 0.15 || 2;
-			minVal = Math.max(0, Math.floor(dataMin - pad));
-			maxVal = Math.ceil(dataMax + pad);
-		} else {
-			[minVal, maxVal] = info.range;
-		}
-	} else {
-		[minVal, maxVal] = info.range;
-	}
-	
-	// Draw background
-	ctx.fillStyle = '#ffffff';
-	ctx.fillRect(0, 0, w, h);
-	
-	// Draw horizontal grid lines and y-axis ticks
-	ctx.fillStyle = '#6c7380';
-	ctx.font = '11px Segoe UI, Arial, sans-serif';
-	ctx.textAlign = 'right';
-	
-	const yTicks = [minVal, (minVal + maxVal) / 2, maxVal];
-	yTicks.forEach(val => {
-		const y = topPad + (1 - (val - minVal) / (maxVal - minVal)) * (h - topPad - bottomPad);
-		
-		// Grid line
-		ctx.strokeStyle = '#e8ecf4';
-		ctx.lineWidth = 1;
-		ctx.setLineDash([5, 5]);
-		ctx.beginPath();
-		ctx.moveTo(leftPad, y);
-		ctx.lineTo(w - rightPad, y);
-		ctx.stroke();
-		ctx.setLineDash([]);
-		
-		// Y-axis label
-		ctx.fillText(val.toFixed(1), leftPad - 12, y + 4);
-	});
-	
-	// Draw vertical grid lines
-	ctx.strokeStyle = '#f0f4f8';
-	ctx.lineWidth = 1;
-	for(let i = 0; i <= 5; i++) {
-		const x = leftPad + (i / 5) * (w - leftPad - rightPad);
-		ctx.setLineDash([3, 3]);
-		ctx.beginPath();
-		ctx.moveTo(x, topPad);
-		ctx.lineTo(x, h - bottomPad);
-		ctx.stroke();
-		ctx.setLineDash([]);
-	}
-	
-	// Prepare or reuse datasets for this canvas so toggles/redraws use consistent series
-	if(!canvas._actualData || !canvas._predictedData) {
-		// ── Fetch real data from Firebase (predictions/latest/plants) ──
-		try {
-			// Check if Firebase is initialized
-			if(!window.firebaseDB || !window.firebaseDoc || !window.firebaseGetDoc) {
-				throw new Error('Firebase not initialized');
-			}
-			
-			const docId = `${farmingMethod}_${plantNum}`;
-			const docRef = window.firebaseDoc(window.firebaseDB, "predictions", "latest", "plants", docId);
-			const docSnap = await window.firebaseGetDoc(docRef);
-			
-			if(docSnap.exists()) {
-				const data = docSnap.data();
-				const actual = data.actual || {};
-				const predicted = data.predicted || {};
-				
-				// Map metric to the correct key
-				const metricKey = metric === 'width' ? 'weight_g' : 
-								   metric === 'leaves' ? 'leaf_count' : 
-								   metric === 'branches' ? 'branch_count' : 
-								   `${metric}_cm`;
-				
-				const actualValue = actual[metricKey] || null;
-				const predictedValue = predicted[metricKey] || null;
-				
-				// Create simple date labels (today's date)
-				const today = new Date();
-				const dateStr = today.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-				
-				canvas._dateLabels = [
-					{ iso: today.toISOString().split('T')[0], display: dateStr }
-				];
-				canvas._actualData = [actualValue];
-				canvas._predictedData = [predictedValue];
-			} else {
-				canvas._dateLabels = [];
-				canvas._actualData = [];
-				canvas._predictedData = [];
-			}
-		} catch(e) {
-			console.warn('[PlantGraph] Firebase fetch failed for plant', plantNum, metric, e.message);
-			canvas._dateLabels = [];
-			canvas._actualData = [];
-			canvas._predictedData = [];
-		}
-
-		// Re-compute dynamic Y-axis range after data loaded
-		if(canvas._actualData && canvas._actualData.length > 0) {
-			const vals = canvas._actualData.filter(v => v !== null && Number.isFinite(v));
-			if(vals.length > 0) {
-				const dataMin = Math.min(...vals);
-				const dataMax = Math.max(...vals);
-				const pad = (dataMax - dataMin) * 0.15 || 2;
-				minVal = Math.max(0, Math.floor(dataMin - pad));
-				maxVal = Math.ceil(dataMax + pad);
-			}
-		}
-	}
-
-	// If no data was loaded, show an empty-state message
-	if(!canvas._actualData || canvas._actualData.length === 0) {
-		ctx.fillStyle = '#888';
-		ctx.font = '13px Segoe UI, Arial, sans-serif';
-		ctx.textAlign = 'center';
-		ctx.fillText('No measurement data yet.', w / 2, h / 2);
-		return;
-	}
-
-	const data = canvas._actualData;
-	const predicted = canvas._predictedData;
-
-	// Draw smooth area/lines using stored data
-	const plotW = w - leftPad - rightPad;
-	const plotH = h - topPad - bottomPad;
-
-	// Create gradient fill for actual
-	const gradient = ctx.createLinearGradient(leftPad, topPad, leftPad, h - bottomPad);
-	gradient.addColorStop(0, 'rgba(43, 110, 246, 0.2)');
-	gradient.addColorStop(1, 'rgba(43, 110, 246, 0)');
-
-	// Build point lists
-	const points = [];
-	data.forEach((val, i) => {
-		const x = leftPad + (i / (data.length - 1)) * plotW;
-		const y = topPad + (1 - (val - minVal) / (maxVal - minVal)) * plotH;
-		points.push({x, y, v: val});
-	});
-
-	const predPoints = [];
-	const hasPredictions = predicted.some(v => v !== null && Number.isFinite(v));
-	if(hasPredictions) {
-		predicted.forEach((val, i) => {
-			const x = leftPad + (i / (predicted.length - 1)) * plotW;
-			const y = (val !== null && Number.isFinite(val))
-				? topPad + (1 - (val - minVal) / (maxVal - minVal)) * plotH
-				: null;
-			predPoints.push({x, y, v: val});
-		});
-	}
-
-	// Filled area (Actual) if enabled
-	if(canvas._showActual === undefined) canvas._showActual = true;
-	if(canvas._showPredicted === undefined) canvas._showPredicted = true;
-
-	if(canvas._showActual) {
-		ctx.beginPath();
-		points.forEach((p, i) => {
-			if(i === 0) ctx.moveTo(p.x, p.y);
-			else {
-				const prev = points[i-1];
-				const cpX = (prev.x + p.x) / 2;
-				const cpY = (prev.y + p.y) / 2;
-				ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
-			}
-		});
-		ctx.lineTo(points[points.length - 1].x, h - bottomPad);
-		ctx.lineTo(points[0].x, h - bottomPad);
-		ctx.closePath();
-		ctx.fillStyle = gradient;
-		ctx.fill();
-	}
-
-	// Draw predicted (dashed) below actual markers – only if we have a trained model
-	if(hasPredictions && predPoints.length > 0 && canvas._showPredicted) {
-		ctx.beginPath();
-		predPoints.forEach((p, i) => {
-			if(p.y === null) return;
-			if(i === 0 || predPoints[i-1].y === null) ctx.moveTo(p.x, p.y);
-			else {
-				const prev = predPoints[i-1];
-				const cpX = (prev.x + p.x) / 2;
-				const cpY = (prev.y + p.y) / 2;
-				ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
-			}
-		});
-		ctx.setLineDash([6,6]);
-		ctx.strokeStyle = '#facc15';
-		ctx.lineWidth = 2.5;
-		ctx.stroke();
-		ctx.setLineDash([]);
-	}
-
-	// Draw actual line on top
-	ctx.beginPath();
-	points.forEach((p, i) => {
-		if(i === 0) ctx.moveTo(p.x, p.y);
-		else {
-			const prev = points[i-1];
-			const cpX = (prev.x + p.x) / 2;
-			const cpY = (prev.y + p.y) / 2;
-			ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
-		}
-	});
-	ctx.quadraticCurveTo(points[points.length - 1].x, points[points.length - 1].y, points[points.length - 1].x, points[points.length - 1].y);
-	ctx.strokeStyle = '#2b6ef6';
-	ctx.lineWidth = 3;
-	ctx.lineCap = 'round';
-	ctx.lineJoin = 'round';
-	ctx.shadowColor = 'rgba(43, 110, 246, 0.3)';
-	ctx.shadowBlur = 6;
-	if(canvas._showActual) ctx.stroke();
-	ctx.shadowBlur = 0;
-
-	// Draw markers for actual
-	points.forEach((p, i) => {
-		if(i % 5 === 0 || i === points.length - 1) {
-			if(canvas._showActual) {
-				ctx.beginPath();
-				ctx.arc(p.x, p.y, 5, 0, Math.PI*2);
-				ctx.fillStyle = '#ffffff';
-				ctx.fill();
-				ctx.strokeStyle = '#2b6ef6';
-				ctx.lineWidth = 2;
-				ctx.stroke();
-			}
-		}
-	});
-
-		// store points for interactivity
-		canvas._points = points;
-		canvas._predPoints = predPoints;
-
-		// Draw hover indicator (vertical line + highlight) if hovering
-		if(canvas._hoverIndex !== undefined && canvas._hoverIndex !== null) {
-			const hi = canvas._hoverIndex;
-			if(canvas._points[hi]) {
-				const hp = canvas._points[hi];
-				ctx.save();
-				ctx.strokeStyle = 'rgba(0,0,0,0.12)';
-				ctx.setLineDash([4,4]);
-				ctx.beginPath();
-				ctx.moveTo(hp.x, topPad);
-				ctx.lineTo(hp.x, h - bottomPad);
-				ctx.stroke();
-				ctx.setLineDash([]);
-
-				ctx.beginPath();
-				ctx.arc(hp.x, hp.y, 6, 0, Math.PI * 2);
-				ctx.fillStyle = '#ffffff';
-				ctx.fill();
-				ctx.lineWidth = 2;
-				ctx.strokeStyle = '#2b6ef6';
-				ctx.stroke();
-				ctx.restore();
-			}
-		}
-
-	// Create DOM legend below canvas (clickable) if not present
-	const parent = canvas.parentElement || canvas.parentNode;
-	if(parent) {
-		let legend = parent.querySelector('.canvas-legend');
-		if(!legend) {
-			legend = document.createElement('div');
-			legend.className = 'canvas-legend';
-			legend.innerHTML = `
-				<span class="legend-item legend-actual" data-series="actual"><span class="legend-swatch actual"></span>Actual</span>
-				<span class="legend-item legend-predicted" data-series="predicted"><span class="legend-swatch predicted"></span>Predicted</span>
-				<div class="legend-tooltip" style="display:none; position:absolute;"></div>
-			`;
-			parent.appendChild(legend);
-
-			// legend click handlers
-			legend.querySelector('.legend-actual').addEventListener('click', () => {
-				canvas._showActual = !canvas._showActual;
-				drawPlantGraph(canvasId, metric, plantNum, farmingMethod);
-			});
-			legend.querySelector('.legend-predicted').addEventListener('click', () => {
-				canvas._showPredicted = !canvas._showPredicted;
-				drawPlantGraph(canvasId, metric, plantNum, farmingMethod);
-			});
-		}
-
-		// Tooltip div (reuse existing in legend or create)
-		let tooltip = parent.querySelector('.canvas-hover-tooltip');
-		if(!tooltip) {
-			tooltip = document.createElement('div');
-			tooltip.className = 'canvas-hover-tooltip';
-			tooltip.style.display = 'none';
-			tooltip.style.position = 'absolute';
-			tooltip.style.pointerEvents = 'none';
-			parent.appendChild(tooltip);
-		}
-
-		// Mouse interaction for hover (show values)
-		canvas.onmousemove = function(evt) {
-			const rect = canvas.getBoundingClientRect();
-			const mx = evt.clientX - rect.left;
-			const my = evt.clientY - rect.top;
-			// map mx to nearest index
-			const idx = Math.round(((mx - leftPad) / plotW) * (canvas._points.length - 1));
-			if(idx < 0 || idx >= canvas._points.length) {
-				tooltip.style.display = 'none';
-				canvas._hoverIndex = null;
-				return;
-			}
-			const px = canvas._points[idx].x;
-			const py = canvas._points[idx].y;
-			const actualVal = canvas._actualData[idx];
-			const predVal = canvas._predictedData[idx];
-
-			// position tooltip near the hovered point inside the parent (.plant-graph-card)
-			const parentRect = parent.getBoundingClientRect();
-			// compute left relative to parent
-			const leftPos = (rect.left - parentRect.left) + px + 12;
-			// show tooltip first so offsetHeight is available
-			tooltip.style.display = 'block';
-			tooltip.style.background = '#fff';
-			tooltip.style.border = '1px solid #ddd';
-			tooltip.style.padding = '6px 8px';
-			tooltip.style.borderRadius = '6px';
-			tooltip.innerHTML = `<div style="font-weight:700;">${(canvas._dateLabels && canvas._dateLabels[idx] && canvas._dateLabels[idx].display) || ''}</div>
-								<div style="color:#2b6ef6">Actual: ${(actualVal !== null && Number.isFinite(actualVal)) ? actualVal.toFixed(2) : '--'}</div>
-								<div style="color:#b8860b">Pred: ${(predVal !== null && Number.isFinite(predVal)) ? predVal.toFixed(2) : '--'}</div>`;
-			const tHeight = tooltip.offsetHeight || 40;
-			let topPos = (rect.top - parentRect.top) + py - tHeight - 8;
-			// if there's no space above the point, show below
-			if(topPos < 6) topPos = (rect.top - parentRect.top) + py + 12;
-			tooltip.style.left = leftPos + 'px';
-			tooltip.style.top = topPos + 'px';
-
-			canvas._hoverIndex = idx;
-			// redraw to show hover vertical line
-			drawPlantGraph(canvasId, metric, plantNum, farmingMethod);
-		};
-
-		canvas.onmouseout = function() {
-			const tooltipEl = parent.querySelector('.canvas-hover-tooltip');
-			if(tooltipEl) tooltipEl.style.display = 'none';
-			canvas._hoverIndex = null;
-			drawPlantGraph(canvasId, metric, plantNum, farmingMethod);
-		};
-	}
-	
-	// X-axis labels: use per-canvas date labels if available
-	ctx.fillStyle = '#9aa4b8';
-	ctx.font = '10px Segoe UI, Arial, sans-serif';
-	ctx.textAlign = 'center';
-	const labels = (canvas._dateLabels && canvas._dateLabels.map(d => d.display)) || ['Day 1','Day 2','Day 3','Day 4'];
-	labels.forEach((lab, i) => {
-		const x = leftPad + (i / (labels.length - 1)) * plotW;
-		ctx.fillText(lab, x, h - bottomPad + 20);
-	});
-	
-	// Y-axis label
-	ctx.save();
-	ctx.translate(15, h / 2);
-	ctx.rotate(-Math.PI / 2);
-	ctx.fillStyle = '#6c7380';
-	ctx.font = '11px Segoe UI, Arial, sans-serif';
-	ctx.textAlign = 'center';
-	ctx.fillText(`${info.label} (${info.unit})`, 0, 0);
-	ctx.restore();
-}
-
-/* Show All modal controls */
-function openShowAllModal(plantNum, farmingMethod, metric) {
-	const modal = document.getElementById('showAllModal');
-	const title = document.getElementById('showAllTitle');
-	if(!modal || !title) return;
-	title.textContent = `Plant ${plantNum} — ${metric.toUpperCase()} (${farmingMethod})`;
-
-	const smallCanvas = document.getElementById(`plant-${plantNum}-${farmingMethod}-graph`);
-	if(!smallCanvas || !smallCanvas._dateLabels) {
-		showToast('No historical data available for this plant yet.', 'dangerous');
-		return;
-	}
-
-	const tbody = document.querySelector('#showAllTable tbody');
-	if(!tbody) return;
-	tbody.innerHTML = '';
-
-	const dateLabels = Array.isArray(smallCanvas._dateLabels) ? smallCanvas._dateLabels : [];
-	const actualArr = Array.isArray(smallCanvas._actualData) ? smallCanvas._actualData : [];
-	const predArr = Array.isArray(smallCanvas._predictedData) ? smallCanvas._predictedData : [];
-
-	// Build rows for each date label (support labels as objects with display/iso or simple strings)
-	dateLabels.forEach((lbl, idx) => {
-		const display = (lbl && lbl.display) ? lbl.display : (typeof lbl === 'string' ? lbl : (lbl && lbl.iso ? lbl.iso : ''));
-		const actualVal = (typeof actualArr[idx] !== 'undefined' && actualArr[idx] !== null) ? actualArr[idx] : '';
-		const predVal = (typeof predArr[idx] !== 'undefined' && predArr[idx] !== null) ? predArr[idx] : '';
-
-		const tr = document.createElement('tr');
-		tr.innerHTML = `
-			<td style="padding:10px; border-bottom:1px solid #f0f7f0;">${display}</td>
-			<td style="padding:10px; border-bottom:1px solid #f0f7f0; text-align:right;">${actualVal !== '' ? Number(actualVal).toFixed(1) : '-'}</td>
-			<td style="padding:10px; border-bottom:1px solid #f0f7f0; text-align:right;">${predVal !== '' ? Number(predVal).toFixed(1) : '-'}</td>
-		`;
-		tbody.appendChild(tr);
-	});
-
-	modal.style.display = 'flex';
-}
-
-function closeShowAllModal() {
-	const modal = document.getElementById('showAllModal');
-	const tbody = document.querySelector('#showAllTable tbody');
-	if(modal) modal.style.display = 'none';
-	if(tbody) tbody.innerHTML = '';
-}
-
-// wire modal close buttons
-setTimeout(() => {
-	const closeBtn = document.getElementById('showAllClose');
-	const okBtn = document.getElementById('showAllOk');
-	if(closeBtn) closeBtn.addEventListener('click', closeShowAllModal);
-	if(okBtn) okBtn.addEventListener('click', closeShowAllModal);
-}, 500);
+/* ML prediction modal functions removed - to be replaced with new approach */
 
 // Comparison Graph Functionality
 let currentDays = 14;
@@ -4906,10 +4219,10 @@ function showAeroponics() {
 	// Store selected method
 	window.selectedFarmingMethod = 'aeroponics';
 	
-	// Regenerate graphs with current metric
-	const activeMetricBtn = document.querySelector('.metric-btn.active');
-	const metric = activeMetricBtn ? activeMetricBtn.getAttribute('data-metric') : 'height';
-	generatePlantGraphs(metric, 'aeroponics');
+	// Regenerate graphs with current metric (ML removed)
+	// const activeMetricBtn = document.querySelector('.metric-btn.active');
+	// const metric = activeMetricBtn ? activeMetricBtn.getAttribute('data-metric') : 'height';
+	// generatePlantGraphs(metric, 'aeroponics');
 }
 
 function showDWC() {
@@ -4934,10 +4247,10 @@ function showDWC() {
 	// Store selected method
 	window.selectedFarmingMethod = 'dwc';
 	
-	// Regenerate graphs with current metric
-	const activeMetricBtn = document.querySelector('.metric-btn.active');
-	const metric = activeMetricBtn ? activeMetricBtn.getAttribute('data-metric') : 'height';
-	generatePlantGraphs(metric, 'dwc');
+	// Regenerate graphs with current metric (ML removed)
+	// const activeMetricBtn = document.querySelector('.metric-btn.active');
+	// const metric = activeMetricBtn ? activeMetricBtn.getAttribute('data-metric') : 'height';
+	// generatePlantGraphs(metric, 'dwc');
 }
 
 // Theme Toggle Functionality
