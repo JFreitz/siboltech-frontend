@@ -932,9 +932,24 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	const tabs = document.querySelectorAll('[data-tab]');
 	const contents = document.querySelectorAll('.tab-content');
 	const predictionOnlyMode = window.location.hash === '#prediction-only';
+	const localDashboardLink = document.querySelector('.local-dashboard-inline-link');
 	const logoutModal = document.getElementById('logoutModal');
 	const logoutCancel = document.getElementById('logoutCancel');
 	const logoutConfirm = document.getElementById('logoutConfirm');
+
+	// Resolve quick-link destination depending on current host.
+	if (localDashboardLink) {
+		const host = window.location.hostname;
+		const isPublicStaticHost = host.includes('vercel.app') || host.includes('netlify.app') || host.includes('github.io') || host.includes('pages.dev');
+
+		if (isPublicStaticHost) {
+			// From Vercel/public site, jump directly to local LAN prediction-only page.
+			localDashboardLink.href = 'http://192.168.100.72:3000/#prediction-only';
+		} else {
+			// From local/LAN host, keep current host and force prediction-only mode.
+			localDashboardLink.href = `${window.location.protocol}//${host}:3000/#prediction-only`;
+		}
+	}
 
 	if (predictionOnlyMode) {
 		document.body.classList.add('prediction-only-mode');
