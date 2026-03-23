@@ -6931,55 +6931,7 @@ body.sidebar-collapsed .brand{
 
 /* ========== PREDICTION TABS & HISTORY ========== */
 
-.pred-tabs {
-	display: flex;
-	gap: 12px;
-	padding: 20px;
-	background: #f5f9f7;
-	border-bottom: 3px solid #7fb86f;
-	flex-wrap: wrap;
-}
-
-.pred-tab-btn {
-	padding: 12px 24px;
-	border: none;
-	background: #ffffff;
-	color: #333;
-	font-size: 15px;
-	font-weight: 600;
-	border-radius: 8px;
-	cursor: pointer;
-	transition: all 0.3s ease;
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-}
-
-.pred-tab-btn:hover {
-	background: #e8f4ea;
-	transform: translateY(-2px);
-}
-
-.pred-tab-btn.active {
-	background: linear-gradient(135deg, #27ae60, #229954);
-	color: white;
-	box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
-}
-
-.pred-tab-icon {
-	font-size: 18px;
-}
-
-.pred-tab-content {
-	display: none;
-	animation: fadeIn 0.4s ease;
-	padding: 20px;
-}
-
-.pred-tab-content.active {
-	display: block;
-}
+/* Tab styles removed - history now accessed via button modal */
 
 @keyframes fadeIn {
 	from {
@@ -7064,6 +7016,64 @@ body.sidebar-collapsed .brand{
 	grid-template-columns: repeat(2, 1fr);
 	gap: 8px;
 	margin-top: 12px;
+}
+
+/* Grid layout for history modal */
+.history-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+	gap: 12px;
+	width: 100%;
+}
+
+.history-card-clickable {
+	background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
+	padding: 14px;
+	border-radius: 10px;
+	border-left: 4px solid #27ae60;
+	cursor: pointer;
+	transition: all 0.3s ease;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.history-card-clickable:hover {
+	transform: translateY(-4px);
+	box-shadow: 0 6px 16px rgba(39, 174, 96, 0.2);
+	background: linear-gradient(135deg, #c8e6c9, #dcedc8);
+}
+
+.history-card-clickable .history-card-date {
+	font-size: 12px;
+	color: #558b2f;
+	font-weight: 600;
+	margin-bottom: 6px;
+}
+
+.history-card-clickable .history-card-plant {
+	display: block;
+	background: none;
+	color: #33691e;
+	padding: 0;
+	font-size: 14px;
+	font-weight: 700;
+	margin-bottom: 6px;
+}
+
+.history-card-clickable .history-card-system {
+	display: block;
+	background: none;
+	color: #689f38;
+	padding: 0;
+	font-size: 12px;
+	margin: 8px 0;
+	font-weight: 500;
+}
+
+.history-card-metrics-mini {
+	font-size: 11px;
+	color: #558b2f;
+	line-height: 1.4;
+	font-weight: 500;
 }
 
 .metric-mini {
@@ -7228,15 +7238,6 @@ body.sidebar-collapsed .brand{
 }
 
 @media (max-width: 768px) {
-	.pred-tabs {
-		padding: 12px;
-	}
-	
-	.pred-tab-btn {
-		padding: 10px 16px;
-		font-size: 14px;
-	}
-	
 	.history-list {
 		grid-template-columns: 1fr;
 	}

@@ -502,21 +502,9 @@
 			<p class="pred-subtitle">🌱 See how big your plants will grow!</p>
 		</div>
 		
-		<!-- Tab Selector -->
-		<div class="pred-tabs">
-			<button class="pred-tab-btn active" data-tab="new-prediction">
-				<span class="pred-tab-icon">➕</span> New Prediction
-			</button>
-			<button class="pred-tab-btn" data-tab="history">
-				<span class="pred-tab-icon">📜</span> All Predictions
-			</button>
-		</div>
-		
-		<!-- NEW PREDICTION TAB -->
-		<div id="new-prediction" class="pred-tab-content active">
-			<div class="pred-main-container">
-				<!-- Left Column: Input Panel -->
-				<div class="pred-left-panel">
+		<div class="pred-main-container">
+			<!-- Left Column: Input Panel -->
+			<div class="pred-left-panel">
 				<div class="pred-form-card">
 					<h3>⚙️ Choose Settings</h3>
 					<div class="pred-form-grid">
@@ -582,6 +570,9 @@
 
 				<!-- Run Button -->
 				<button class="btn btn-success btn-large" id="runPredictionBtn">🚀 PREDICT NOW!</button>
+				
+				<!-- Show History Button -->
+				<button class="btn btn-secondary btn-large" id="showHistoryBtn">📜 See All Predictions</button>
 			</div>
 
 			<!-- Right Column: Results -->
@@ -661,17 +652,6 @@
 					</div>
 				</div>
 			</div>
-		</div>
-		</div>
-
-		<!-- HISTORY TAB -->
-		<div id="history" class="pred-tab-content">
-			<div class="history-container">
-				<h3>📜 All Your Predictions</h3>
-				<p class="history-subtitle">Click any prediction to see the details!</p>
-				<div id="historyList" class="history-list">
-					<p class="loading-text">📥 Loading your predictions...</p>
-				</div>
 			</div>
 		</div>
 

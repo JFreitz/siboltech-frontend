@@ -5252,35 +5252,11 @@ document.addEventListener('DOMContentLoaded', () => {
 		// Run prediction button
 		document.getElementById('runPredictionBtn').addEventListener('click', runPrediction);
 
-		// Tab switching
-		document.querySelectorAll('.pred-tab-btn').forEach(btn => {
-			btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
-		});
+		// Show history button
+		document.getElementById('showHistoryBtn').addEventListener('click', showHistoryModal);
 
 		// History modal close
 		document.getElementById('closePredDetail').addEventListener('click', closeDetailModal);
-
-		// Load history when tab becomes visible
-		setTimeout(loadPredictionHistory, 500);
-	}
-
-	function switchTab(tabName) {
-		// Hide all tabs
-		document.querySelectorAll('.pred-tab-content').forEach(tab => {
-			tab.classList.remove('active');
-		});
-		document.querySelectorAll('.pred-tab-btn').forEach(btn => {
-			btn.classList.remove('active');
-		});
-
-		// Show selected tab
-		document.getElementById(tabName).classList.add('active');
-		document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-
-		// Reload history if switching to history tab
-		if (tabName === 'history') {
-			loadPredictionHistory();
-		}
 	}
 
 	function getActualValues() {
@@ -5298,6 +5274,68 @@ document.addEventListener('DOMContentLoaded', () => {
 		if (leaves) values.leaves = parseInt(leaves);
 		if (branches) values.branches = parseInt(branches);
 		return Object.keys(values).length > 0 ? values : null;
+	}
+
+	async function showHistoryModal() {
+		// Load and display history as list of cards in modal
+		try {
+			const response = await fetch(`${API_BASE}/api/predictions/history?limit=100`);
+			const data = await response.json();
+
+			const modal = document.getElementById('predictionDetailModal');
+			const content = document.getElementById('predDetailContent');
+
+			if (!data.success || !data.predictions || data.predictions.length === 0) {
+				content.innerHTML = `
+					<div class="detail-header">
+						<h2>📜 All Predictions</h2>
+					</div>
+					<p class="text-center" style="padding: 20px;">📭 No predictions yet. Make one above!</p>
+				`;
+				modal.style.display = 'flex';
+				return;
+			}
+
+			// Build history list
+			let historyHTML = `
+				<div class="detail-header">
+					<h2>📜 All Predictions (${data.predictions.length})</h2>
+				</div>
+				<div class="history-grid">
+			`;
+
+			data.predictions.forEach(pred => {
+				const systemLabel = pred.farming_system === 'dwc' ? '💧 DWC' : '💨 Aero';
+				const dateObj = new Date(pred.prediction_date);
+				const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+				const predictions = pred.predictions || {};
+				let metricsStr = '';
+				['height', 'length', 'weight', 'leaves', 'branches'].forEach(metric => {
+					const val = predictions[metric];
+					if (val !== undefined && val !== null) {
+						metricsStr += `${metric.substring(0, 1).toUpperCase()}: ${val.toFixed(1)} `;
+					}
+				});
+
+				historyHTML += `
+					<div class="history-card-clickable" onclick="window.predictionModule.showDetailFromHistory(${JSON.stringify(pred).replace(/"/g, '&quot;')})">
+						<div class="history-card-date">📅 ${dateStr}</div>
+						<div class="history-card-plant">🌱 Plant ${pred.plant_id}</div>
+						<div class="history-card-system">${systemLabel}</div>
+						<div class="history-card-metrics-mini">${metricsStr}</div>
+					</div>
+				`;
+			});
+
+			historyHTML += '</div>';
+			content.innerHTML = historyHTML;
+			modal.style.display = 'flex';
+		} catch (error) {
+			console.error('[Prediction] History load error:', error);
+			document.getElementById('predDetailContent').innerHTML = '<p class="text-center">❌ Could not load history</p>';
+			document.getElementById('predictionDetailModal').style.display = 'flex';
+		}
 	}
 
 	async function runPrediction() {
@@ -5629,6 +5667,13 @@ document.addEventListener('DOMContentLoaded', () => {
 			closeDetailModal();
 		}
 	});
+
+	// Expose module methods for onclick handlers
+	window.predictionModule = {
+		showDetailFromHistory: function(pred) {
+			showPredictionDetail(pred);
+		}
+	};
 
 	// Initialize when DOM is ready
 	if (document.readyState === 'loading') {
