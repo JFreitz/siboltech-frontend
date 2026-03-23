@@ -497,110 +497,157 @@
 
 	
 		<section id="predicting" class="tab-content">
-		<div class="aero-dwc-header">
-				<ul class="calibrate-tabs">
-					<li class="calibrate-tab-btn active aero-dwc-tab-btn" data-sensor="aeroponicssystem">Aeroponics</li>
-					<li class="calibrate-tab-btn aero-dwc-tab-btn" data-sensor="deepwaterculturesystem">Deep Water Culture</li>
-				</ul>
-				<button class="btn submit-all-pred-btn" id="submitAllPredBtn">SUBMIT</button>
-			</div>
-	
-		<div class="prediction-graphs-two-column">
-			<div id="aeroponicsContainer" class="farming-method-container active"> 
-				<div id="plantsGraphsContainer-aeroponics" class="plants-graphs-container">
-					<!-- Aeroponics plant graphs will be generated here -->
-					<!-- Example static template (one plant) -->
-					<div class="plant-graph-card">
-						<div class="card-header">Plant 1</div>
-						<div class="metrics-row">
-							<div class="metric-card">
-								<div class="metric-label">NO OF LEAVES</div>
-								<div class="metric-value" data-metric="leaves" data-value="leaves"></div>
-							</div>
-							<div class="metric-card">
-								<div class="metric-label">NO OF BRANCHES</div>
-								<div class="metric-value" data-metric="branches" data-value="branches"></div>
-							</div>
-							<div class="metric-card">
-								<div class="metric-label">HEIGHT</div>
-								<div class="metric-value" data-metric="height" data-value="height"></div>
-							</div>
-							<div class="metric-card">
-								<div class="metric-label">WEIGHT</div>
-								<div class="metric-value" data-metric="width" data-value="width"></div>
-							</div>
-							<div class="metric-card">
-								<div class="metric-label">LENGTH</div>
-								<div class="metric-value" data-metric="length" data-value="length"></div>
-							</div>
-						</div>
-						<canvas id="plant-1-aeroponics-graph" class="plant-graph-canvas" width="600" height="300"></canvas>
-						<div class="prediction-input-panel">
-							<div class="inputs-row">
-								<div class="input-group-mini"><label class="input-mini-label">NO OF LEAVES<input type="number" step="0.1" class="prediction-input" data-metric="leaves"></label></div>
-								<div class="input-group-mini"><label class="input-mini-label">NO OF BRANCHES<input type="number" step="0.1" class="prediction-input" data-metric="branches"></label></div>
-								<div class="input-group-mini"><label class="input-mini-label">HEIGHT<input type="number" step="0.1" class="prediction-input" data-metric="height"></label></div>
-								<div class="input-group-mini"><label class="input-mini-label">WEIGHT<input type="number" step="0.1" class="prediction-input" data-metric="width"></label></div>
-								<div class="input-group-mini"><label class="input-mini-label">LENGTH<input type="number" step="0.1" class="prediction-input" data-metric="length"></label></div>
-							</div>
-							<div class="controls-row">
-								<div class="canvas-legend">
-									<div class="legend-item"><span class="legend-swatch actual"></span><span>Actual</span></div>
-									<div class="legend-item"><span class="legend-swatch predicted"></span><span>Predicted</span></div>
-								</div>
-							</div>
-						</div>
-						<button class="btn show-all-btn" aria-label="Show all data">Show all</button>
+		<div class="pred-header">
+			<h2>🌱 Plant Growth Prediction</h2>
+			<p class="pred-subtitle">Use ML to predict plant metrics based on sensor data</p>
+		</div>
+		
+		<!-- Prediction Input Panel -->
+		<div class="pred-input-section">
+			<div class="pred-form-card">
+				<h3>Prediction Input</h3>
+				<div class="pred-form-grid">
+					<!-- Date Picker -->
+					<div class="form-group">
+						<label>Date to Predict</label>
+						<input type="date" id="predDate" class="form-input" />
+					</div>
+					
+					<!-- Farming System Selector -->
+					<div class="form-group">
+						<label>Farming System</label>
+						<select id="predFarmingSystem" class="form-input">
+							<option value="dwc">Deep Water Culture (DWC)</option>
+							<option value="aeroponics">Aeroponics</option>
+						</select>
+					</div>
+					
+					<!-- Plant ID Selector -->
+					<div class="form-group">
+						<label>Plant No.</label>
+						<input type="number" id="predPlantId" class="form-input" min="1" max="6" value="1" />
+					</div>
+					
+					<!-- Action Buttons -->
+					<div class="form-group button-group">
+						<button class="btn btn-primary" id="addActualValuesBtn">+ Add Actual Values</button>
+						<button class="btn btn-success" id="runPredictionBtn">Run Prediction</button>
 					</div>
 				</div>
-				
 			</div>
-			<div id="dwcContainer" class="farming-method-container"> 
-				<div id="plantsGraphsContainer-dwc" class="plants-graphs-container"> 
-					<!-- DWC plant graphs will be generated here -->
-					<!-- Example static template (one plant) -->
-					<div class="plant-graph-card">
-						<div class="card-header">Plant 1</div>
-						<div class="metrics-row">
-							<div class="metric-card">
-								<div class="metric-label">NO OF LEAVES</div>
-								<div class="metric-value" data-metric="leaves" data-value="leave"></div>
-							</div>
-							<div class="metric-card">
-								<div class="metric-label">NO OF BRANCHES</div>
-								<div class="metric-value" data-metric="branches" data-value="branch"></div>
-							</div>
-							<div class="metric-card">
-								<div class="metric-label">HEIGHT</div>
-								<div class="metric-value" data-metric="height" data-value="height"></div>
-							</div>
-							<div class="metric-card">
-								<div class="metric-label">WEIGHT</div>
-								<div class="metric-value" data-metric="width" data-value="width"></div>
-							</div>
-							<div class="metric-card">
-								<div class="metric-label">LENGTH</div>
-								<div class="metric-value" data-metric="length" data-value="length"></div>
-							</div>
+		</div>
+		
+		<!-- Actual Values Modal -->
+		<div id="actualValuesModal" class="modal" style="display: none;">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h3>Enter Actual Plant Measurements</h3>
+					<button class="modal-close" id="closeActualModal">&times;</button>
+				</div>
+				<div class="modal-body">
+					<div class="actual-values-grid">
+						<div class="input-field">
+							<label>Height (cm)</label>
+							<input type="number" id="actualHeight" step="0.1" placeholder="e.g., 15.5" />
 						</div>
-						<canvas id="plant-1-dwc-graph" class="plant-graph-canvas" width="600" height="250"></canvas>
-						<div class="prediction-input-panel">
-							<div class="inputs-row">
-								<div class="input-group-mini"><label class="input-mini-label">NO OF LEAVES<input type="number" step="0.1" class="prediction-input" data-metric="leaves"></label></div>
-								<div class="input-group-mini"><label class="input-mini-label">NO OF BRANCHES<input type="number" step="0.1" class="prediction-input" data-metric="branches"></label></div>
-								<div class="input-group-mini"><label class="input-mini-label">HEIGHT<input type="number" step="0.1" class="prediction-input" data-metric="height"></label></div>
-								<div class="input-group-mini"><label class="input-mini-label">WEIGHT<input type="number" step="0.1" class="prediction-input" data-metric="width"></label></div>
-								<div class="input-group-mini"><label class="input-mini-label">LENGTH<input type="number" step="0.1" class="prediction-input" data-metric="length"></label></div>
-							</div>
-							<div class="controls-row">
-								<div class="canvas-legend">
-									<div class="legend-item"><span class="legend-swatch actual"></span><span>Actual</span></div>
-									<div class="legend-item"><span class="legend-swatch predicted"></span><span>Predicted</span></div>
-								</div>
-							</div>
-						</div> 
-						<button class="btn show-all-btn" aria-label="Show all data">Show all</button>
+						<div class="input-field">
+							<label>Length (cm)</label>
+							<input type="number" id="actualLength" step="0.1" placeholder="e.g., 10.2" />
 						</div>
+						<div class="input-field">
+							<label>Weight (g)</label>
+							<input type="number" id="actualWeight" step="0.1" placeholder="e.g., 120.5" />
+						</div>
+						<div class="input-field">
+							<label>Leaves (count)</label>
+							<input type="number" id="actualLeaves" step="1" placeholder="e.g., 45" />
+						</div>
+						<div class="input-field">
+							<label>Branches (count)</label>
+							<input type="number" id="actualBranches" step="1" placeholder="e.g., 8" />
+						</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button class="btn btn-secondary" id="cancelActualBtn">Cancel</button>
+					<button class="btn btn-primary" id="saveActualBtn">Save Values</button>
+				</div>
+			</div>
+		</div>
+		
+		<!-- Prediction Results Section -->
+		<div id="predictionResults" class="pred-results-section" style="display: none;">
+			<!-- Sensor Data Used -->
+			<div class="results-card">
+				<h3>📊 Sensor Data Used</h3>
+				<div class="sensor-data-grid">
+					<div class="sensor-data-item">
+						<span class="data-label">pH</span>
+						<span class="data-value" id="sensorPH">-</span>
+					</div>
+					<div class="sensor-data-item">
+						<span class="data-label">DO (mg/L)</span>
+						<span class="data-value" id="sensorDO">-</span>
+					</div>
+					<div class="sensor-data-item">
+						<span class="data-label">TDS (ppm)</span>
+						<span class="data-value" id="sensorTDS">-</span>
+					</div>
+					<div class="sensor-data-item">
+						<span class="data-label">Temp (°C)</span>
+						<span class="data-value" id="sensorTemp">-</span>
+					</div>
+					<div class="sensor-data-item">
+						<span class="data-label">Humidity (%)</span>
+						<span class="data-value" id="sensorHumidity">-</span>
+					</div>
+				</div>
+			</div>
+			
+			<!-- Predictions vs Actual Metrics Table -->
+			<div class="results-card">
+				<h3>📈 Prediction Results</h3>
+				<div class="table-responsive">
+					<table class="results-table">
+						<thead>
+							<tr>
+								<th>Metric</th>
+								<th>Unit</th>
+								<th class="actual-col">Actual</th>
+								<th class="predicted-col">Predicted</th>
+								<th>Difference</th>
+								<th>Error %</th>
+							</tr>
+						</thead>
+						<tbody id="resultsTableBody">
+							<!-- Results rows will be generated here -->
+						</tbody>
+					</table>
+				</div>
+			</div>
+			
+			<!-- Comparison Charts -->
+			<div class="charts-container">
+				<div class="chart-card">
+					<h4>Height (cm)</h4>
+					<canvas id="chartHeight"></canvas>
+				</div>
+				<div class="chart-card">
+					<h4>Length (cm)</h4>
+					<canvas id="chartLength"></canvas>
+				</div>
+				<div class="chart-card">
+					<h4>Weight (g)</h4>
+					<canvas id="chartWeight"></canvas>
+				</div>
+				<div class="chart-card">
+					<h4>Leaves (count)</h4>
+					<canvas id="chartLeaves"></canvas>
+				</div>
+				<div class="chart-card">
+					<h4>Branches (count)</h4>
+					<canvas id="chartBranches"></canvas>
+				</div>
 			</div>
 		</div>
 		

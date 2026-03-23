@@ -743,6 +743,134 @@ def export_sensor_actuator():
     )
 
 
+# ==================== ML PREDICTIONS ====================
+@app.route("/api/predict", methods=["POST"])
+def predict_plant_growth():
+    """
+    Make ML predictions for plant growth metrics.
+    
+    Request body:
+    {
+        "date": "2026-03-23",  # YYYY-MM-DD format
+        "plant_id": 1,
+        "farming_system": "dwc",  # or "aeroponics"
+        "actual_values": {  # Optional: actual measured values for comparison
+            "height": 15.5,
+            "length": 10.2,
+            "weight": 120.3,
+            "leaves": 45,
+            "branches": 8
+        }
+    }
+    """
+    from ml_predictor import PlantGrowthPredictor
+    
+    try:
+        data = request.get_json()
+        date_str = data.get('date')
+        plant_id = int(data.get('plant_id', 1))
+        farming_system = data.get('farming_system', 'dwc')
+        actual_values = data.get('actual_values', {})
+        
+        # Parse date
+        try:
+            date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+            date_obj = date_obj.replace(tzinfo=timezone.utc)
+        except Exception as e:
+            return jsonify({"success": False, "error": f"Invalid date format: {e}"}), 400
+        
+        # Fetch average sensor readings for that date
+        date_start = date_obj.replace(hour=0, minute=0, second=0, microsecond=0)
+        date_end = date_obj.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        sensor_data = {}
+        sensor_map = {
+            'ave_ph': 'ph',
+            'ave_do': 'do_mg_per_l',
+            'ave_tds': 'tds_ppm',
+            'ave_temp': 'temperature_c',
+            'ave_humidity': 'humidity'
+        }
+        
+        with Session() as session:
+            for key, sensor_name in sensor_map.items():
+                result = session.execute(text("""
+                    SELECT AVG(value) FROM sensor_readings 
+                    WHERE sensor = :sensor 
+                    AND timestamp >= :start 
+                    AND timestamp <= :end
+                """), {
+                    "sensor": sensor_name,
+                    "start": date_start.isoformat(),
+                    "end": date_end.isoformat()
+                }).fetchone()
+                
+                if result and result[0] is not None:
+                    sensor_data[key] = float(result[0])
+        
+        # If no sensor data found, use defaults
+        if not sensor_data:
+            sensor_data = {
+                'ave_ph': 6.5,
+                'ave_do': 5.0,
+                'ave_tds': 600,
+                'ave_temp': 24,
+                'ave_humidity': 60
+            }
+        
+        # Load predictor and make predictions
+        predictor = PlantGrowthPredictor()
+        if not predictor.is_available():
+            return jsonify({
+                "success": False,
+                "error": "ML models not available",
+                "available": False
+            }), 503
+        
+        predictions = predictor.predict(
+            sensor_data=sensor_data,
+            plant_id=plant_id,
+            plant_system=farming_system,
+            date_obj=date_obj
+        )
+        
+        # Build response
+        result = {
+            "success": True,
+            "date": date_str,
+            "plant_id": plant_id,
+            "farming_system": farming_system,
+            "sensor_data_used": sensor_data,
+            "predictions": predictions,
+            "actual_values": actual_values if actual_values else None
+        }
+        
+        # Calculate errors if actual values provided
+        if actual_values:
+            result["comparison"] = {}
+            for metric in ["height", "length", "weight", "leaves", "branches"]:
+                actual = actual_values.get(metric)
+                predicted = predictions.get(metric)
+                
+                if actual is not None and predicted is not None:
+                    error = abs(actual - predicted)
+                    pct_error = (error / max(abs(actual), 0.001)) * 100
+                    result["comparison"][metric] = {
+                        "actual": actual,
+                        "predicted": predicted,
+                        "error": error,
+                        "error_percent": pct_error
+                    }
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        print(f"[API] Prediction error: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)

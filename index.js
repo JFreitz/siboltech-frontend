@@ -5217,8 +5217,7 @@ document.addEventListener('DOMContentLoaded', () => {
 	function stopPolling() {
 		if (pollInterval) {
 			clearInterval(pollInterval);
-			pollInterval = null;
-		}
+		pollInterval = null;
 	}
 
 	// Watch for tab switches
@@ -5236,5 +5235,230 @@ document.addEventListener('DOMContentLoaded', () => {
 		observer.observe(manualSection, { attributes: true, attributeFilter: ['class'] });
 		// Also start if already active
 		if (manualSection.classList.contains('active')) startPolling();
+	}
+})();
+
+// ==================== ML PREDICTION MODULE ====================
+(function() {
+	const API_BASE = window.location.origin;
+	let storedActualValues = {};
+
+	// Initialize prediction UI
+	function initPrediction() {
+		// Set today's date as default
+		const today = new Date().toISOString().split('T')[0];
+		document.getElementById('predDate').value = today;
+
+		// Event listeners for actual values modal
+		document.getElementById('addActualValuesBtn').addEventListener('click', openActualValuesModal);
+		document.getElementById('closeActualModal').addEventListener('click', closeActualValuesModal);
+		document.getElementById('cancelActualBtn').addEventListener('click', closeActualValuesModal);
+		document.getElementById('saveActualBtn').addEventListener('click', saveActualValues);
+
+		// Run prediction button
+		document.getElementById('runPredictionBtn').addEventListener('click', runPrediction);
+	}
+
+	function openActualValuesModal() {
+		const modal = document.getElementById('actualValuesModal');
+		modal.style.display = 'flex';
+
+		// Pre-fill with stored values if they exist
+		if (storedActualValues.height) document.getElementById('actualHeight').value = storedActualValues.height;
+		if (storedActualValues.length) document.getElementById('actualLength').value = storedActualValues.length;
+		if (storedActualValues.weight) document.getElementById('actualWeight').value = storedActualValues.weight;
+		if (storedActualValues.leaves) document.getElementById('actualLeaves').value = storedActualValues.leaves;
+		if (storedActualValues.branches) document.getElementById('actualBranches').value = storedActualValues.branches;
+	}
+
+	function closeActualValuesModal() {
+		document.getElementById('actualValuesModal').style.display = 'none';
+	}
+
+	function saveActualValues() {
+		storedActualValues = {
+			height: parseFloat(document.getElementById('actualHeight').value) || null,
+			length: parseFloat(document.getElementById('actualLength').value) || null,
+			weight: parseFloat(document.getElementById('actualWeight').value) || null,
+			leaves: parseInt(document.getElementById('actualLeaves').value) || null,
+			branches: parseInt(document.getElementById('actualBranches').value) || null
+		};
+
+		// Remove null values
+		Object.keys(storedActualValues).forEach(k => storedActualValues[k] === null && delete storedActualValues[k]);
+
+		closeActualValuesModal();
+		console.log('[Prediction] Actual values saved:', storedActualValues);
+	}
+
+	async function runPrediction() {
+		const date = document.getElementById('predDate').value;
+		const farmingSystem = document.getElementById('predFarmingSystem').value;
+		const plantId = parseInt(document.getElementById('predPlantId').value);
+
+		if (!date) {
+			alert('Please select a date');
+			return;
+		}
+
+		try {
+			const btn = document.getElementById('runPredictionBtn');
+			btn.disabled = true;
+			btn.textContent = 'Running...';
+
+			const response = await fetch(`${API_BASE}/api/predict`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					date: date,
+					plant_id: plantId,
+					farming_system: farmingSystem,
+					actual_values: Object.keys(storedActualValues).length > 0 ? storedActualValues : null
+				})
+			});
+
+			const data = await response.json();
+
+			if (data.success) {
+				displayResults(data);
+			} else {
+				showError(data.error || 'Prediction failed');
+			}
+
+			btn.disabled = false;
+			btn.textContent = 'Run Prediction';
+		} catch (error) {
+			showError('Error: ' + error.message);
+			document.getElementById('runPredictionBtn').disabled = false;
+			document.getElementById('runPredictionBtn').textContent = 'Run Prediction';
+		}
+	}
+
+	function displayResults(data) {
+		const resultsSection = document.getElementById('predictionResults');
+
+		// Display sensor data used
+		const sensorData = data.sensor_data_used;
+		document.getElementById('sensorPH').textContent = sensorData.ave_ph?.toFixed(2) || '-';
+		document.getElementById('sensorDO').textContent = sensorData.ave_do?.toFixed(2) || '-';
+		document.getElementById('sensorTDS').textContent = sensorData.ave_tds?.toFixed(1) || '-';
+		document.getElementById('sensorTemp').textContent = sensorData.ave_temp?.toFixed(1) || '-';
+		document.getElementById('sensorHumidity').textContent = sensorData.ave_humidity?.toFixed(1) || '-';
+
+		// Build results table
+		const metrics = ['height', 'length', 'weight', 'leaves', 'branches'];
+		const units = { height: 'cm', length: 'cm', weight: 'g', leaves: 'count', branches: 'count' };
+		const tbody = document.getElementById('resultsTableBody');
+		tbody.innerHTML = '';
+
+		const chartData = {};
+
+		metrics.forEach(metric => {
+			const predicted = data.predictions[metric];
+			const actual = data.actual_values ? data.actual_values[metric] : null;
+			const comparison = data.comparison ? data.comparison[metric] : null;
+
+			const row = document.createElement('tr');
+			row.innerHTML = `
+				<td><strong>${metric.charAt(0).toUpperCase() + metric.slice(1)}</strong></td>
+				<td>${units[metric]}</td>
+				<td>${actual !== null ? actual.toFixed(2) : '-'}</td>
+				<td>${predicted !== null ? predicted.toFixed(2) : '-'}</td>
+				<td>${comparison ? comparison.error.toFixed(2) : '-'}</td>
+				<td>${comparison ? comparison.error_percent.toFixed(1) + '%' : '-'}</td>
+			`;
+			tbody.appendChild(row);
+
+			// Prepare chart data
+			if (actual !== null || predicted !== null) {
+				chartData[metric] = {
+					actual: actual || 0,
+					predicted: predicted || 0
+				};
+			}
+		});
+
+		// Draw charts
+		drawCharts(chartData);
+
+		// Show results
+		resultsSection.style.display = 'block';
+		resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+	}
+
+	function drawCharts(chartData) {
+		const metrics = Object.keys(chartData);
+
+		metrics.forEach(metric => {
+			const canvasId = `chart${metric.charAt(0).toUpperCase() + metric.slice(1)}`;
+			const canvas = document.getElementById(canvasId);
+
+			if (!canvas) return;
+
+			const ctx = canvas.getContext('2d');
+			const data = chartData[metric];
+
+			// Destroy existing chart if any
+			if (window.predictionCharts && window.predictionCharts[metric]) {
+				window.predictionCharts[metric].destroy();
+			}
+
+			// Initialize charts object
+			if (!window.predictionCharts) window.predictionCharts = {};
+
+			// Create new chart
+			window.predictionCharts[metric] = new Chart(ctx, {
+				type: 'bar',
+				data: {
+					labels: ['Value'],
+					datasets: [
+						{
+							label: 'Actual',
+							data: [data.actual],
+							backgroundColor: '#27ae60',
+							borderColor: '#1e7e34',
+							borderWidth: 2
+						},
+						{
+							label: 'Predicted',
+							data: [data.predicted],
+							backgroundColor: '#3498db',
+							borderColor: '#2980b9',
+							borderWidth: 2
+						}
+					]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: true,
+					indexAxis: 'y',
+					plugins: {
+						legend: {
+							display: true,
+							position: 'top'
+						}
+					},
+					scales: {
+						x: {
+							beginAtZero: true
+						}
+					}
+				}
+			});
+		});
+	}
+
+	function showError(message) {
+		const resultsSection = document.getElementById('predictionResults');
+		resultsSection.innerHTML = `<div class="error-message">❌ ${message}</div>`;
+		resultsSection.style.display = 'block';
+		resultsSection.scrollIntoView({ behavior: 'smooth' });
+	}
+
+	// Initialize when DOM is ready
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', initPrediction);
+	} else {
+		initPrediction();
 	}
 })();

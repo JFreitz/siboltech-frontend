@@ -1,1 +1,8 @@
 nohup: ignoring input
+[AUTOMATION] GROW_LIGHTS_AERO -> ON
+[AUTOMATION] Started
+[API] Automation started (misting: 10s ON / 3m OFF, lights: 6am-6pm)
+ * Serving Flask app 'api'
+ * Debug mode: off
+Address already in use
+Port 5000 is in use by another program. Either identify and stop that program, or start the server with a different port.
