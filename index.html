@@ -504,44 +504,44 @@
 	
 		<section id="predicting" class="tab-content">
 		<div class="pred-header">
-			<h2>🤖 AI Plant Predictor</h2>
-			<p class="pred-subtitle">🌱 See how big your plants will grow!</p>
-			<p class="pred-subtitle">Predicting: Height, Length, Weight, Leaves, Branches</p>
+			<h2>Plant Growth Prediction</h2>
+			<p class="pred-subtitle">Estimate growth using daily sensor averages.</p>
+			<p class="pred-subtitle">Metrics: Height, Length, Weight, Leaves, Branches</p>
 		</div>
 		
 		<div class="pred-main-container">
 			<!-- Left Column: Input Panel -->
 			<div class="pred-left-panel">
 				<div class="pred-form-card">
-					<h3>⚙️ Choose Settings</h3>
+					<h3>Prediction Settings</h3>
 					<div class="pred-form-grid">
 						<!-- Plant ID Selector -->
 						<div class="form-group">
-							<label>🌿 Plant No. <span class="required">*</span></label>
+							<label>Plant No. <span class="required">*</span></label>
 							<select id="predPlantId" class="form-input">
-								<option value="">🔽 Pick a plant</option>
-								<option value="1">🌱 Plant 1</option>
-								<option value="2">🌱 Plant 2</option>
-								<option value="3">🌱 Plant 3</option>
-								<option value="4">🌱 Plant 4</option>
-								<option value="5">🌱 Plant 5</option>
-								<option value="6">🌱 Plant 6</option>
+								<option value="">Select plant</option>
+								<option value="1">Plant 1</option>
+								<option value="2">Plant 2</option>
+								<option value="3">Plant 3</option>
+								<option value="4">Plant 4</option>
+								<option value="5">Plant 5</option>
+								<option value="6">Plant 6</option>
 							</select>
 						</div>
 						
 						<!-- Farming System Selector -->
 						<div class="form-group">
-							<label>💧 Growing Method <span class="required">*</span></label>
+							<label>Growing Method <span class="required">*</span></label>
 							<select id="predFarmingSystem" class="form-input">
-								<option value="">🔽 Pick a method</option>
-								<option value="dwc">💧 Water Culture (DWC)</option>
-								<option value="aeroponics">💨 Misting System (Aeroponics)</option>
+								<option value="">Select method</option>
+								<option value="dwc">Water Culture (DWC)</option>
+								<option value="aeroponics">Misting System (Aeroponics)</option>
 							</select>
 						</div>
 						
 						<!-- Date Picker -->
 						<div class="form-group">
-							<label>📅 Which day? <span class="required">*</span></label>
+							<label>Date <span class="required">*</span></label>
 							<input type="date" id="predDate" class="form-input" />
 						</div>
 					</div>
@@ -549,38 +549,40 @@
 
 				<!-- Optional Actual Values Section -->
 				<div class="pred-form-card">
-					<h3>📏 What did you MEASURE? <span class="optional">(Not Required)</span></h3>
-					<p class="helper-text">😊 If you measured the plants, write the real numbers here!</p>
+					<h3>Actual Measurements <span class="optional">(Optional)</span></h3>
+					<p class="helper-text">Enter measured values if available.</p>
 					<div class="actual-values-grid">
 						<div class="input-field">
-							<label>📏 Height (how tall in cm)</label>
-							<input type="number" id="actualHeight" step="0.1" placeholder="👉 skip if you don't have it" />
+							<label>Height (cm)</label>
+							<input type="number" id="actualHeight" step="0.1" placeholder="Leave blank if unavailable" />
 						</div>
 						<div class="input-field">
-							<label>📏 Length (how wide in cm)</label>
-							<input type="number" id="actualLength" step="0.1" placeholder="👉 skip if you don't have it" />
+							<label>Length (cm)</label>
+							<input type="number" id="actualLength" step="0.1" placeholder="Leave blank if unavailable" />
 						</div>
 						<div class="input-field">
-							<label>⚖️ Weight (in grams)</label>
-							<input type="number" id="actualWeight" step="0.1" placeholder="👉 skip if you don't have it" />
+							<label>Weight (g)</label>
+							<input type="number" id="actualWeight" step="0.1" placeholder="Leave blank if unavailable" />
 						</div>
 						<div class="input-field">
-							<label>🍃 Leaves (how many)</label>
-							<input type="number" id="actualLeaves" step="1" placeholder="👉 skip if you don't have it" />
+							<label>Leaves (count)</label>
+							<input type="number" id="actualLeaves" step="1" placeholder="Leave blank if unavailable" />
 						</div>
 						<div class="input-field">
-							<label>🌿 Branches (how many)</label>
-							<input type="number" id="actualBranches" step="1" placeholder="👉 skip if you don't have it" />
+							<label>Branches (count)</label>
+							<input type="number" id="actualBranches" step="1" placeholder="Leave blank if unavailable" />
 						</div>
 					</div>
 				</div>
 
 				<!-- Run Buttons -->
-				<button class="btn btn-success btn-large" id="runPredictionBtn">🚀 Predict (Sensors Only)</button>
-				<button class="btn btn-primary btn-large" id="addActualAndPredictBtn">➕ Add Actual + Predict</button>
+				<div class="pred-actions-row">
+					<button class="btn btn-success btn-large" id="runPredictionBtn">Run Prediction (Sensors Only)</button>
+					<button class="btn btn-primary btn-large" id="addActualAndPredictBtn">Save Actual + Predict</button>
+				</div>
 				
 				<!-- Show History Button -->
-				<button class="btn btn-secondary btn-large" id="showHistoryBtn">📜 See All Predictions</button>
+				<button class="btn btn-secondary btn-large" id="showHistoryBtn">See All Predictions</button>
 			</div>
 
 			<!-- Right Column: Results -->
@@ -588,7 +590,7 @@
 				<div id="predictionResults" class="pred-results-section">
 					<!-- Sensor Data Used -->
 					<div class="results-card results-card-sensor">
-						<h3>🔬 What the Sensors Found</h3>
+						<h3>Sensor Inputs</h3>
 						<div class="sensor-data-grid">
 							<div class="sensor-data-item">
 								<span class="data-label">pH</span>
@@ -615,15 +617,15 @@
 					
 					<!-- Predictions vs Actual Metrics Table -->
 					<div class="results-card results-card-metrics">
-						<h3>🎯 AI's Prediction vs Your Measurement</h3>
+						<h3>Prediction vs Actual</h3>
 						<div class="table-responsive">
 							<table class="results-table">
 								<thead>
 									<tr>
 										<th>What We Measure</th>
 										<th>Unit</th>
-										<th class="actual-col">📏 You Got</th>
-										<th class="predicted-col">🤖 AI Says</th>
+										<th class="actual-col">Actual</th>
+										<th class="predicted-col">Predicted</th>
 										<th>Difference</th>
 										<th>% Off</th>
 									</tr>
@@ -639,23 +641,23 @@
 				<!-- Charts Section -->
 				<div id="chartsSection" class="charts-container">
 					<div class="chart-card">
-						<h4>📊 Height (cm)</h4>
+						<h4>Height (cm)</h4>
 						<canvas id="chartHeight"></canvas>
 					</div>
 					<div class="chart-card">
-						<h4>📊 Length (cm)</h4>
+						<h4>Length (cm)</h4>
 						<canvas id="chartLength"></canvas>
 					</div>
 					<div class="chart-card">
-						<h4>⚖️ Weight (g)</h4>
+						<h4>Weight (g)</h4>
 						<canvas id="chartWeight"></canvas>
 					</div>
 					<div class="chart-card">
-						<h4>🍃 Leaves (count)</h4>
+						<h4>Leaves (count)</h4>
 						<canvas id="chartLeaves"></canvas>
 					</div>
 					<div class="chart-card">
-						<h4>🌿 Branches (count)</h4>
+						<h4>Branches (count)</h4>
 						<canvas id="chartBranches"></canvas>
 					</div>
 				</div>
@@ -1236,7 +1238,7 @@
 		<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 		
 		<!-- Load main app JS first -->
-		<script src="index.js?v=1.0"></script>
+		<script src="index.js?v=1.2"></script>
 		
 		<!-- Firebase SDK - load after index.js so listeners are ready -->
 		<script type="module">
@@ -1254,6 +1256,22 @@
 			
 			const app = initializeApp(firebaseConfig);
 			const db = getFirestore(app);
+
+			function setTopbarConnectionStatus(isConnected) {
+				if (typeof window.updateConnectionStatus === 'function') {
+					window.updateConnectionStatus(isConnected);
+					return;
+				}
+				const el = document.getElementById('connectionStatus');
+				if (!el) return;
+				const dot = el.querySelector('.connection-dot');
+				const label = el.querySelector('.connection-label');
+				if (dot) dot.className = 'connection-dot ' + (isConnected ? 'connected' : 'disconnected');
+				if (label) {
+					label.textContent = isConnected ? 'Connected' : 'Disconnected';
+					label.className = 'connection-label ' + (isConnected ? 'connected' : 'disconnected');
+				}
+			}
 			
 			// Make Firebase available globally
 			window.firebaseDB = db;
@@ -1267,6 +1285,7 @@
 			window.firebaseSetDoc = setDoc;
 			window.firebaseServerTimestamp = serverTimestamp;
 			window.firebaseReady = true;
+			setTopbarConnectionStatus(true);
 			
 			// Load plant history from Firebase
 			window.loadPlantHistory = async function(farmingSystem, maxResults = 100) {
@@ -1388,6 +1407,7 @@
 			const relayDocRef = doc(db, 'actuators', 'relays');
 			onSnapshot(relayDocRef, (docSnap) => {
 				if (docSnap.exists()) {
+					setTopbarConnectionStatus(true);
 					const data = docSnap.data();
 					const status = data.status || {};
 					const relayToActuator = {
@@ -1416,12 +1436,14 @@
 				}
 			}, (error) => {
 				console.error('Firebase relay listener error:', error);
+				setTopbarConnectionStatus(false);
 			});
 			
 			// Directly start the real-time sensor listener here
 			const docRef = doc(db, 'sensors', 'latest');
 			onSnapshot(docRef, (docSnap) => {
 				if (docSnap.exists()) {
+					setTopbarConnectionStatus(true);
 					const data = docSnap.data();
 					console.log('📡 Firebase update:', Object.keys(data).filter(k => !k.startsWith('_')).join(', '));
 					
@@ -1446,6 +1468,7 @@
 				}
 			}, (error) => {
 				console.error('Firebase error:', error);
+				setTopbarConnectionStatus(false);
 			});
 		</script>
 </body>

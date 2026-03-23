@@ -167,6 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Fetch real sensor data from API
 let _lastDataTimestamp = 0;
+const _connectionWatchStartTs = Date.now();
 async function fetchSensorData() {
     // Skip if using Firebase real-time (Firebase will push updates)
     if (window.firebaseListenerActive) return;
@@ -296,9 +297,13 @@ function updateConnectionStatus(isConnected) {
     }
 }
 
+// Expose for Firebase module script in index.html
+window.updateConnectionStatus = updateConnectionStatus;
+
 // Stale-data watchdog: if no data for 15s, mark disconnected
 setInterval(() => {
-    if (_lastDataTimestamp && (Date.now() - _lastDataTimestamp > 15000)) {
+	const basisTs = _lastDataTimestamp || _connectionWatchStartTs;
+	if (Date.now() - basisTs > 15000) {
         updateConnectionStatus(false);
     }
 }, 5000);
