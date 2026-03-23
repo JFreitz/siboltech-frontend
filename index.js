@@ -5241,6 +5241,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ==================== ML PREDICTION MODULE ====================
 (function() {
+	function isStaticPublicHost(host) {
+		return host.includes('vercel.app') ||
+		       host.includes('netlify.app') ||
+		       host.includes('github.io') ||
+		       host.includes('pages.dev');
+	}
+
 	// Get API base for prediction endpoints.
 	// Local/LAN always uses port 5000 where Flask API runs.
 	function getPredictionApiBase() {
@@ -5258,8 +5265,13 @@ document.addEventListener('DOMContentLoaded', () => {
 	// Check if we're on local network where API is available
 	function isLocalNetwork() {
 		const host = window.location.hostname;
+		if (!host) return false;
+		if (isStaticPublicHost(host)) return false;
+
 		return host === 'localhost' ||
 		       host === '127.0.0.1' ||
+		       host.endsWith('.local') ||
+		       !host.includes('.') ||
 		       host.startsWith('192.168.') ||
 		       host.startsWith('10.') ||
 		       host.startsWith('172.');
@@ -5267,14 +5279,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	// Initialize prediction UI
 	function initPrediction() {
-		// Hide prediction section if not on local network
 		const predSection = document.getElementById('predicting');
-		if (!isLocalNetwork()) {
-			if (predSection) predSection.style.display = 'none';
-			return;
-		}
-
-		// Show prediction section on local network
+		// Always show prediction section. API availability is handled at request time.
 		if (predSection) predSection.style.display = 'block';
 
 		// Set today's date as default
@@ -5320,6 +5326,9 @@ document.addEventListener('DOMContentLoaded', () => {
 		// Load and display history as list of cards in modal
 		try {
 			const apiBase = getPredictionApiBase();
+			if (isStaticPublicHost(window.location.hostname) && apiBase === window.location.origin) {
+				throw new Error('Prediction history API is local-only. Open dashboard on local LAN IP.');
+			}
 			const response = await fetch(`${apiBase}/api/predictions/history?limit=100`);
 			const data = await response.json();
 
@@ -5402,6 +5411,9 @@ document.addEventListener('DOMContentLoaded', () => {
 			btn.textContent = '⏳ Running...';
 
 			const apiBase = getPredictionApiBase();
+			if (isStaticPublicHost(window.location.hostname) && apiBase === window.location.origin) {
+				throw new Error('Prediction API is local-only. Open dashboard on your local LAN IP (e.g. http://192.168.x.x:3000).');
+			}
 			const url = `${apiBase}/api/predict`;
 			console.log('[Prediction] Using API URL:', url);
 			
