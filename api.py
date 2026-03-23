@@ -210,12 +210,81 @@ def db_status():
 
 @app.route("/api/ingest", methods=["POST"])
 def ingest():
-    """Accept sensor readings from ESP32."""
-    data = request.get_json(silent=True) or {}
-    
-    # Just return success - actual ingestion happens via ingest_serial.py
-    # This endpoint exists for compatibility with ESP32 firmware
-    return jsonify({"success": True, "message": "Use ingest_serial.py for ingestion"})
+    """Ingest readings into local DB (used by firebase_sync serial thread and ESP32 HTTP uploads)."""
+    payload = request.get_json(silent=True) or {}
+    readings = payload.get("readings") or {}
+    if not isinstance(readings, dict):
+        return jsonify({"success": False, "error": "invalid readings"}), 400
+
+    # Parse timestamp if provided, else use now
+    ts = datetime.now(timezone.utc)
+    raw_ts = payload.get("ts") or payload.get("timestamp")
+    if raw_ts:
+        try:
+            ts = datetime.fromisoformat(str(raw_ts).replace("Z", "+00:00"))
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+        except Exception:
+            pass
+
+    # Compute calibrated values if only voltages are provided
+    computed = dict(readings)
+    try:
+        if "ph" not in computed and "ph_voltage_v" in computed:
+            from calibration import calibrate_ph
+            computed["ph"] = float(calibrate_ph(float(computed["ph_voltage_v"])))
+    except Exception:
+        pass
+    try:
+        if "do_mg_per_l" not in computed and "do_voltage_v" in computed:
+            from calibration import calibrate_do
+            do_val = float(calibrate_do(float(computed["do_voltage_v"])))
+            computed["do_mg_per_l"] = do_val
+            computed["do_mg_l"] = do_val  # compatibility alias
+    except Exception:
+        pass
+
+    allowed = {
+        "temperature_c", "humidity", "tds_ppm",
+        "ph", "do_mg_per_l", "do_mg_l",
+        "ph_voltage_v", "do_voltage_v", "tds_voltage_v"
+    }
+    units = {
+        "temperature_c": "C",
+        "humidity": "%",
+        "tds_ppm": "ppm",
+        "ph": "pH",
+        "do_mg_per_l": "mg/L",
+        "do_mg_l": "mg/L",
+        "ph_voltage_v": "V",
+        "do_voltage_v": "V",
+        "tds_voltage_v": "V",
+    }
+
+    to_insert = []
+    for sensor_name, value in computed.items():
+        if sensor_name not in allowed:
+            continue
+        try:
+            v = float(value)
+        except Exception:
+            continue
+        to_insert.append(
+            SensorReading(
+                timestamp=ts,
+                sensor=str(sensor_name),
+                value=v,
+                unit=units.get(sensor_name),
+                meta={"source": "http_ingest", "device": payload.get("device", "unknown")},
+            )
+        )
+
+    with Session() as session:
+        if to_insert:
+            session.add_all(to_insert)
+            session.commit()
+
+    return jsonify({"success": True, "inserted": len(to_insert)})
 
 
 @app.route("/api/readings")

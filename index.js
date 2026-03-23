@@ -193,7 +193,8 @@ function updateSensorDisplayFromData(data) {
     // API returns: { "ph": {"value": 6.5, "unit": "pH"}, "temperature_c": {...}, ... }
     // Update dashboard sensor values (default to 0 if no data)
     const phVal = (data.ph && data.ph.value !== undefined) ? parseFloat(data.ph.value).toFixed(2) : '0.00';
-    const doVal = (data.do_mg_l && data.do_mg_l.value !== undefined) ? parseFloat(data.do_mg_l.value).toFixed(2) + ' mg/L' : '0.00 mg/L';
+	const doObj = (data.do_mg_per_l && data.do_mg_per_l.value !== undefined) ? data.do_mg_per_l : data.do_mg_l;
+	const doVal = (doObj && doObj.value !== undefined) ? parseFloat(doObj.value).toFixed(2) + ' mg/L' : '0.00 mg/L';
     const tempVal = (data.temperature_c && data.temperature_c.value !== undefined) ? parseFloat(data.temperature_c.value).toFixed(1) + ' °C' : '0.0 °C';
     const humVal = (data.humidity && data.humidity.value !== undefined) ? parseFloat(data.humidity.value).toFixed(1) + ' %' : '0.0 %';
     const tdsVal = (data.tds_ppm && data.tds_ppm.value !== undefined) ? parseFloat(data.tds_ppm.value).toFixed(0) + ' ppm' : '0 ppm';
