@@ -5241,13 +5241,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ==================== ML PREDICTION MODULE ====================
 (function() {
-	// Get the API base URL - uses global API_BASE_URL that's initialized at page load
-	// On local network: points to localhost:5000
+	// Get the API base URL - ensures it waits for initialization
+	// On local network: points to localhost:5000 or 192.168.x.x:5000
 	// On Vercel: prediction feature is hidden
 	function getAPIBase() {
-		const base = API_BASE_URL || (window.location.origin + '/api');
-		// Remove /api suffix if present to avoid duplication
-		return base.endsWith('/api') ? base.slice(0, -4) : base;
+		// On local network, API_BASE_URL should be set to port 5000
+		if (typeof API_BASE_URL !== 'undefined' && API_BASE_URL) {
+			// Remove /api suffix if present to avoid duplication
+			if (API_BASE_URL.endsWith('/api')) {
+				return API_BASE_URL.slice(0, -4);
+			}
+			return API_BASE_URL;
+		}
+		// Fallback: shouldn't happen if initialization worked
+		return window.location.origin;
 	}
 
 	// Check if we're on local network where API is available
@@ -5387,7 +5394,10 @@ document.addEventListener('DOMContentLoaded', () => {
 			btn.textContent = '⏳ Running...';
 
 			const apiBase = getAPIBase();
-			const response = await fetch(`${apiBase}/api/predict`, {
+			const url = `${apiBase}/api/predict`;
+			console.log('[Prediction] Using API URL:', url);
+			
+			const response = await fetch(url, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -5397,6 +5407,11 @@ document.addEventListener('DOMContentLoaded', () => {
 					actual_values: getActualValues()
 				})
 			});
+
+			if (!response.ok) {
+				console.error('[Prediction] API response:', response.status, response.statusText);
+				throw new Error(`API Error: ${response.status} ${response.statusText}`);
+			}
 
 			const data = await response.json();
 
