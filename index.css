@@ -1388,25 +1388,41 @@ body.sidebar-collapsed .brand{
 /* Compact quick-link under Training in sidebar */
 .local-dashboard-inline-item {
 	margin: -4px 0 8px 0 !important;
-	padding-left: 44px;
 }
 
 .local-dashboard-inline-link {
-	display: inline-block !important;
-	padding: 4px 8px !important;
-	font-size: 12px;
+	display: flex !important;
+	align-items: center;
+	gap: 12px;
+	padding: 8px 10px !important;
+	font-size: 14px;
 	font-weight: 600;
-	color: #1f5fa8 !important;
-	background: #eef6ff;
-	border: 1px solid #d9e7ff;
-	border-radius: 8px;
+	color: #35530a !important;
+	background: transparent;
+	border: 1px solid rgba(127, 184, 111, 0.35);
+	border-radius: 14px;
 	text-decoration: none;
 }
 
 .local-dashboard-inline-link:hover {
-	background: #dfefff !important;
-	color: #0f4a88 !important;
-	border-radius: 8px !important;
+	background: linear-gradient(135deg, rgba(180, 232, 173, 0.4) 0%, rgba(143, 217, 144, 0.4) 100%) !important;
+	color: #2d5016 !important;
+	border-radius: 20px !important;
+}
+
+.local-dashboard-inline-link .icon {
+	font-size: 18px;
+	flex-shrink: 0;
+	width: 20px;
+	text-align: center;
+}
+
+.local-dashboard-inline-link .icon img {
+	width: 35px;
+	height: 20px;
+	object-fit: contain;
+	vertical-align: middle;
+	display: inline-block;
 }
 
 .sidebar.collapsed .local-dashboard-inline-item {
@@ -7266,10 +7282,6 @@ body.sidebar-collapsed .brand{
 }
 
 @media (max-width: 768px) {
-	.local-dashboard-inline-item {
-		padding-left: 36px;
-	}
-
 	.history-list {
 		grid-template-columns: 1fr;
 	}
