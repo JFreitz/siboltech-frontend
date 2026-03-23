@@ -7,7 +7,7 @@ Deploy on Railway, Vercel calls this for dashboard.
 
 import os
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from sqlalchemy import create_engine, text
@@ -451,6 +451,198 @@ def calibration_mode():
 
 
 # ==================== ML PREDICTIONS ====================
+
+
+# ==================== TRAINING + GROWTH STATE ====================
+def _normalize_farming_system(value: str) -> str:
+    s = (value or "dwc").strip().lower()
+    if s in {"aero", "aeroponics"}:
+        return "aeroponics"
+    if s in {"trad", "traditional"}:
+        return "traditional"
+    return "dwc"
+
+
+def _map_plant_id_for_system(plant_id: int, farming_system: str) -> str:
+    """Map Training tab plant IDs (1-6) to DB buckets by system."""
+    fs = _normalize_farming_system(farming_system)
+    if fs == "aeroponics":
+        return str(100 + plant_id)
+    if fs == "traditional":
+        return str(200 + plant_id)
+    return str(plant_id)
+
+
+@app.route("/api/plant-reading", methods=["POST"])
+def save_plant_reading():
+    """Save one plant measurement row from Training tab."""
+    try:
+        data = request.get_json(silent=True) or {}
+
+        plant_id_raw = data.get("plant_id")
+        if plant_id_raw is None:
+            return jsonify({"success": False, "error": "plant_id is required"}), 400
+
+        try:
+            plant_id = int(plant_id_raw)
+        except Exception:
+            return jsonify({"success": False, "error": "plant_id must be an integer"}), 400
+
+        if plant_id < 1 or plant_id > 6:
+            return jsonify({"success": False, "error": "plant_id must be between 1 and 6"}), 400
+
+        farming_system = _normalize_farming_system(data.get("farming_system", "dwc"))
+        mapped_plant_id = _map_plant_id_for_system(plant_id, farming_system)
+
+        ts = datetime.now(timezone.utc)
+        raw_ts = data.get("timestamp")
+        if raw_ts:
+            try:
+                ts = datetime.fromisoformat(str(raw_ts).replace("Z", "+00:00"))
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+            except Exception:
+                pass
+
+        def _f(v):
+            if v is None or v == "":
+                return None
+            try:
+                return float(v)
+            except Exception:
+                return None
+
+        height = _f(data.get("height"))
+        weight = _f(data.get("weight"))
+        length = _f(data.get("length"))
+        width = _f(data.get("width"))
+        leaves = _f(data.get("leaves"))
+        branches = _f(data.get("branches"))
+
+        with Session() as session:
+            session.execute(text("""
+                INSERT INTO plant_measurements (
+                    timestamp, plant_id, height_cm, weight_g,
+                    leaf_count, branch_count, leaf_length_cm, leaf_width_cm,
+                    notes, measured_by
+                ) VALUES (
+                    :timestamp, :plant_id, :height_cm, :weight_g,
+                    :leaf_count, :branch_count, :leaf_length_cm, :leaf_width_cm,
+                    :notes, :measured_by
+                )
+            """), {
+                "timestamp": ts,
+                "plant_id": mapped_plant_id,
+                "height_cm": height,
+                "weight_g": weight,
+                "leaf_count": leaves,
+                "branch_count": branches,
+                "leaf_length_cm": length,
+                "leaf_width_cm": width,
+                "notes": f"training-submit;system={farming_system}",
+                "measured_by": "training-tab",
+            })
+            session.commit()
+
+        return jsonify({
+            "success": True,
+            "plant_id": plant_id,
+            "mapped_plant_id": mapped_plant_id,
+            "farming_system": farming_system,
+            "timestamp": ts.isoformat(),
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/growth-comparison", methods=["GET"])
+def growth_comparison():
+    """Return daily averaged growth metric by system for Growth State graph."""
+    try:
+        metric = (request.args.get("metric") or "height").strip().lower()
+        metric_map = {
+            "height": "height_cm",
+            "length": "leaf_length_cm",
+            "weight": "weight_g",
+            "width": "weight_g",   # frontend uses width button as weight in this view
+            "leaves": "leaf_count",
+            "branches": "branch_count",
+        }
+        if metric not in metric_map:
+            return jsonify({"success": False, "error": f"Unsupported metric: {metric}"}), 400
+
+        col = metric_map[metric]
+        days_param = (request.args.get("days") or "14").strip().lower()
+        if days_param == "all":
+            cutoff = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        else:
+            try:
+                cutoff = datetime.now(timezone.utc) - timedelta(days=max(1, int(days_param)))
+            except Exception:
+                cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+
+        with Session() as session:
+            rows = session.execute(text(f"""
+                SELECT
+                    date(timestamp) AS d,
+                    CASE
+                        WHEN CAST(plant_id AS INTEGER) BETWEEN 1 AND 6 THEN 'dwc'
+                        WHEN CAST(plant_id AS INTEGER) BETWEEN 101 AND 106 THEN 'aero'
+                        WHEN CAST(plant_id AS INTEGER) BETWEEN 201 AND 206 THEN 'trad'
+                        ELSE 'other'
+                    END AS system,
+                    AVG({col}) AS avg_val
+                FROM plant_measurements
+                WHERE timestamp >= :cutoff
+                  AND {col} IS NOT NULL
+                GROUP BY d, system
+                HAVING system IN ('dwc', 'aero', 'trad')
+                ORDER BY d ASC
+            """), {"cutoff": cutoff}).fetchall()
+
+        if not rows:
+            return jsonify({
+                "success": True,
+                "metric": metric,
+                "days": days_param,
+                "dates": [],
+                "aeroponic": [],
+                "dwc": [],
+                "traditional": [],
+                "unit": "count" if metric in {"leaves", "branches"} else "cm",
+                "has_real_data": False,
+            })
+
+        dates = sorted({str(r[0]) for r in rows})
+        lookup = {(str(r[0]), str(r[1])): float(r[2]) for r in rows if r[2] is not None}
+
+        aero = [lookup.get((d, "aero")) for d in dates]
+        dwc = [lookup.get((d, "dwc")) for d in dates]
+        trad = [lookup.get((d, "trad")) for d in dates]
+
+        unit_map = {
+            "height": "cm",
+            "length": "cm",
+            "weight": "g",
+            "width": "g",
+            "leaves": "count",
+            "branches": "count",
+        }
+
+        return jsonify({
+            "success": True,
+            "metric": metric,
+            "days": days_param,
+            "dates": dates,
+            "aeroponic": aero,
+            "dwc": dwc,
+            "traditional": trad,
+            "unit": unit_map.get(metric, "units"),
+            "has_real_data": True,
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 
 # ==================== PLANT HISTORY ====================
 @app.route("/api/plant-history")

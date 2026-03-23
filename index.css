@@ -1433,7 +1433,7 @@ body.prediction-only-mode .sidebar {
 
 body.prediction-only-mode .main {
 	margin-left: 0 !important;
-	padding: 16px !important;
+	padding: 20px !important;
 }
 
 body.prediction-only-mode .tab-content {
@@ -1442,6 +1442,23 @@ body.prediction-only-mode .tab-content {
 
 body.prediction-only-mode #predicting.tab-content {
 	display: block !important;
+	max-width: 1320px;
+	margin: 0 auto;
+}
+
+body.prediction-only-mode .pred-header {
+	padding: 20px 24px;
+	margin-bottom: 20px;
+	border-radius: 10px;
+}
+
+body.prediction-only-mode .pred-main-container {
+	padding: 8px 0 16px;
+	gap: 20px;
+}
+
+body.prediction-only-mode .pred-subtitle {
+	opacity: 0.95;
 }
 
 .sidebar.collapsed .local-dashboard-inline-item {
@@ -6788,6 +6805,12 @@ body.prediction-only-mode #predicting.tab-content {
 	transition: all 0.2s ease;
 }
 
+.pred-actions-row {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 10px;
+}
+
 .btn-success {
 	background: linear-gradient(135deg, #27ae60, #229954);
 	color: white;
@@ -6971,6 +6994,10 @@ body.prediction-only-mode #predicting.tab-content {
 @media (max-width: 768px) {
 	.pred-main-container {
 		padding: 12px;
+	}
+
+	.pred-actions-row {
+		grid-template-columns: 1fr;
 	}
 	
 	.sensor-data-grid {
