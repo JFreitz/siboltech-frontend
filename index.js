@@ -5243,35 +5243,51 @@ document.addEventListener('DOMContentLoaded', () => {
 (function() {
 	// Get the API base URL - uses global API_BASE_URL that's initialized at page load
 	// On local network: points to localhost:5000
-	// On Vercel: points to configured remote API or returns error
+	// On Vercel: prediction feature is hidden
 	function getAPIBase() {
 		const base = API_BASE_URL || (window.location.origin + '/api');
 		// Remove /api suffix if present to avoid duplication
 		return base.endsWith('/api') ? base.slice(0, -4) : base;
 	}
 
-	// Check if we're on Vercel and API is not configured
-	function isVercelWithoutAPI() {
+	// Check if we're on local network where API is available
+	function isLocalNetwork() {
 		const host = window.location.hostname;
-		const isVercel = host.includes('vercel.app') || host.includes('netlify.app') || host.includes('pages.dev');
-		const apiNotConfigured = !API_BASE_URL || API_BASE_URL === window.location.origin + '/api';
-		return isVercel && apiNotConfigured;
+		return host === 'localhost' ||
+		       host === '127.0.0.1' ||
+		       host.startsWith('192.168.') ||
+		       host.startsWith('10.') ||
+		       host.startsWith('172.');
 	}
 
 	// Initialize prediction UI
 	function initPrediction() {
+		// Hide prediction section if not on local network
+		const predSection = document.getElementById('prediction');
+		if (!isLocalNetwork()) {
+			if (predSection) predSection.style.display = 'none';
+			return;
+		}
+
+		// Show prediction section on local network
+		if (predSection) predSection.style.display = 'block';
+
 		// Set today's date as default
 		const today = new Date().toISOString().split('T')[0];
-		document.getElementById('predDate').value = today;
+		const dateInput = document.getElementById('predDate');
+		if (dateInput) dateInput.value = today;
 
 		// Run prediction button
-		document.getElementById('runPredictionBtn').addEventListener('click', runPrediction);
+		const runBtn = document.getElementById('runPredictionBtn');
+		if (runBtn) runBtn.addEventListener('click', runPrediction);
 
 		// Show history button
-		document.getElementById('showHistoryBtn').addEventListener('click', showHistoryModal);
+		const historyBtn = document.getElementById('showHistoryBtn');
+		if (historyBtn) historyBtn.addEventListener('click', showHistoryModal);
 
 		// History modal close
-		document.getElementById('closePredDetail').addEventListener('click', closeDetailModal);
+		const closeBtn = document.getElementById('closePredDetail');
+		if (closeBtn) closeBtn.addEventListener('click', closeDetailModal);
 	}
 
 	function getActualValues() {
@@ -5293,13 +5309,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	async function showHistoryModal() {
 		// Load and display history as list of cards in modal
-		
-		// Check if API is available
-		if (isVercelWithoutAPI()) {
-			alert('❌ Prediction history is not available on Vercel without API access.\n\nTo use predictions on Vercel, you need to:\n1. Set up a tunnel (ngrok, Cloudflare)\n2. Store the API URL in browser localStorage as "remoteAPIUrl"\n\nOn local network, history works automatically at localhost:5000');
-			return;
-		}
-
 		try {
 			const apiBase = getAPIBase();
 			const response = await fetch(`${apiBase}/api/predictions/history?limit=100`);
@@ -5369,12 +5378,6 @@ document.addEventListener('DOMContentLoaded', () => {
 		// Validate inputs
 		if (!date || !farmingSystem || !plantId) {
 			alert('❌ Please fill in Plant No., System Type, and Prediction Date');
-			return;
-		}
-
-		// Check if API is available (only on local network or with configured remote API)
-		if (isVercelWithoutAPI()) {
-			alert('❌ Predictions are not available on Vercel without API access.\n\nTo use predictions on Vercel, you need to:\n1. Set up a tunnel (ngrok, Cloudflare)\n2. Store the API URL in browser localStorage as "remoteAPIUrl"\n\nOn local network, predictions work automatically at localhost:5000');
 			return;
 		}
 
