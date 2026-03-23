@@ -5241,19 +5241,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ==================== ML PREDICTION MODULE ====================
 (function() {
-	// Get the API base URL - ensures it waits for initialization
-	// On local network: points to localhost:5000 or 192.168.x.x:5000
-	// On Vercel: prediction feature is hidden
-	function getAPIBase() {
-		// On local network, API_BASE_URL should be set to port 5000
-		if (typeof API_BASE_URL !== 'undefined' && API_BASE_URL) {
-			// Remove /api suffix if present to avoid duplication
-			if (API_BASE_URL.endsWith('/api')) {
-				return API_BASE_URL.slice(0, -4);
-			}
-			return API_BASE_URL;
+	// Get API base for prediction endpoints.
+	// Local/LAN always uses port 5000 where Flask API runs.
+	function getPredictionApiBase() {
+		if (isLocalNetwork()) {
+			return `${window.location.protocol}//${window.location.hostname}:5000`;
 		}
-		// Fallback: shouldn't happen if initialization worked
+
+		if (typeof API_BASE_URL !== 'undefined' && API_BASE_URL) {
+			return API_BASE_URL.endsWith('/api') ? API_BASE_URL.slice(0, -4) : API_BASE_URL;
+		}
+
 		return window.location.origin;
 	}
 
@@ -5270,7 +5268,7 @@ document.addEventListener('DOMContentLoaded', () => {
 	// Initialize prediction UI
 	function initPrediction() {
 		// Hide prediction section if not on local network
-		const predSection = document.getElementById('prediction');
+		const predSection = document.getElementById('predicting');
 		if (!isLocalNetwork()) {
 			if (predSection) predSection.style.display = 'none';
 			return;
@@ -5286,7 +5284,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 		// Run prediction button
 		const runBtn = document.getElementById('runPredictionBtn');
-		if (runBtn) runBtn.addEventListener('click', runPrediction);
+		if (runBtn) runBtn.addEventListener('click', () => runPrediction(false));
+
+		// Add actual + predict button
+		const addActualBtn = document.getElementById('addActualAndPredictBtn');
+		if (addActualBtn) addActualBtn.addEventListener('click', () => runPrediction(true));
 
 		// Show history button
 		const historyBtn = document.getElementById('showHistoryBtn');
@@ -5317,7 +5319,7 @@ document.addEventListener('DOMContentLoaded', () => {
 	async function showHistoryModal() {
 		// Load and display history as list of cards in modal
 		try {
-			const apiBase = getAPIBase();
+			const apiBase = getPredictionApiBase();
 			const response = await fetch(`${apiBase}/api/predictions/history?limit=100`);
 			const data = await response.json();
 
@@ -5377,14 +5379,20 @@ document.addEventListener('DOMContentLoaded', () => {
 		}
 	}
 
-	async function runPrediction() {
+	async function runPrediction(requireActualValues = false) {
 		const date = document.getElementById('predDate').value;
 		const farmingSystem = document.getElementById('predFarmingSystem').value;
 		const plantId = parseInt(document.getElementById('predPlantId').value);
+		const actualValues = getActualValues();
 
 		// Validate inputs
 		if (!date || !farmingSystem || !plantId) {
 			alert('❌ Please fill in Plant No., System Type, and Prediction Date');
+			return;
+		}
+
+		if (requireActualValues && !actualValues) {
+			alert('❌ Please add at least one actual plant measurement first.');
 			return;
 		}
 
@@ -5393,7 +5401,7 @@ document.addEventListener('DOMContentLoaded', () => {
 			btn.disabled = true;
 			btn.textContent = '⏳ Running...';
 
-			const apiBase = getAPIBase();
+			const apiBase = getPredictionApiBase();
 			const url = `${apiBase}/api/predict`;
 			console.log('[Prediction] Using API URL:', url);
 			
@@ -5404,7 +5412,7 @@ document.addEventListener('DOMContentLoaded', () => {
 					date: date,
 					plant_id: plantId,
 					farming_system: farmingSystem,
-					actual_values: getActualValues()
+					actual_values: actualValues
 				})
 			});
 
@@ -5422,11 +5430,11 @@ document.addEventListener('DOMContentLoaded', () => {
 			}
 
 			btn.disabled = false;
-			btn.textContent = '🚀 Get Predictions';
+			btn.textContent = '🚀 Predict (Sensors Only)';
 		} catch (error) {
 			showError('Error: ' + error.message);
 			document.getElementById('runPredictionBtn').disabled = false;
-			document.getElementById('runPredictionBtn').textContent = '🚀 Get Predictions';
+			document.getElementById('runPredictionBtn').textContent = '🚀 Predict (Sensors Only)';
 		}
 	}
 
@@ -5552,7 +5560,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	async function loadPredictionHistory() {
 		try {
-			const apiBase = getAPIBase();
+			const apiBase = getPredictionApiBase();
 			const response = await fetch(`${apiBase}/api/predictions/history?limit=100`);
 			const data = await response.json();
 
