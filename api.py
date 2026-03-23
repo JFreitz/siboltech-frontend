@@ -497,7 +497,7 @@ def export_ml_training():
                 sensor,
                 ROUND(AVG(value), 4) AS avg_value
             FROM sensor_readings
-            WHERE sensor IN ('ph','do_mg_l','tds_ppm','temperature_c','humidity')
+            WHERE sensor IN ('ph','do_mg_per_l','tds_ppm','temperature_c','humidity')
             AND timestamp >= :cutoff
             GROUP BY time_bucket, sensor
             ORDER BY time_bucket
@@ -571,7 +571,7 @@ def export_ml_training():
                 'day': day_num(bucket),
                 'farming_system': fs,
                 'ave_ph': sensors.get('ph', '-'),
-                'ave_do': sensors.get('do_mg_l', '-'),
+                'ave_do': sensors.get('do_mg_per_l', '-'),
                 'ave_tds': sensors.get('tds_ppm', '-'),
                 'ave_temp': sensors.get('temperature_c', '-'),
                 'ave_humidity': sensors.get('humidity', '-'),
@@ -627,7 +627,7 @@ def export_sensor_actuator():
                 sensor,
                 ROUND(AVG(value), 4) AS avg_value
             FROM sensor_readings
-            WHERE sensor IN ('ph','do_mg_l','tds_ppm','temperature_c','humidity')
+            WHERE sensor IN ('ph','do_mg_per_l','tds_ppm','temperature_c','humidity')
             AND timestamp >= :cutoff
             GROUP BY time_bucket, sensor
             ORDER BY time_bucket
@@ -688,7 +688,7 @@ def export_sensor_actuator():
         row_dict = {
             'timestamp': bucket,
             'ph': sensors.get('ph', '-'),
-            'do_mg_l': sensors.get('do_mg_l', '-'),
+            'do_mg_l': sensors.get('do_mg_per_l', '-'),
             'tds_ppm': sensors.get('tds_ppm', '-'),
             'temperature_c': sensors.get('temperature_c', '-'),
             'humidity': sensors.get('humidity', '-'),

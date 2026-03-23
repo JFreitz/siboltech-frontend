@@ -1011,11 +1011,11 @@ def main():
 
             print(f"[{ts_str}] Sync #{sync_count}...")
             
-            # === PRIORITY 0: Sync latest sensor readings (every 2 cycles = ~30s) ===
+            # === PRIORITY 0: Sync latest sensor readings (every cycle = ~15s) ===
             # Critical for real-time dashboard display! But must throttle to respect quota.
-            # Sync frequency: Every ~30s = ~2,880 writes/day (well within 20k quota)
+            # Sync frequency: Every ~15s = ~5,760 writes/day (well within 20k quota)
             # Each write updates one "latest" doc with all 5 sensors + metadata
-            if sync_count % 2 == 0 and not quota.should_skip("latest"):
+            if not quota.should_skip("latest"):
                 try:
                     success = sync_latest_to_firebase(db, session)
                     if success:
