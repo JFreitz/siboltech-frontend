@@ -5280,8 +5280,20 @@ document.addEventListener('DOMContentLoaded', () => {
 	// Initialize prediction UI
 	function initPrediction() {
 		const predSection = document.getElementById('predicting');
-		// Always show prediction section. API availability is handled at request time.
-		if (predSection) predSection.style.display = 'block';
+
+		// On static public hosts (e.g., Vercel), hide prediction UI completely.
+		if (isStaticPublicHost(window.location.hostname)) {
+			if (predSection) predSection.style.display = 'none';
+			const predictionTab = document.getElementById('predictiontab');
+			if (predictionTab) {
+				const tabItem = predictionTab.closest('li');
+				if (tabItem) tabItem.style.display = 'none';
+			}
+			return;
+		}
+
+		// Do not force display here; main tab system controls visibility.
+		if (predSection) predSection.style.display = '';
 
 		// Set today's date as default
 		const today = new Date().toISOString().split('T')[0];
