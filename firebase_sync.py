@@ -48,8 +48,8 @@ SYNC_INTERVAL = int(os.getenv("FIREBASE_SYNC_INTERVAL", "2"))  # seconds - very 
 BATCH_SIZE = 10  # Keep small to stay within Spark plan (20k writes/day)
 
 # Time-based task cadence (converted to cycles from SYNC_INTERVAL)
-RELAY_CHECK_CYCLES = max(1, int(round(30 / max(SYNC_INTERVAL, 1))))       # ~30s
-OVERRIDE_CHECK_CYCLES = max(1, int(round(120 / max(SYNC_INTERVAL, 1))))   # ~2 min
+RELAY_CHECK_CYCLES = max(1, int(round(5 / max(SYNC_INTERVAL, 1))))        # ~5s for responsive manual relay commands
+OVERRIDE_CHECK_CYCLES = max(1, int(round(5 / max(SYNC_INTERVAL, 1))))     # ~5s so override takes effect quickly
 CALMODE_CHECK_CYCLES = max(1, int(round(300 / max(SYNC_INTERVAL, 1))))    # ~5 min
 HISTORY_SYNC_CYCLES = max(1, int(round(900 / max(SYNC_INTERVAL, 1))))     # ~15 min
 CAL_UPDATE_CYCLES = max(1, int(round(600 / max(SYNC_INTERVAL, 1))))       # ~10 min
@@ -469,7 +469,12 @@ def process_relay_commands(db: firestore.Client):
         if not _relay_cmd_override_synced:
             try:
                 ov_resp = requests.get("http://localhost:5000/api/override-mode", timeout=2)
-                if ov_resp.ok and not ov_resp.json().get("enabled", False):
+                if ov_resp.ok:
+                    ov_data = ov_resp.json() or {}
+                    ov_enabled = bool(ov_data.get("enabled", ov_data.get("override_mode", False)))
+                else:
+                    ov_enabled = False
+                if not ov_enabled:
                     requests.post(
                         "http://localhost:5000/api/override-mode",
                         json={"enabled": True},

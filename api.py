@@ -30,6 +30,7 @@ from automation import AutomationController
 
 # In-memory relay states (persisted in DB for reliability)
 RELAY_STATES = {i: False for i in range(1, 10)}  # 9 relays
+CALIBRATION_MODE = False
 
 RELAY_LABELS = {
     1: "Leafy Green",
@@ -379,7 +380,7 @@ def relay_off(relay_id):
 @app.route("/api/relay/all/on", methods=["POST"])
 def relay_all_on():
     """Turn all relays ON."""
-    for i in range(1, 9):
+    for i in range(1, 10):
         RELAY_STATES[i] = True
         _save_relay_state(i, True)
     
@@ -389,7 +390,7 @@ def relay_all_on():
 @app.route("/api/relay/all/off", methods=["POST"])
 def relay_all_off():
     """Turn all relays OFF."""
-    for i in range(1, 9):
+    for i in range(1, 10):
         RELAY_STATES[i] = False
         _save_relay_state(i, False)
     
@@ -407,13 +408,38 @@ def relays_alias():
 def override_mode():
     """Get or set override mode (manual relay control)."""
     if request.method == "GET":
-        return jsonify({"override_mode": automation_controller.override_mode})
+        current = bool(automation_controller.override_mode)
+        # Return both keys for backward compatibility with old/new clients
+        return jsonify({"override_mode": current, "enabled": current})
     else:
         # POST to set override mode
         data = request.get_json(silent=True) or {}
-        mode = data.get("mode", False)
-        automation_controller.override_mode = mode
-        return jsonify({"success": True, "override_mode": mode})
+        raw_mode = data.get("enabled", data.get("mode", False))
+        if isinstance(raw_mode, str):
+            mode = raw_mode.strip().lower() in {"1", "true", "on", "yes"}
+        else:
+            mode = bool(raw_mode)
+        # Use controller method so internal reset/resync logic runs correctly
+        automation_controller.set_override(mode)
+        return jsonify({"success": True, "override_mode": mode, "enabled": mode})
+
+
+@app.route("/api/calibration-mode", methods=["GET", "POST"])
+def calibration_mode():
+    """Get or set calibration mode for dashboard calibration workflow."""
+    global CALIBRATION_MODE
+    if request.method == "GET":
+        return jsonify({"calibration_mode": CALIBRATION_MODE, "enabled": CALIBRATION_MODE})
+
+    data = request.get_json(silent=True) or {}
+    raw_mode = data.get("enabled", data.get("mode", False))
+    if isinstance(raw_mode, str):
+        mode = raw_mode.strip().lower() in {"1", "true", "on", "yes"}
+    else:
+        mode = bool(raw_mode)
+
+    CALIBRATION_MODE = mode
+    return jsonify({"success": True, "calibration_mode": CALIBRATION_MODE, "enabled": CALIBRATION_MODE})
 
 
 # ==================== ML PREDICTIONS ====================

@@ -199,21 +199,16 @@ class AutomationController:
         was_override = self.override_mode
         self.override_mode = override
         print(f"[AUTOMATION] Override mode: {'ON' if override else 'OFF'}", flush=True)
-        
-        # Always immediately re-assert grow lights (they're time-based, never affected by override)
-        self._process_grow_lights()
-        
+
         # When override is turned OFF, immediately run automation to restore proper states
         if was_override and not override:
             print("[AUTOMATION] Override disabled - forcing relay state resync", flush=True)
             try:
                 # Reset internal relay states to force callback execution
-                # EXCEPT grow lights — they were just set correctly above
-                GROW_LIGHT_NAMES = {"GROW_LIGHTS_AERO", "GROW_LIGHTS_DWC"}
                 for name, relay in self.relays.items():
-                    if name not in GROW_LIGHT_NAMES:
-                        relay.state = None  # Force state to unknown so next set() will trigger callback
-                        relay.last_change = 0  # Reset debounce timer
+                    relay.state = None  # Force state to unknown so next set() will trigger callback
+                    relay.last_change = 0  # Reset debounce timer
+                self._process_grow_lights()
                 self._process_automation()
             except Exception as e:
                 print(f"[AUTOMATION] Error during immediate cycle: {e}", flush=True)
@@ -250,19 +245,12 @@ class AutomationController:
         """Main automation loop."""
         while not self._stop_event.is_set():
             try:
-                now = time.time()
-                
-                # Grow lights are ALWAYS time-based (6am-6pm) regardless of override mode
-                # They must never flicker due to mode changes or manual relay commands
-                self._process_grow_lights()
-                
-                # Full automation (including misting) only when override is OFF
+                # Full automation only when override is OFF.
+                # When override is ON, all relays are manual-only.
                 if not self.override_mode:
+                    self._process_grow_lights()
                     self._process_automation()
                     self._enforce_relay_states()
-                else:
-                    # Even in override mode, keep misting running on its schedule
-                    self._process_misting(now)
             except Exception as e:
                 print(f"[AUTOMATION] Error: {e}")
             
