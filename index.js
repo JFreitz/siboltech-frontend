@@ -233,6 +233,21 @@ function showSensorError() {
     document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => { if (el) el.textContent = '0 ppm'; });
 }
 
+function getCurrentSensorValue(sensorType, fallbackValue) {
+	const map = {
+		ph: '#val-ph',
+		do: '#val-do',
+		tds: '#val-tds',
+		temp: '#val-temp',
+		hum: '#val-hum'
+	};
+	const selector = map[sensorType];
+	if (!selector) return fallbackValue;
+	const raw = document.querySelector(selector)?.textContent || '';
+	const parsed = parseFloat(String(raw).replace(/[^0-9.+-]/g, ''));
+	return Number.isFinite(parsed) ? parsed : fallbackValue;
+}
+
 // Initialize Firebase real-time listener
 function initFirebaseListener() {
     if (!window.firebaseReady || !window.firebaseDB) {
@@ -1902,21 +1917,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		arr.push({ t: Date.now(), v: value });
 		// Keep last 288 points (~24h if every 5 min). Trim older.
 		if(arr.length > 288) arr.shift();
-	}
-
-	function getCurrentSensorValue(sensorType, fallbackValue) {
-		const map = {
-			ph: '#val-ph',
-			do: '#val-do',
-			tds: '#val-tds',
-			temp: '#val-temp',
-			hum: '#val-hum'
-		};
-		const selector = map[sensorType];
-		if (!selector) return fallbackValue;
-		const raw = document.querySelector(selector)?.textContent || '';
-		const parsed = parseFloat(String(raw).replace(/[^0-9.+-]/g, ''));
-		return Number.isFinite(parsed) ? parsed : fallbackValue;
 	}
 
 
@@ -3717,23 +3717,10 @@ async function fetchGrowthData(days, metric) {
 		const data = await res.json();
 		
 		if (data.success && data.dates && data.dates.length > 0) {
-			// Convert nulls to interpolated values or 0
-			const fillGaps = (arr) => arr.map((v, i, a) => {
-				if (v !== null) return v;
-				// Find nearest non-null values
-				let prev = null, next = null;
-				for (let j = i - 1; j >= 0; j--) if (a[j] !== null) { prev = a[j]; break; }
-				for (let j = i + 1; j < a.length; j++) if (a[j] !== null) { next = a[j]; break; }
-				if (prev !== null && next !== null) return (prev + next) / 2;
-				if (prev !== null) return prev;
-				if (next !== null) return next;
-				return 0;
-			});
-			
 			const result = {
-				aeroponic: fillGaps(data.aeroponic || []),
-				dwc: fillGaps(data.dwc || []),
-				traditional: fillGaps(data.traditional || []),
+				aeroponic: data.aeroponic || [],
+				dwc: data.dwc || [],
+				traditional: data.traditional || [],
 				dates: data.dates || [],
 				unit: data.unit || null,
 				hasRealData: true
