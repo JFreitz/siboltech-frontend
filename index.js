@@ -2248,33 +2248,69 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	// Helper function to update all sensor alerts (dashboard, training, etc.)
 	function updateSensorAlert(sensorType, value){
-		const {status, statusClass} = getSensorStatus(sensorType, value);
-		const thresholds = sensorThresholds[sensorType];
-		const recommended = thresholds
-			? formatRangeList(thresholds.ranges.neutral, thresholds.unit)
-			: '-';
-		const statusMsg = {
-			neutral: 'System is stable',
-			warning: 'Monitor and adjust soon',
-			normal: 'Outside optimal range',
-			dangerous: 'Immediate action needed'
-		}[statusClass] || 'Monitoring';
+		const num = parseFloat(value);
+
+		function getInterpretation(sensor, v){
+			if (!Number.isFinite(v)) {
+				return { level: '-', recommendation: 'Check sensor connection', statusText: 'No sensor data', statusClass: 'normal', statusLabel: 'Normal' };
+			}
+
+			switch (sensor) {
+				case 'ph':
+					if (v < 5.5) return { level: 'Very Low (Acidic)', recommendation: 'Turn ON pH Up', statusText: 'Critical - Too Acidic', statusClass: 'dangerous', statusLabel: 'Critical' };
+					if (v < 5.8) return { level: 'Below Normal', recommendation: 'Turn ON pH Up', statusText: 'Warning - Acidic', statusClass: 'warning', statusLabel: 'Warning' };
+					if (v <= 6.2) return { level: 'Normal pH', recommendation: 'No action needed', statusText: 'Normal', statusClass: 'neutral', statusLabel: 'Optimal' };
+					if (v <= 7.0) return { level: 'Above Normal', recommendation: 'Turn ON pH Down', statusText: 'Warning - Alkaline', statusClass: 'warning', statusLabel: 'Warning' };
+					return { level: 'Very High (Alkaline)', recommendation: 'Turn ON pH Down', statusText: 'Critical - Too Alkaline', statusClass: 'dangerous', statusLabel: 'Critical' };
+
+				case 'do':
+					if (v < 5.0) return { level: 'Very Low Oxygen', recommendation: 'Turn ON Air Pump', statusText: 'Critical - Low Oxygen', statusClass: 'dangerous', statusLabel: 'Critical' };
+					if (v < 6.5) return { level: 'Below Normal', recommendation: 'Increase aeration', statusText: 'Warning - Low Oxygen', statusClass: 'warning', statusLabel: 'Warning' };
+					return { level: 'Normal Oxygen', recommendation: 'No action needed', statusText: 'Normal', statusClass: 'neutral', statusLabel: 'Optimal' };
+
+				case 'temp':
+					if (v > 30) return { level: 'Very High', recommendation: 'Turn ON Exhaust Fans', statusText: 'Critical - Too Hot', statusClass: 'dangerous', statusLabel: 'Critical' };
+					if (v >= 28) return { level: 'Above Normal', recommendation: 'Increase cooling', statusText: 'Warning - Warm', statusClass: 'warning', statusLabel: 'Warning' };
+					if (v >= 18) return { level: 'Normal Temperature', recommendation: 'No action needed', statusText: 'Normal', statusClass: 'neutral', statusLabel: 'Optimal' };
+					if (v >= 15) return { level: 'Below Normal', recommendation: 'Reduce cooling', statusText: 'Warning - Cool', statusClass: 'warning', statusLabel: 'Warning' };
+					return { level: 'Very Low', recommendation: 'Protect from cold', statusText: 'Critical - Too Cold', statusClass: 'dangerous', statusLabel: 'Critical' };
+
+				case 'hum':
+					if (v > 80) return { level: 'Very High Humidity', recommendation: 'Turn ON Exhaust Fans', statusText: 'Critical - Too Humid', statusClass: 'dangerous', statusLabel: 'Critical' };
+					if (v >= 70) return { level: 'Above Normal', recommendation: 'Increase ventilation', statusText: 'Warning - Humid', statusClass: 'warning', statusLabel: 'Warning' };
+					if (v >= 50) return { level: 'Normal Humidity', recommendation: 'No action needed', statusText: 'Normal', statusClass: 'neutral', statusLabel: 'Optimal' };
+					if (v >= 40) return { level: 'Below Normal', recommendation: 'Reduce fan speed', statusText: 'Warning - Slightly Dry', statusClass: 'warning', statusLabel: 'Warning' };
+					return { level: 'Very Low Humidity', recommendation: 'Add humidity / reduce airflow', statusText: 'Critical - Too Dry', statusClass: 'dangerous', statusLabel: 'Critical' };
+
+				case 'tds':
+					if (v < 200) return { level: 'Very Low Nutrients', recommendation: 'Add nutrient solution', statusText: 'Critical - Too Low', statusClass: 'dangerous', statusLabel: 'Critical' };
+					if (v < 400) return { level: 'Below Normal', recommendation: 'Add leafy green nutrient', statusText: 'Warning - Low Nutrients', statusClass: 'warning', statusLabel: 'Warning' };
+					if (v <= 700) return { level: 'Normal Nutrients', recommendation: 'No action needed', statusText: 'Normal', statusClass: 'neutral', statusLabel: 'Optimal' };
+					if (v <= 1000) return { level: 'Above Normal', recommendation: 'Dilute with fresh water', statusText: 'Warning - High Nutrients', statusClass: 'warning', statusLabel: 'Warning' };
+					return { level: 'Very High Nutrients', recommendation: 'Dilute immediately', statusText: 'Critical - Too High', statusClass: 'dangerous', statusLabel: 'Critical' };
+
+				default:
+					return { level: '-', recommendation: '-', statusText: 'Monitoring', statusClass: 'normal', statusLabel: 'Normal' };
+			}
+		}
+
+		const interp = getInterpretation(sensorType, num);
 
 		document.querySelectorAll(`[id="level-${sensorType}"] .sensor-line-value`).forEach(el => {
-			el.textContent = status;
+			el.textContent = interp.level;
 		});
 		document.querySelectorAll(`[id="recommend-${sensorType}"] .sensor-line-value`).forEach(el => {
-			el.textContent = recommended;
+			el.textContent = interp.recommendation;
 		});
 		document.querySelectorAll(`[id="status-${sensorType}"]`).forEach(statusEl => {
-			statusEl.textContent = statusMsg;
-			statusEl.className = `sensor-status ${statusClass}`;
+			statusEl.textContent = interp.statusText;
+			statusEl.className = `sensor-status ${interp.statusClass}`;
 		});
 
 		// Backward compatibility for legacy alert nodes if present
 		document.querySelectorAll(`[id="alert-${sensorType}"]`).forEach(alertEl => {
-			alertEl.textContent = status;
-			alertEl.className = `alert ${statusClass}`;
+			alertEl.textContent = interp.statusLabel;
+			alertEl.className = `alert ${interp.statusClass}`;
 		});
 
 		// Side pop-up notifications for critical sensor values disabled by user request

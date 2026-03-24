@@ -3262,7 +3262,7 @@ body.prediction-only-mode .pred-subtitle {
 	color:#35530a;
     font-weight:400;
     margin-bottom:6px;
-	height: 210px;
+	height: auto;
 }
 .card-header{
     grid-area: header;
@@ -3284,15 +3284,22 @@ body.prediction-only-mode .pred-subtitle {
     gap:4px;
 }
 
-.sensor .label{
-    font-size:13px;
-	color:#35530a;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:4px;
-    width:100%;
-    position:relative;
+.sensor-header{
+	display:flex;
+	align-items:center;
+	justify-content:space-between;
+	gap:8px;
+	width:100%;
+}
+
+.sensor-title{
+	flex:1;
+	font-size:13px;
+	font-weight:600;
+	color:#395e16;
+	white-space:nowrap;
+	overflow:hidden;
+	text-overflow:ellipsis;
 }
 
 .sensor .info-icon{
@@ -3313,7 +3320,7 @@ body.prediction-only-mode .pred-subtitle {
 .sensor .value{
     font-size:clamp(18px, 2.8vw, 36px);
     font-weight:700;
-    margin-top:-2px;
+	margin-top:2px;
 	text-align: center;
 	width: 100%;
 	white-space: nowrap;
@@ -3349,7 +3356,7 @@ body.prediction-only-mode .pred-subtitle {
 
 .sensor-line-value {
 	color: #2f4a15;
-	font-weight: 600;
+	font-weight: 500;
 	text-align: right;
 }
 
