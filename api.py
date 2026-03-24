@@ -7,6 +7,7 @@ Deploy on Railway, Vercel calls this for dashboard.
 
 import os
 import requests
+import csv
 from datetime import datetime, timezone, timedelta
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -573,6 +574,117 @@ def growth_comparison():
 
         col = metric_map[metric]
         days_param = (request.args.get("days") or "14").strip().lower()
+
+        # Prefer explicit Growth-State CSV files when present
+        # (Aero-Growth-State.csv, DWC-Growth-State.csv, Trad-Growth-State.csv).
+        def _csv_growth_payload():
+            csv_metric_map = {
+                "height": "height",
+                "length": "length",
+                "weight": "weight",
+                "width": "weight",  # frontend width button maps to weight in this graph
+                "leaves": "leaves",
+                "branches": "branches",
+            }
+            csv_col = csv_metric_map.get(metric)
+            if not csv_col:
+                return None
+
+            base_dir = os.path.dirname(__file__)
+            files = {
+                "aero": os.path.join(base_dir, "Aero-Growth-State.csv"),
+                "dwc": os.path.join(base_dir, "DWC-Growth-State.csv"),
+                "trad": os.path.join(base_dir, "Trad-Growth-State.csv"),
+            }
+
+            if not all(os.path.exists(p) for p in files.values()):
+                return None
+
+            cutoff_date = None
+            if days_param != "all":
+                try:
+                    d = max(1, int(days_param))
+                    cutoff_date = (datetime.now(timezone.utc) - timedelta(days=d)).date()
+                except Exception:
+                    cutoff_date = (datetime.now(timezone.utc) - timedelta(days=14)).date()
+
+            by_system_date = {"aero": {}, "dwc": {}, "trad": {}}
+            all_dates = set()
+
+            for system_key, path in files.items():
+                with open(path, "r", encoding="utf-8-sig", newline="") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        date_str = (row.get("date") or "").strip()
+                        if not date_str:
+                            continue
+                        try:
+                            d_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+                        except Exception:
+                            continue
+                        if cutoff_date and d_obj < cutoff_date:
+                            continue
+
+                        raw_val = row.get(csv_col)
+                        if raw_val is None or str(raw_val).strip() == "":
+                            continue
+                        try:
+                            val = float(raw_val)
+                        except Exception:
+                            continue
+
+                        all_dates.add(date_str)
+                        by_system_date[system_key].setdefault(date_str, []).append(val)
+
+            if not all_dates:
+                return {
+                    "success": True,
+                    "metric": metric,
+                    "days": days_param,
+                    "dates": [],
+                    "aeroponic": [],
+                    "dwc": [],
+                    "traditional": [],
+                    "unit": "count" if metric in {"leaves", "branches"} else ("g" if metric in {"weight", "width"} else "cm"),
+                    "has_real_data": False,
+                    "source": "growth_state_csv",
+                }
+
+            dates = sorted(all_dates)
+
+            def avg_or_none(vals):
+                return (sum(vals) / len(vals)) if vals else None
+
+            aero = [avg_or_none(by_system_date["aero"].get(d, [])) for d in dates]
+            dwc = [avg_or_none(by_system_date["dwc"].get(d, [])) for d in dates]
+            trad = [avg_or_none(by_system_date["trad"].get(d, [])) for d in dates]
+
+            unit_map = {
+                "height": "cm",
+                "length": "cm",
+                "weight": "g",
+                "width": "g",
+                "leaves": "count",
+                "branches": "count",
+            }
+
+            return {
+                "success": True,
+                "metric": metric,
+                "days": days_param,
+                "dates": dates,
+                "aeroponic": aero,
+                "dwc": dwc,
+                "traditional": trad,
+                "unit": unit_map.get(metric, "units"),
+                "has_real_data": True,
+                "source": "growth_state_csv",
+            }
+
+        csv_payload = _csv_growth_payload()
+        if csv_payload is not None:
+            return jsonify(csv_payload)
+
         if days_param == "all":
             cutoff = datetime(2000, 1, 1, tzinfo=timezone.utc)
         else:
