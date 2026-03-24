@@ -3708,54 +3708,23 @@ async function fetchGrowthData(days, metric) {
 				dwc: fillGaps(data.dwc || []),
 				traditional: fillGaps(data.traditional || []),
 				dates: data.dates || [],
+				unit: data.unit || null,
 				hasRealData: true
 			};
 			graphDataCache[cacheKey] = result;
 			return result;
 		}
 	} catch (e) {
-		console.log('[GrowthComparison] API fetch failed, using mock data:', e.message);
+		console.log('[GrowthComparison] API fetch failed:', e.message);
 	}
-	
-	// Fallback to generated mock data if no real data
-	return generateMockGraphData(days, metric);
-}
 
-function generateMockGraphData(days, metric) {
-	const points = typeof days === 'number' ? Math.min(days * 4, 120) : 120;
-
-
-	// Pick base values per metric to simulate different scales
-	const metricBases = {
-		height: { aero: 50, dwc: 45, trad: 40, unit: 'cm' },
-		width: { aero: 30, dwc: 28, trad: 26, unit: 'cm' },
-		length: { aero: 40, dwc: 36, trad: 34, unit: 'cm' },
-		leaves: { aero: 20, dwc: 16, trad: 12, unit: 'count' },
-		branches: { aero: 6, dwc: 5, trad: 4, unit: 'count' }
-	};
-
-	const m = metricBases[metric] || metricBases.height;
-
-	// Aeroponic - fastest growth, highest values
-	const aeroponicBase = m.aero;
-	const aeroponicData = window.randomWalk(points, aeroponicBase, 8)
-		.map((v, i) => Math.max(30, Math.min(100, v + (i / points) * 15)));
-	
-	// Deep Water Culture - medium growth
-	const dwcBase = 45;
-	const dwcData = window.randomWalk(points, dwcBase, 7)
-		.map((v, i) => Math.max(25, Math.min(90, v + (i / points) * 12)));
-	
-	// Traditional - slowest growth
-	const traditionalBase = m.trad;
-	const traditionalData = window.randomWalk(points, traditionalBase, 6)
-		.map((v, i) => Math.max(20, Math.min(80, v + (i / points) * 10)));
-	
+	// No random fallback: return explicit empty state
 	return {
-		aeroponic: aeroponicData,
-		dwc: dwcData,
-		traditional: traditionalData,
+		aeroponic: [],
+		dwc: [],
+		traditional: [],
 		dates: [],
+		unit: null,
 		hasRealData: false
 	};
 }
@@ -3920,8 +3889,9 @@ async function drawComparisonGraph() {
 	
 	// Draw data points at key positions with glow and white center
 	methods.forEach(method => {
-		method.points.forEach((point, i) => {
-			if(i % Math.ceil(method.points.length / 8) === 0 || i === method.points.length - 1) {
+		const pts = method.points || [];
+		pts.forEach((point, i) => {
+			if(i % Math.ceil(pts.length / 8) === 0 || i === pts.length - 1) {
 				// outer glow
 				ctx.beginPath();
 				ctx.arc(point.x, point.y, 7, 0, Math.PI * 2);
