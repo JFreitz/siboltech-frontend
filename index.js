@@ -3666,7 +3666,7 @@ document.addEventListener('click', function(e) {
 /* ML prediction modal functions removed - to be replaced with new approach */
 
 // Comparison Graph Functionality
-let currentDays = 14;
+let currentDays = 'all';
 let currentMetric = 'height';
 let graphData = {
 	aeroponic: [],
@@ -3759,12 +3759,27 @@ async function drawComparisonGraph() {
 	const plotW = w - leftPad - rightPad;
 	const plotH = h - topPad - bottomPad;
 	
-	// Fetch real data from API (falls back to mock if no data)
-	const data = await fetchGrowthData(currentDays, currentMetric);
+	// Fetch real data from API
+	let data = await fetchGrowthData(currentDays, currentMetric);
 	graphData = data;
+
+	// If selected window has no rows, auto-fallback to all history once
+	let allValues = [...(data.aeroponic || []), ...(data.dwc || []), ...(data.traditional || [])].filter(v => v !== null && v !== undefined);
+	if (allValues.length === 0 && currentDays !== 'all') {
+		const allData = await fetchGrowthData('all', currentMetric);
+		const allVals = [...(allData.aeroponic || []), ...(allData.dwc || []), ...(allData.traditional || [])].filter(v => v !== null && v !== undefined);
+		if (allVals.length > 0) {
+			data = allData;
+			graphData = allData;
+			allValues = allVals;
+			currentDays = 'all';
+			document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+			document.querySelector('.time-btn[data-days="all"]')?.classList.add('active');
+		}
+	}
 	
 	// Check if we have any data to display
-	const allValues = [...(data.aeroponic || []), ...(data.dwc || []), ...(data.traditional || [])].filter(v => v !== null && v !== undefined);
+	allValues = [...(data.aeroponic || []), ...(data.dwc || []), ...(data.traditional || [])].filter(v => v !== null && v !== undefined);
 	
 	if (allValues.length === 0) {
 		// No data - show message
@@ -3919,10 +3934,24 @@ async function drawComparisonGraph() {
 	ctx.font = '11px Poppins, sans-serif';
 	ctx.textAlign = 'center';
 	const numLabels = 5;
-	for(let i = 0; i <= numLabels; i++) {
-		const x = leftPad + (i / numLabels) * plotW;
-		const day = Math.round((i / numLabels) * currentDays);
-		ctx.fillText(`Day ${day}`, x, h - bottomPad + 20);
+	if (Array.isArray(data.dates) && data.dates.length > 1) {
+		for (let i = 0; i <= numLabels; i++) {
+			const x = leftPad + (i / numLabels) * plotW;
+			const idx = Math.round((i / numLabels) * (data.dates.length - 1));
+			const d = String(data.dates[idx] || '');
+			const label = d.length >= 10 ? d.slice(5) : d;
+			ctx.fillText(label || `P${idx + 1}`, x, h - bottomPad + 20);
+		}
+	} else {
+		for(let i = 0; i <= numLabels; i++) {
+			const x = leftPad + (i / numLabels) * plotW;
+			if (typeof currentDays === 'number') {
+				const day = Math.round((i / numLabels) * currentDays);
+				ctx.fillText(`Day ${day}`, x, h - bottomPad + 20);
+			} else {
+				ctx.fillText(`P${i + 1}`, x, h - bottomPad + 20);
+			}
+		}
 	}
 	
 	// Y-axis label (based on metric)
