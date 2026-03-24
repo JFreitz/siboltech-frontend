@@ -1898,10 +1898,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	function recordSensorValue(sensor, value){
 		const arr = window.sensorSeries[sensor];
-		if(!arr) return;
+		if(!arr || !Number.isFinite(value)) return;
 		arr.push({ t: Date.now(), v: value });
 		// Keep last 288 points (~24h if every 5 min). Trim older.
 		if(arr.length > 288) arr.shift();
+	}
+
+	function getCurrentSensorValue(sensorType, fallbackValue) {
+		const map = {
+			ph: '#val-ph',
+			do: '#val-do',
+			tds: '#val-tds',
+			temp: '#val-temp',
+			hum: '#val-hum'
+		};
+		const selector = map[sensorType];
+		if (!selector) return fallbackValue;
+		const raw = document.querySelector(selector)?.textContent || '';
+		const parsed = parseFloat(String(raw).replace(/[^0-9.+-]/g, ''));
+		return Number.isFinite(parsed) ? parsed : fallbackValue;
 	}
 
 
@@ -1930,21 +1945,29 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		
 		const leftPad = Math.max(35, w * 0.15), rightPad = 8, topPad = 8, bottomPad = 8;
 		
-		// Determine base values based on sensor type
-		let baseVal, unit, currentVal;
-		if(id === 'mini1') { // DO
-			baseVal = 7 + Math.random() * 2;
-			unit = ' mg/L';
-			currentVal = baseVal.toFixed(1);
-		} else if(id === 'mini2') { // pH
-			baseVal = 6 + Math.random() * 0.8;
-			unit = ' pH';
-			currentVal = baseVal.toFixed(2);
-		} else { // Temperature
-			baseVal = 24 + Math.random() * 3;
-			unit = ' °C';
-			currentVal = baseVal.toFixed(1);
+		// Map mini cards to real sensor series
+		const miniConfig = {
+			mini1: { sensor: 'do', unit: ' mg/L', decimals: 1, fallback: 7.0 },
+			mini2: { sensor: 'ph', unit: ' pH', decimals: 2, fallback: 6.0 },
+			mini3: { sensor: 'temp', unit: ' °C', decimals: 1, fallback: 25.0 }
+		};
+		const cfg = miniConfig[id] || miniConfig.mini2;
+		const series = Array.isArray(window.sensorSeries?.[cfg.sensor]) ? window.sensorSeries[cfg.sensor] : [];
+
+		let data = [];
+		let currentValue = getCurrentSensorValue(cfg.sensor, cfg.fallback);
+		if (series.length >= 2) {
+			const startIdx = Math.max(0, series.length - 20);
+			for (let i = startIdx; i < series.length; i++) {
+				data.push(series[i].v);
+			}
+			currentValue = data[data.length - 1];
+		} else {
+			data = Array.from({ length: 20 }, () => currentValue);
 		}
+
+		const unit = cfg.unit;
+		const currentVal = currentValue.toFixed(cfg.decimals);
 		
 		// Update value display
 		const valueEl = document.getElementById(id + '-value');
@@ -1952,9 +1975,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
 			valueEl.textContent = currentVal + unit;
 		}
 		
-		const data = randomWalk(20, baseVal, baseVal * 0.15);
-		const min = Math.min(...data);
-		const max = Math.max(...data);
+		let min = Math.min(...data);
+		let max = Math.max(...data);
+		if (Math.abs(max - min) < 1e-9) {
+			const pad = Math.max(Math.abs(max) * 0.03, cfg.sensor === 'tds' ? 10 : 0.15);
+			min -= pad;
+			max += pad;
+		}
 		const range = max - min || 1;
 
 		// Draw smooth line with gradient fill
@@ -4102,11 +4129,11 @@ function drawSensorGraph(canvasId, sensorType) {
 	
 	const config = sensorConfig[sensorType] || sensorConfig.ph;
 
-	// Prefer live series if available; otherwise generate demo data
+	// Prefer live series if available; otherwise render a stable baseline from current real reading
 	let series = Array.isArray(window.sensorSeries?.[sensorType]) ? window.sensorSeries[sensorType] : [];
 	let data = [];
 	let times = [];
-	if(series && series.length >= 4){
+	if(series && series.length >= 2){
 		// Use the recorded time series
 		const startIdx = Math.max(0, series.length - 48);
 		for(let i = startIdx; i < series.length; i++){
@@ -4114,15 +4141,14 @@ function drawSensorGraph(canvasId, sensorType) {
 			times.push(new Date(series[i].t));
 		}
 	} else {
-		// Fallback: demo data with smooth variation
+		// Fallback: flat baseline from currently displayed real sensor value (no synthetic random walk)
 		const dataPoints = 30;
 		const now = new Date();
+		const baseline = getCurrentSensorValue(sensorType, config.base);
 		for(let i = 0; i < dataPoints; i++) {
 			const time = new Date(now.getTime() - (dataPoints - i - 1) * 1200000);
 			times.push(time);
-			const variation = Math.sin(i * 0.3) * config.range * 0.6;
-			const value = config.base + variation + (Math.random() - 0.5) * config.range * 0.4;
-			data.push(value);
+			data.push(baseline);
 		}
 	}
 	
