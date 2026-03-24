@@ -3250,11 +3250,11 @@ body.prediction-only-mode .pred-subtitle {
     gap:12px;
     margin-top: 50px;
 }
-.sensor[data-key="ph"]{ grid-area: ph; height: 130px;color:#35530a;}
-.sensor[data-key="do"]{ grid-area: do; height: 130px;color:#35530a;}
-.sensor[data-key="temp"]{ grid-area: temp; height: 130px;color:#35530a;}
-.sensor[data-key="hum"]{ grid-area: hum; height: 130px;color:#35530a;}
-.sensor[data-key="tds"]{ grid-area: tds; height: 130px;color:#35530a;}   
+.sensor[data-key="ph"]{ grid-area: ph; min-height: 180px;color:#35530a;}
+.sensor[data-key="do"]{ grid-area: do; min-height: 180px;color:#35530a;}
+.sensor[data-key="temp"]{ grid-area: temp; min-height: 180px;color:#35530a;}
+.sensor[data-key="hum"]{ grid-area: hum; min-height: 180px;color:#35530a;}
+.sensor[data-key="tds"]{ grid-area: tds; min-height: 180px;color:#35530a;}   
 
 .sensor-cards{
     grid-area: header;
@@ -3313,13 +3313,79 @@ body.prediction-only-mode .pred-subtitle {
 .sensor .value{
     font-size:clamp(18px, 2.8vw, 36px);
     font-weight:700;
-    margin-top:-5px;
+    margin-top:-2px;
 	text-align: center;
 	width: 100%;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	
+}
+
+.sensor-info {
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 4px 8px;
+	background: rgba(255,255,255,0.35);
+	border-radius: 8px;
+	border: 1px solid rgba(53, 83, 10, 0.12);
+}
+
+.sensor-line {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+	font-size: 12px;
+	line-height: 1.35;
+}
+
+.sensor-line-label {
+	color: #546b35;
+	font-weight: 600;
+}
+
+.sensor-line-value {
+	color: #2f4a15;
+	font-weight: 600;
+	text-align: right;
+}
+
+.sensor-status {
+	width: 100%;
+	padding: 6px 8px;
+	border-radius: 8px;
+	font-size: 12px;
+	font-weight: 700;
+	text-align: center;
+	background: rgba(245, 247, 240, 0.9);
+	color: #35530a;
+	border: 1px solid rgba(53, 83, 10, 0.2);
+}
+
+.sensor-status.neutral {
+	color: #35530a;
+	border-color: rgba(53, 83, 10, 0.25);
+}
+
+.sensor-status.warning {
+	color: #a26a00;
+	background: rgba(255, 248, 225, 0.95);
+	border-color: rgba(249, 168, 37, 0.35);
+}
+
+.sensor-status.normal {
+	color: #ad5b00;
+	background: rgba(255, 243, 224, 0.95);
+	border-color: rgba(245, 124, 0, 0.35);
+}
+
+.sensor-status.dangerous {
+	color: #c62828;
+	background: rgba(255, 235, 238, 0.95);
+	border-color: rgba(198, 40, 40, 0.35);
 }
 .alert{
 	font-size:18px;

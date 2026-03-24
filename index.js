@@ -168,6 +168,15 @@ document.addEventListener('DOMContentLoaded', () => {
 // Fetch real sensor data from API
 let _lastDataTimestamp = 0;
 const _connectionWatchStartTs = Date.now();
+
+function markSystemHeartbeat() {
+	_lastDataTimestamp = Date.now();
+	updateConnectionStatus(true);
+}
+
+// Expose heartbeat hook so module scripts (Firebase listeners in index.html) can keep watchdog fresh
+window.markSystemHeartbeat = markSystemHeartbeat;
+
 async function fetchSensorData() {
     // Skip if using Firebase real-time (Firebase will push updates)
     if (window.firebaseListenerActive) return;
@@ -179,8 +188,7 @@ async function fetchSensorData() {
         const res = await fetch(`${RELAY_API_URL}/latest`);
         const data = await res.json();
         updateSensorDisplayFromData(data);
-        _lastDataTimestamp = Date.now();
-        updateConnectionStatus(true);
+		markSystemHeartbeat();
     } catch (e) {
         console.log('API fetch error:', e);
         // On error, show zeros
@@ -242,8 +250,7 @@ function initFirebaseListener() {
                 console.log('📡 Firebase update received:', Object.keys(data).filter(k => !k.startsWith('_')).join(', '));
                 updateSensorDisplayFromData(data);
                 window.firebaseListenerActive = true;
-                _lastDataTimestamp = Date.now();
-                updateConnectionStatus(true);
+				markSystemHeartbeat();
             }
         }, (error) => {
             console.error('Firebase listener error:', error);
@@ -303,7 +310,8 @@ window.updateConnectionStatus = updateConnectionStatus;
 // Stale-data watchdog: if no data for 15s, mark disconnected
 setInterval(() => {
 	const basisTs = _lastDataTimestamp || _connectionWatchStartTs;
-	if (Date.now() - basisTs > 15000) {
+	const staleTimeoutMs = window.firebaseListenerActive ? 90000 : 15000;
+	if (Date.now() - basisTs > staleTimeoutMs) {
         updateConnectionStatus(false);
     }
 }, 5000);
@@ -2241,6 +2249,29 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	// Helper function to update all sensor alerts (dashboard, training, etc.)
 	function updateSensorAlert(sensorType, value){
 		const {status, statusClass} = getSensorStatus(sensorType, value);
+		const thresholds = sensorThresholds[sensorType];
+		const recommended = thresholds
+			? formatRangeList(thresholds.ranges.neutral, thresholds.unit)
+			: '-';
+		const statusMsg = {
+			neutral: 'System is stable',
+			warning: 'Monitor and adjust soon',
+			normal: 'Outside optimal range',
+			dangerous: 'Immediate action needed'
+		}[statusClass] || 'Monitoring';
+
+		document.querySelectorAll(`[id="level-${sensorType}"] .sensor-line-value`).forEach(el => {
+			el.textContent = status;
+		});
+		document.querySelectorAll(`[id="recommend-${sensorType}"] .sensor-line-value`).forEach(el => {
+			el.textContent = recommended;
+		});
+		document.querySelectorAll(`[id="status-${sensorType}"]`).forEach(statusEl => {
+			statusEl.textContent = statusMsg;
+			statusEl.className = `sensor-status ${statusClass}`;
+		});
+
+		// Backward compatibility for legacy alert nodes if present
 		document.querySelectorAll(`[id="alert-${sensorType}"]`).forEach(alertEl => {
 			alertEl.textContent = status;
 			alertEl.className = `alert ${statusClass}`;
