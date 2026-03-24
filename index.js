@@ -36,8 +36,10 @@ async function initializeAPIUrl() {
         // For history tab: bypass Firebase to save quota, use API directly
         const remoteAPI = localStorage.getItem('remoteAPIUrl');
         if (remoteAPI) {
-            RELAY_API_URL = remoteAPI;
-            API_BASE_URL = remoteAPI;
+			const trimmed = String(remoteAPI).trim().replace(/\/+$/, '');
+			const normalized = /\/api$/i.test(trimmed) ? trimmed : `${trimmed}/api`;
+			RELAY_API_URL = normalized;
+			API_BASE_URL = normalized;
             console.log('Using remote API for history (quota optimization):', RELAY_API_URL);
         } else {
             console.log('Using Firebase for sensor data (no remote API configured)');
@@ -3712,9 +3714,33 @@ async function fetchGrowthData(days, metric) {
 	
 	try {
 		const daysParam = days === 'all' ? 'all' : days;
-		const res = await fetch(`${RELAY_API_URL}/growth-comparison?metric=${metric}&days=${daysParam}`);
-		if (!res.ok) throw new Error('API error');
-		const data = await res.json();
+		const endpoint = `growth-comparison?metric=${encodeURIComponent(metric)}&days=${encodeURIComponent(daysParam)}`;
+		const baseCandidates = [];
+		if (RELAY_API_URL) baseCandidates.push(String(RELAY_API_URL).replace(/\/+$/, ''));
+		baseCandidates.push('/api');
+
+		const uniqBases = [...new Set(baseCandidates)];
+		let data = null;
+		let lastErr = null;
+
+		for (const base of uniqBases) {
+			try {
+				const url = `${base}/${endpoint}`;
+				const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+				if (!res.ok) throw new Error(`HTTP ${res.status}`);
+				const ct = (res.headers.get('content-type') || '').toLowerCase();
+				if (!ct.includes('application/json')) {
+					const bodyPreview = (await res.text()).slice(0, 40);
+					throw new Error(`Non-JSON response: ${bodyPreview}`);
+				}
+				data = await res.json();
+				break;
+			} catch (err) {
+				lastErr = err;
+			}
+		}
+
+		if (!data) throw (lastErr || new Error('API error'));
 		
 		if (data.success && data.dates && data.dates.length > 0) {
 			const result = {
