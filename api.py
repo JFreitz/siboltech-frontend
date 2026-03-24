@@ -1111,7 +1111,8 @@ def predict_plant_growth():
     try:
         data = request.get_json()
         date_str = data.get('date')
-        plant_id = int(data.get('plant_id', 1))
+        requested_plant_id = int(data.get('plant_id', 6))
+        plant_id = 6  # New ML flow predicts Plant 6 only
         farming_system = data.get('farming_system', 'dwc')
         actual_values = data.get('actual_values', {})
         
@@ -1171,10 +1172,10 @@ def predict_plant_growth():
         
         # Load predictor and make predictions
         predictor = PlantGrowthPredictor()
-        if not predictor.is_available():
+        if not predictor.is_available(farming_system):
             return jsonify({
                 "success": False,
-                "error": "ML models not available",
+                "error": f"ML models not available for system: {farming_system}",
                 "available": False
             }), 503
         
@@ -1190,6 +1191,7 @@ def predict_plant_growth():
             "success": True,
             "date": date_str,
             "plant_id": plant_id,
+            "requested_plant_id": requested_plant_id,
             "farming_system": farming_system,
             "sensor_data_used": sensor_data,
             "predictions": predictions,

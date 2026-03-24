@@ -5450,6 +5450,13 @@ document.addEventListener('DOMContentLoaded', () => {
 		const dateInput = document.getElementById('predDate');
 		if (dateInput) dateInput.value = today;
 
+		// New ML flow: Plant 6 only
+		const plantSel = document.getElementById('predPlantId');
+		if (plantSel) {
+			plantSel.value = '6';
+			plantSel.disabled = true;
+		}
+
 		// Run prediction button
 		const runBtn = document.getElementById('runPredictionBtn');
 		if (runBtn) runBtn.addEventListener('click', () => runPrediction(false));
@@ -5553,7 +5560,7 @@ document.addEventListener('DOMContentLoaded', () => {
 	async function runPrediction(requireActualValues = false) {
 		const date = document.getElementById('predDate').value;
 		const farmingSystem = document.getElementById('predFarmingSystem').value;
-		const plantId = parseInt(document.getElementById('predPlantId').value);
+		const plantId = 6;
 		const actualValues = getActualValues();
 
 		// Validate inputs
