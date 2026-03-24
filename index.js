@@ -5457,6 +5457,16 @@ document.addEventListener('DOMContentLoaded', () => {
 			plantSel.disabled = true;
 		}
 
+		const manualToggle = document.getElementById('useManualSensorToggle');
+		const manualPanel = document.getElementById('manualSensorPanel');
+		if (manualToggle && manualPanel) {
+			const syncManualPanel = () => {
+				manualPanel.style.display = manualToggle.checked ? 'grid' : 'none';
+			};
+			manualToggle.addEventListener('change', syncManualPanel);
+			syncManualPanel();
+		}
+
 		// Run prediction button
 		const runBtn = document.getElementById('runPredictionBtn');
 		if (runBtn) runBtn.addEventListener('click', () => runPrediction(false));
@@ -5489,6 +5499,34 @@ document.addEventListener('DOMContentLoaded', () => {
 		if (leaves) values.leaves = parseInt(leaves);
 		if (branches) values.branches = parseInt(branches);
 		return Object.keys(values).length > 0 ? values : null;
+	}
+
+	function getManualSensorValues() {
+		const enabled = !!document.getElementById('useManualSensorToggle')?.checked;
+		if (!enabled) return { enabled: false, data: null, error: null };
+
+		const fields = [
+			{ id: 'manualPH', key: 'ave_ph', label: 'pH' },
+			{ id: 'manualDO', key: 'ave_do', label: 'DO' },
+			{ id: 'manualTDS', key: 'ave_tds', label: 'TDS' },
+			{ id: 'manualTemp', key: 'ave_temp', label: 'Temperature' },
+			{ id: 'manualHumidity', key: 'ave_humidity', label: 'Humidity' }
+		];
+
+		const data = {};
+		for (const f of fields) {
+			const raw = document.getElementById(f.id)?.value;
+			if (raw === undefined || raw === null || String(raw).trim() === '') {
+				return { enabled: true, data: null, error: `Please fill ${f.label} for manual sensor mode.` };
+			}
+			const val = parseFloat(raw);
+			if (Number.isNaN(val)) {
+				return { enabled: true, data: null, error: `Invalid ${f.label} value.` };
+			}
+			data[f.key] = val;
+		}
+
+		return { enabled: true, data, error: null };
 	}
 
 	async function showHistoryModal() {
@@ -5562,6 +5600,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		const farmingSystem = document.getElementById('predFarmingSystem').value;
 		const plantId = 6;
 		const actualValues = getActualValues();
+		const manualSensors = getManualSensorValues();
 
 		// Validate inputs
 		if (!date || !farmingSystem || !plantId) {
@@ -5571,6 +5610,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 		if (requireActualValues && !actualValues) {
 			alert('❌ Please add at least one actual plant measurement first.');
+			return;
+		}
+
+		if (manualSensors.error) {
+			alert('❌ ' + manualSensors.error);
 			return;
 		}
 
@@ -5593,7 +5637,9 @@ document.addEventListener('DOMContentLoaded', () => {
 					date: date,
 					plant_id: plantId,
 					farming_system: farmingSystem,
-					actual_values: actualValues
+					actual_values: actualValues,
+					sensor_data: manualSensors.data,
+					use_manual_sensor_data: manualSensors.enabled
 				})
 			});
 

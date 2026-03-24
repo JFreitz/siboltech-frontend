@@ -566,6 +566,40 @@
 					</div>
 				</div>
 
+				<!-- Optional Manual Sensor Input Section -->
+				<div class="pred-form-card">
+					<h3>Sensor Input Source <span class="optional">(Optional)</span></h3>
+					<p class="helper-text">Default uses daily averaged sensor data. Enable manual input to override.</p>
+					<div class="form-group" style="margin-bottom: 12px;">
+						<label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+							<input type="checkbox" id="useManualSensorToggle" />
+							<span>Use manual sensor values</span>
+						</label>
+					</div>
+					<div id="manualSensorPanel" class="actual-values-grid" style="display:none;">
+						<div class="input-field">
+							<label>pH</label>
+							<input type="number" id="manualPH" step="0.01" placeholder="e.g. 6.50" />
+						</div>
+						<div class="input-field">
+							<label>DO (mg/L)</label>
+							<input type="number" id="manualDO" step="0.01" placeholder="e.g. 7.20" />
+						</div>
+						<div class="input-field">
+							<label>TDS (ppm)</label>
+							<input type="number" id="manualTDS" step="0.1" placeholder="e.g. 650" />
+						</div>
+						<div class="input-field">
+							<label>Temp (°C)</label>
+							<input type="number" id="manualTemp" step="0.1" placeholder="e.g. 24.5" />
+						</div>
+						<div class="input-field">
+							<label>Humidity (%)</label>
+							<input type="number" id="manualHumidity" step="0.1" placeholder="e.g. 65" />
+						</div>
+					</div>
+				</div>
+
 				<!-- Optional Actual Values Section -->
 				<div class="pred-form-card">
 					<h3>Actual Measurements <span class="optional">(Optional)</span></h3>
@@ -1257,7 +1291,7 @@
 		<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 		
 		<!-- Load main app JS first -->
-		<script src="index.js?v=2.2"></script>
+		<script src="index.js?v=2.3"></script>
 		
 		<!-- Firebase SDK - load after index.js so listeners are ready -->
 		<script type="module">

@@ -1115,6 +1115,7 @@ def predict_plant_growth():
         plant_id = 6  # New ML flow predicts Plant 6 only
         farming_system = data.get('farming_system', 'dwc')
         actual_values = data.get('actual_values', {})
+        manual_sensor_data = data.get('sensor_data') if isinstance(data.get('sensor_data'), dict) else None
         
         # Parse date
         try:
@@ -1128,47 +1129,64 @@ def predict_plant_growth():
         date_only = date_obj.strftime("%Y-%m-%d")
 
         sensor_data = {}
-        sensor_map = {
-            'ave_ph': ['ph'],
-            'ave_do': ['do_mg_per_l', 'do_mg_l'],
-            'ave_tds': ['tds_ppm'],
-            'ave_temp': ['temperature_c'],
-            'ave_humidity': ['humidity']
-        }
+        sensor_source = "daily_average"
 
-        with Session() as session:
-            for key, sensor_names in sensor_map.items():
-                if key == 'ave_do':
-                    # Support both historical naming conventions for DO sensor
-                    result = session.execute(text("""
-                        SELECT AVG(value)
-                        FROM sensor_readings
-                        WHERE date(timestamp) = :date_only
-                          AND sensor IN ('do_mg_per_l', 'do_mg_l')
-                    """), {"date_only": date_only}).fetchone()
-                else:
-                    result = session.execute(text("""
-                        SELECT AVG(value)
-                        FROM sensor_readings
-                        WHERE date(timestamp) = :date_only
-                          AND sensor = :sensor_name
-                    """), {
-                        "date_only": date_only,
-                        "sensor_name": sensor_names[0]
-                    }).fetchone()
-
-                if result and result[0] is not None:
-                    sensor_data[key] = float(result[0])
-        
-        # If no sensor data found, use defaults
-        if not sensor_data:
-            sensor_data = {
-                'ave_ph': 6.5,
-                'ave_do': 5.0,
-                'ave_tds': 600,
-                'ave_temp': 24,
-                'ave_humidity': 60
+        if manual_sensor_data:
+            # Manual override from frontend
+            try:
+                sensor_data = {
+                    'ave_ph': float(manual_sensor_data.get('ave_ph')),
+                    'ave_do': float(manual_sensor_data.get('ave_do')),
+                    'ave_tds': float(manual_sensor_data.get('ave_tds')),
+                    'ave_temp': float(manual_sensor_data.get('ave_temp')),
+                    'ave_humidity': float(manual_sensor_data.get('ave_humidity')),
+                }
+                sensor_source = "manual"
+            except Exception:
+                return jsonify({"success": False, "error": "Invalid manual sensor_data payload"}), 400
+        else:
+            sensor_map = {
+                'ave_ph': ['ph'],
+                'ave_do': ['do_mg_per_l', 'do_mg_l'],
+                'ave_tds': ['tds_ppm'],
+                'ave_temp': ['temperature_c'],
+                'ave_humidity': ['humidity']
             }
+
+            with Session() as session:
+                for key, sensor_names in sensor_map.items():
+                    if key == 'ave_do':
+                        # Support both historical naming conventions for DO sensor
+                        result = session.execute(text("""
+                            SELECT AVG(value)
+                            FROM sensor_readings
+                            WHERE date(timestamp) = :date_only
+                              AND sensor IN ('do_mg_per_l', 'do_mg_l')
+                        """), {"date_only": date_only}).fetchone()
+                    else:
+                        result = session.execute(text("""
+                            SELECT AVG(value)
+                            FROM sensor_readings
+                            WHERE date(timestamp) = :date_only
+                              AND sensor = :sensor_name
+                        """), {
+                            "date_only": date_only,
+                            "sensor_name": sensor_names[0]
+                        }).fetchone()
+
+                    if result and result[0] is not None:
+                        sensor_data[key] = float(result[0])
+
+            # If no sensor data found, use defaults
+            if not sensor_data:
+                sensor_data = {
+                    'ave_ph': 6.5,
+                    'ave_do': 5.0,
+                    'ave_tds': 600,
+                    'ave_temp': 24,
+                    'ave_humidity': 60
+                }
+                sensor_source = "default"
         
         # Load predictor and make predictions
         predictor = PlantGrowthPredictor()
@@ -1194,6 +1212,7 @@ def predict_plant_growth():
             "requested_plant_id": requested_plant_id,
             "farming_system": farming_system,
             "sensor_data_used": sensor_data,
+            "sensor_data_source": sensor_source,
             "predictions": predictions,
             "actual_values": actual_values if actual_values else None
         }
