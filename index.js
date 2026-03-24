@@ -5479,6 +5479,10 @@ document.addEventListener('DOMContentLoaded', () => {
 		const historyBtn = document.getElementById('showHistoryBtn');
 		if (historyBtn) historyBtn.addEventListener('click', showHistoryModal);
 
+		// Download all predictions CSV
+		const downloadBtn = document.getElementById('downloadPredictionHistoryBtn');
+		if (downloadBtn) downloadBtn.addEventListener('click', downloadAllPredictionsCsv);
+
 		// History modal close
 		const closeBtn = document.getElementById('closePredDetail');
 		if (closeBtn) closeBtn.addEventListener('click', closeDetailModal);
@@ -5942,6 +5946,80 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	function closeDetailModal() {
 		document.getElementById('predictionDetailModal').style.display = 'none';
+	}
+
+	async function downloadAllPredictionsCsv() {
+		try {
+			const apiBase = getPredictionApiBase();
+			if (isStaticPublicHost(window.location.hostname) && apiBase === window.location.origin) {
+				throw new Error('Prediction history API is local-only. Open dashboard on local LAN IP.');
+			}
+
+			const response = await fetch(`${apiBase}/api/predictions/history?limit=10000`);
+			const data = await response.json();
+			if (!data.success || !Array.isArray(data.predictions) || data.predictions.length === 0) {
+				alert('No prediction history to download.');
+				return;
+			}
+
+			const headers = [
+				'id', 'timestamp', 'prediction_date', 'plant_id', 'farming_system',
+				'ave_ph', 'ave_do', 'ave_tds', 'ave_temp', 'ave_humidity',
+				'pred_height', 'pred_length', 'pred_weight', 'pred_leaves', 'pred_branches',
+				'act_height', 'act_length', 'act_weight', 'act_leaves', 'act_branches',
+				'err_height', 'err_length', 'err_weight', 'err_leaves', 'err_branches',
+				'errpct_height', 'errpct_length', 'errpct_weight', 'errpct_leaves', 'errpct_branches'
+			];
+
+			const esc = (v) => {
+				if (v === null || v === undefined) return '';
+				const s = String(v);
+				if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+					return `"${s.replace(/"/g, '""')}"`;
+				}
+				return s;
+			};
+
+			const rows = data.predictions.map((p) => {
+				const sd = p.sensor_data || {};
+				const pr = p.predictions || {};
+				const av = p.actual_values || {};
+				const cp = p.comparison || {};
+
+				const g = (obj, key, subKey = null) => {
+					const val = obj ? obj[key] : undefined;
+					if (subKey && val && typeof val === 'object') return val[subKey];
+					return val;
+				};
+
+				return [
+					p.id,
+					p.timestamp,
+					p.prediction_date,
+					p.plant_id,
+					p.farming_system,
+					g(sd, 'ave_ph'), g(sd, 'ave_do'), g(sd, 'ave_tds'), g(sd, 'ave_temp'), g(sd, 'ave_humidity'),
+					g(pr, 'height'), g(pr, 'length'), g(pr, 'weight'), g(pr, 'leaves'), g(pr, 'branches'),
+					g(av, 'height'), g(av, 'length'), g(av, 'weight'), g(av, 'leaves'), g(av, 'branches'),
+					g(cp, 'height', 'error'), g(cp, 'length', 'error'), g(cp, 'weight', 'error'), g(cp, 'leaves', 'error'), g(cp, 'branches', 'error'),
+					g(cp, 'height', 'error_percent'), g(cp, 'length', 'error_percent'), g(cp, 'weight', 'error_percent'), g(cp, 'leaves', 'error_percent'), g(cp, 'branches', 'error_percent')
+				];
+			});
+
+			const csvLines = [headers.map(esc).join(',')].concat(rows.map(r => r.map(esc).join(',')));
+			const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `prediction_history_${new Date().toISOString().slice(0,10)}.csv`;
+			document.body.appendChild(a);
+			a.click();
+			a.remove();
+			URL.revokeObjectURL(url);
+		} catch (error) {
+			console.error('[Prediction] Download CSV error:', error);
+			alert('Could not download predictions CSV: ' + error.message);
+		}
 	}
 
 	// Close modal when clicking outside
