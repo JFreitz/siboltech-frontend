@@ -2,6 +2,7 @@
 // Using Firebase Firestore for real-time sensor data
 let RELAY_API_URL = window.location.origin + '/api';  // For local LAN access
 let API_BASE_URL = window.location.origin + '/api';   // Alias for compatibility
+const RPI_LAN_API_URL = 'http://192.168.100.72:5000/api';
 
 // Check if we're on local network (RPi LAN)
 function isLocalAccess() {
@@ -38,11 +39,21 @@ async function initializeAPIUrl() {
         if (remoteAPI) {
 			const trimmed = String(remoteAPI).trim().replace(/\/+$/, '');
 			const normalized = /\/api$/i.test(trimmed) ? trimmed : `${trimmed}/api`;
-			RELAY_API_URL = normalized;
-			API_BASE_URL = normalized;
-            console.log('Using remote API for history (quota optimization):', RELAY_API_URL);
+			// Guard against accidentally using same-origin static site URL (returns HTML, not JSON API)
+			if (normalized.startsWith(window.location.origin)) {
+				console.warn('Ignoring same-origin remoteAPIUrl because it is likely static HTML:', normalized);
+				RELAY_API_URL = RPI_LAN_API_URL;
+				API_BASE_URL = RPI_LAN_API_URL;
+				console.log('Falling back to LAN API URL:', RELAY_API_URL);
+			} else {
+				RELAY_API_URL = normalized;
+				API_BASE_URL = normalized;
+				console.log('Using remote API for history (quota optimization):', RELAY_API_URL);
+			}
         } else {
-            console.log('Using Firebase for sensor data (no remote API configured)');
+			RELAY_API_URL = RPI_LAN_API_URL;
+			API_BASE_URL = RPI_LAN_API_URL;
+			console.log('Using LAN API fallback for history:', RELAY_API_URL);
         }
     }
 }
@@ -3717,6 +3728,11 @@ async function fetchGrowthData(days, metric) {
 		const endpoint = `growth-comparison?metric=${encodeURIComponent(metric)}&days=${encodeURIComponent(daysParam)}`;
 		const baseCandidates = [];
 		if (RELAY_API_URL) baseCandidates.push(String(RELAY_API_URL).replace(/\/+$/, ''));
+		if (API_BASE_URL) baseCandidates.push(String(API_BASE_URL).replace(/\/+$/, ''));
+		if (isLocalAccess()) {
+			baseCandidates.push(`${window.location.protocol}//${window.location.hostname}:5000/api`);
+		}
+		baseCandidates.push(RPI_LAN_API_URL);
 		baseCandidates.push('/api');
 
 		const uniqBases = [...new Set(baseCandidates)];
