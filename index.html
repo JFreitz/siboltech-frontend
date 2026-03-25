@@ -1181,29 +1181,82 @@
 		</section>
 
 		<section id="manual" class="tab-content">
-			<div class="serial-console-card">
-				<div class="serial-console-header">
-					<h2>🖥️ ESP32 Serial Monitor</h2>
-					<div class="serial-controls">
-						<span id="serialStatus" class="serial-status disconnected">● Disconnected</span>
-						<button id="serialPauseBtn" class="serial-btn" title="Pause/Resume">⏸️</button>
-						<button id="serialClearBtn" class="serial-btn" title="Clear">🗑️</button>
-						<label class="serial-autoscroll">
-							<input type="checkbox" id="serialAutoScroll" checked> Auto-scroll
-						</label>
-					</div>
+			<div class="pred-form-card" style="max-width: 1100px; margin: 0 auto;">
+				<div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+					<h2 style="margin:0;">📘 SIBOLTECH User Manual</h2>
+					<a href="https://github.com/JFreitz/siboltech-frontend/blob/master/SIBOLTECH%20MANUAL.txt" target="_blank" rel="noopener" class="btn btn-secondary" style="text-decoration:none;">Open Source Manual</a>
 				</div>
-				<div id="serialOutput" class="serial-output"></div>
-				<div class="serial-input-row">
-					<input type="text" id="serialCmdInput" class="serial-cmd-input" placeholder="Type command (STATUS, HELP, R1 ON, R2 OFF, ALL ON...)" autocomplete="off">
-					<button id="serialSendBtn" class="serial-send-btn">Send</button>
-				</div>
-				<div class="serial-quick-cmds">
-					<span class="quick-cmd-label">Quick:</span>
-					<button class="serial-quick-btn" data-cmd="STATUS">STATUS</button>
-					<button class="serial-quick-btn" data-cmd="HELP">HELP</button>
-					<button class="serial-quick-btn" data-cmd="ALL ON">ALL ON</button>
-					<button class="serial-quick-btn" data-cmd="ALL OFF">ALL OFF</button>
+				<p class="helper-text" style="margin-top:8px;">Reference guide for dashboard usage, prediction workflow, growth graphs, calibration, and history.</p>
+
+				<div style="max-height: 70vh; overflow:auto; padding: 10px 4px 4px 4px; line-height:1.6;">
+					<h3>DASHBOARD</h3>
+					<p>The dashboard shows real-time sensor readings, actuator status, and nutrient controls.</p>
+
+					<h4>1) Sensor Readings</h4>
+					<ul>
+						<li>Status: Normal, Warning, Critical</li>
+						<li>Level: deviation from normal conditions</li>
+						<li>Recommendation: suggested corrective action</li>
+						<li>Numerical Value: live sensor value</li>
+					</ul>
+					<p><strong>Automation behavior:</strong> Warning = no automation trigger, Critical = automation may activate.</p>
+
+					<h4>Sensor Threshold Summary</h4>
+					<ul>
+						<li><strong>pH:</strong> &lt;5.5 Critical, 5.5–5.8 Warning, 5.8–6.2 Normal, 6.2–7 Warning, &gt;7 Critical</li>
+						<li><strong>DO:</strong> &lt;5 Critical, below optimal Warning, optimal Normal</li>
+						<li><strong>Temperature:</strong> &gt;30°C Critical, 28–29°C Warning, 19–27°C Normal, 15–18°C Warning, &lt;15°C Critical</li>
+						<li><strong>Humidity:</strong> &gt;80% Critical, 70–79% Warning, 50–70% Normal, 40–49% Warning, &lt;30% Critical</li>
+						<li><strong>TDS:</strong> &lt;500 Critical, 500–700 Warning, 700–1400 Normal, &gt;1400 Critical</li>
+					</ul>
+
+					<h4>2) Actuator Status</h4>
+					<ul>
+						<li>Air Pump, Exhaust Fan In/Out, Grow Lights (Aero/DWC)</li>
+						<li>Switches auto-sync to actual relay state</li>
+						<li><strong>Override mode:</strong> when enabled, system follows automated behavior only</li>
+					</ul>
+
+					<h4>3) Nutrient Solution Controls</h4>
+					<ul>
+						<li>pH Up: dispenses 1 mL/sec</li>
+						<li>pH Down: dispenses 1 mL/sec</li>
+						<li>Leafy Green: activates for 1 minute</li>
+						<li>Misting Pump: activates misting system</li>
+					</ul>
+
+					<h3>PREDICTION</h3>
+					<ol>
+						<li>Select <strong>Plant, Growing Method, Date</strong></li>
+						<li>(Optional) Enter actual measurements: Height, Length, Weight, Leaves, Branches</li>
+						<li>Use <strong>Run Prediction (Sensors Only)</strong> or <strong>Save Actual + Predict</strong></li>
+						<li>Use <strong>See All Predictions</strong> for saved records</li>
+					</ol>
+
+					<h3>SENSOR READINGS</h3>
+					<p>Line charts display sensor values over time.</p>
+
+					<h3>GROWTH STATE</h3>
+					<ul>
+						<li>Metrics: Height, Weight, Length, Leaves, Branches</li>
+						<li>Intervals: 1 Day, 14 Days, All Records</li>
+						<li>Legend: Green = Aeroponics, Blue = DWC, Orange = Traditional</li>
+					</ul>
+
+					<h3>CALIBRATION</h3>
+					<p>Enable Calibration Mode first to temporarily disable automation.</p>
+					<ul>
+						<li><strong>pH:</strong> 2-point or 3-point, capture pH 4.00 / 6.86 / optional 9.18, apply calibration</li>
+						<li><strong>DO:</strong> 1-point (100%) or 2-point (100% + 0%), apply calibration</li>
+						<li><strong>TDS:</strong> 1-point or 2-point, input known ppm, capture, apply calibration</li>
+					</ul>
+
+					<h3>HISTORY</h3>
+					<ul>
+						<li>Plant History: Aeroponics / DWC / Traditional</li>
+						<li>View modes: Daily or 15-minute</li>
+						<li>Tables include timestamps, sensor readings, plant readings, and actuator events</li>
+					</ul>
 				</div>
 			</div>
 		</section>
