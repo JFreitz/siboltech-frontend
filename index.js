@@ -4808,22 +4808,58 @@ function updateMiniCharts(){
         let data = {};
         
         if (isStaticHosting()) {
-            // Read voltage from Firebase latest sensor data
-            const sensorData = window.latestSensorData;
-            if (!sensorData) return;
-            
-            // Map Firebase sensor keys to calibration sensor names
-            const voltageMap = {
-                ph: sensorData.ph?.raw_voltage,
-                do: sensorData.do_mg_l?.raw_voltage,
-                tds: sensorData.tds_ppm?.raw_voltage
-            };
-            
-            for (const sensor of ['ph', 'do', 'tds']) {
-                if (voltageMap[sensor] !== undefined && voltageMap[sensor] !== null) {
-                    data[sensor] = { voltage: voltageMap[sensor] };
-                }
-            }
+			// Read voltage from Firebase latest sensor data first.
+			// Fallback to API /voltage if raw fields are missing.
+			const sensorData = window.latestSensorData || {};
+
+			const pickVoltage = (...vals) => {
+				for (const v of vals) {
+					if (v !== undefined && v !== null && !Number.isNaN(Number(v))) {
+						return Number(v);
+					}
+				}
+				return null;
+			};
+
+			const voltageMap = {
+				ph: pickVoltage(
+					sensorData.ph?.raw_voltage,
+					sensorData.ph?.voltage,
+					sensorData.ph_voltage_v?.value,
+					sensorData.ph_voltage_v
+				),
+				do: pickVoltage(
+					sensorData.do_mg_per_l?.raw_voltage,
+					sensorData.do_mg_l?.raw_voltage,
+					sensorData.do_mg_per_l?.voltage,
+					sensorData.do_mg_l?.voltage,
+					sensorData.do_voltage_v?.value,
+					sensorData.do_voltage_v
+				),
+				tds: pickVoltage(
+					sensorData.tds_ppm?.raw_voltage,
+					sensorData.tds_ppm?.voltage,
+					sensorData.tds_voltage_v?.value,
+					sensorData.tds_voltage_v
+				)
+			};
+
+			for (const sensor of ['ph', 'do', 'tds']) {
+				if (voltageMap[sensor] !== null) {
+					data[sensor] = { voltage: voltageMap[sensor] };
+				}
+			}
+
+			// If Firebase payload doesn't contain raw voltages, try backend voltage endpoint.
+			if (!data.ph && !data.do && !data.tds) {
+				try {
+					const res = await fetch(`${getApiUrl()}/voltage`);
+					data = await res.json();
+				} catch (e) {
+					console.error('Failed to fetch voltage fallback:', e);
+					return;
+				}
+			}
         } else {
             try {
                 const res = await fetch(`${getApiUrl()}/voltage`);
