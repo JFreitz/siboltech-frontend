@@ -4840,15 +4840,22 @@ function updateMiniCharts(){
 				return Number.isFinite(n) ? n : null;
 			};
 			return {
-				ph: { voltage: getVal(payload.ph_voltage_v) },
-				do: { voltage: getVal(payload.do_voltage_v) },
-				tds: { voltage: getVal(payload.tds_voltage_v) },
+				ph: { voltage: getVal(payload.ph_voltage_v), timestamp: payload.ph_voltage_v?.timestamp || null },
+				do: { voltage: getVal(payload.do_voltage_v), timestamp: payload.do_voltage_v?.timestamp || null },
+				tds: { voltage: getVal(payload.tds_voltage_v), timestamp: payload.tds_voltage_v?.timestamp || null },
 			};
+		};
+
+		const isFreshTs = (ts) => {
+			if (!ts) return false;
+			const t = new Date(ts).getTime();
+			if (!Number.isFinite(t)) return false;
+			return (Date.now() - t) <= 12000;
 		};
         
         if (isStaticHosting()) {
-			// Read voltage from Firebase latest sensor data first.
-			// Fallback to API /voltage if raw fields are missing.
+			// On static hosting, prefer backend /voltage first (real ESP values).
+			// Only fallback to Firebase raw voltage fields if backend is unreachable.
 			const sensorData = window.latestSensorData || {};
 
 			const pickVoltage = (...vals) => {
@@ -4883,13 +4890,46 @@ function updateMiniCharts(){
 				)
 			};
 
-			for (const sensor of ['ph', 'do', 'tds']) {
-				if (voltageMap[sensor] !== null) {
-					data[sensor] = { voltage: voltageMap[sensor] };
+			// 1) Try backend endpoint first.
+			try {
+				const voltageUrl = `${getApiUrl()}/voltage?_ts=${Date.now()}`;
+				if (!isMixedContentBlocked(voltageUrl)) {
+					const res = await fetch(voltageUrl, { cache: 'no-store' });
+					if (res.ok) {
+						const ct = (res.headers.get('content-type') || '').toLowerCase();
+						if (ct.includes('application/json')) {
+							data = await res.json();
+						}
+					}
+				}
+			} catch (e) {
+				// Ignore and continue with Firebase fallback.
+			}
+
+			// 2) Fallback to Firebase raw voltages only if backend did not return usable values.
+			if (!data.ph && !data.do && !data.tds) {
+				for (const sensor of ['ph', 'do', 'tds']) {
+					if (voltageMap[sensor] !== null) {
+						data[sensor] = { voltage: voltageMap[sensor], timestamp: null };
+					}
 				}
 			}
 
-			// If Firebase payload doesn't contain raw voltages, try backend voltage endpoint.
+			// 3) Secondary fallback: direct voltage keys in latest payload.
+			if (!data.ph && !data.do && !data.tds) {
+				const mapped = mapFromLatestPayload(sensorData);
+				if (mapped.ph.voltage !== null || mapped.do.voltage !== null || mapped.tds.voltage !== null) {
+					data = mapped;
+				}
+			}
+
+			// Reject stale voltage from backend payload.
+			for (const sensor of ['ph', 'do', 'tds']) {
+				if (data[sensor]?.voltage !== undefined && data[sensor]?.timestamp && !isFreshTs(data[sensor].timestamp)) {
+					delete data[sensor];
+				}
+			}
+
 			if (!data.ph && !data.do && !data.tds) {
 				try {
 					const voltageUrl = `${getApiUrl()}/voltage?_ts=${Date.now()}`;
@@ -4908,20 +4948,18 @@ function updateMiniCharts(){
 					// Ignore fallback errors on static hosting to avoid console spam.
 				}
 			}
-
-			// Secondary fallback: map direct voltage sensors from latest payload.
-			if (!data.ph && !data.do && !data.tds) {
-				const mapped = mapFromLatestPayload(sensorData);
-				if (mapped.ph.voltage !== null || mapped.do.voltage !== null || mapped.tds.voltage !== null) {
-					data = mapped;
-				}
-			}
         } else {
             try {
 				const base = getApiUrl();
 				const res = await fetch(`${base}/voltage?_ts=${Date.now()}`, { cache: 'no-store' });
 				if (res.ok) {
 					data = await res.json();
+				}
+
+				for (const sensor of ['ph', 'do', 'tds']) {
+					if (data[sensor]?.voltage !== undefined && data[sensor]?.timestamp && !isFreshTs(data[sensor].timestamp)) {
+						delete data[sensor];
+					}
 				}
 
 				// Fallback to /latest voltage sensor keys
@@ -4945,10 +4983,17 @@ function updateMiniCharts(){
             const stabilityEl = document.getElementById(`${sensor}Stability`);
             
             if (data[sensor]?.voltage !== undefined) {
-                // Apply smoothing for stable display
-                const smoothed = smoothVoltage(sensor, data[sensor].voltage);
-                calState[sensor].voltage = smoothed;
-                if (el) el.textContent = `${(smoothed * 1000).toFixed(1)} mV`;
+				// Use raw live voltage (no estimation, no averaging)
+				const rawVoltage = Number(data[sensor].voltage);
+				if (!Number.isFinite(rawVoltage)) {
+					continue;
+				}
+				calState[sensor].history.push(rawVoltage);
+				if (calState[sensor].history.length > VOLTAGE_HISTORY_SIZE) {
+					calState[sensor].history.shift();
+				}
+				calState[sensor].voltage = rawVoltage;
+				if (el) el.textContent = `${(rawVoltage * 1000).toFixed(1)} mV`;
 				markVoltageUpdate();
                 
                 // Update stability indicator
