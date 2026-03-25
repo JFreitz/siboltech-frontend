@@ -331,6 +331,46 @@ def get_latest():
     return jsonify(data)
 
 
+@app.route("/api/voltage")
+def get_voltage():
+    """Get latest probe voltages for calibration tab (ph/do/tds)."""
+    with Session() as session:
+        result = session.execute(text("""
+            SELECT sensor, value, timestamp
+            FROM sensor_readings
+            WHERE sensor IN ('ph_voltage_v', 'do_voltage_v', 'tds_voltage_v')
+              AND (sensor, timestamp) IN (
+                SELECT sensor, MAX(timestamp)
+                FROM sensor_readings
+                WHERE sensor IN ('ph_voltage_v', 'do_voltage_v', 'tds_voltage_v')
+                GROUP BY sensor
+            )
+        """)).fetchall()
+
+    mapped = {
+        'ph_voltage_v': 'ph',
+        'do_voltage_v': 'do',
+        'tds_voltage_v': 'tds',
+    }
+
+    data = {
+        'ph': {'voltage': None, 'timestamp': None},
+        'do': {'voltage': None, 'timestamp': None},
+        'tds': {'voltage': None, 'timestamp': None},
+    }
+
+    for sensor, value, ts in result:
+        key = mapped.get(sensor)
+        if not key:
+            continue
+        data[key] = {
+            'voltage': float(value) if value is not None else None,
+            'timestamp': str(ts) if ts is not None else None,
+        }
+
+    return jsonify(data)
+
+
 # ==================== RELAY CONTROL ====================
 @app.route("/api/relay/pending")
 def relay_pending():
