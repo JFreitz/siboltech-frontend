@@ -23,6 +23,10 @@ function isStaticHosting() {
            host.includes('pages.dev');
 }
 
+function isMixedContentBlocked(url) {
+	return window.location.protocol === 'https:' && String(url || '').startsWith('http://');
+}
+
 // Initialize - Firebase will handle data via the module in index.html
 async function initializeAPIUrl() {
     if (isLocalAccess()) {
@@ -42,17 +46,17 @@ async function initializeAPIUrl() {
 			// Guard against accidentally using same-origin static site URL (returns HTML, not JSON API)
 			if (normalized.startsWith(window.location.origin)) {
 				console.warn('Ignoring same-origin remoteAPIUrl because it is likely static HTML:', normalized);
-				RELAY_API_URL = RPI_LAN_API_URL;
-				API_BASE_URL = RPI_LAN_API_URL;
-				console.log('Falling back to LAN API URL:', RELAY_API_URL);
+				RELAY_API_URL = isMixedContentBlocked(RPI_LAN_API_URL) ? '/api' : RPI_LAN_API_URL;
+				API_BASE_URL = RELAY_API_URL;
+				console.log('Falling back API URL:', RELAY_API_URL);
 			} else {
-				RELAY_API_URL = normalized;
-				API_BASE_URL = normalized;
+				RELAY_API_URL = isMixedContentBlocked(normalized) ? '/api' : normalized;
+				API_BASE_URL = RELAY_API_URL;
 				console.log('Using remote API for history (quota optimization):', RELAY_API_URL);
 			}
         } else {
-			RELAY_API_URL = RPI_LAN_API_URL;
-			API_BASE_URL = RPI_LAN_API_URL;
+			RELAY_API_URL = isMixedContentBlocked(RPI_LAN_API_URL) ? '/api' : RPI_LAN_API_URL;
+			API_BASE_URL = RELAY_API_URL;
 			console.log('Using LAN API fallback for history:', RELAY_API_URL);
         }
     }
@@ -4853,7 +4857,11 @@ function updateMiniCharts(){
 			// If Firebase payload doesn't contain raw voltages, try backend voltage endpoint.
 			if (!data.ph && !data.do && !data.tds) {
 				try {
-					const res = await fetch(`${getApiUrl()}/voltage`);
+					const voltageUrl = `${getApiUrl()}/voltage`;
+					if (isMixedContentBlocked(voltageUrl)) {
+						return;
+					}
+					const res = await fetch(voltageUrl);
 					data = await res.json();
 				} catch (e) {
 					console.error('Failed to fetch voltage fallback:', e);
