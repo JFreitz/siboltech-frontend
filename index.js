@@ -4824,34 +4824,6 @@ function updateMiniCharts(){
 		_calVoltageLastUpdateTs = Date.now();
 	}
 
-	function buildEstimatedVoltageFromDashboard() {
-		const estimateVoltage = (sensor, measuredValue) => {
-			const m = Number(measuredValue);
-			const defaultSlope = { ph: 4.24, do: 4.24, tds: 606.06 }[sensor] || 1;
-			const slope = Number.isFinite(Number(calCoeffs[sensor]?.slope)) ? Number(calCoeffs[sensor].slope) : defaultSlope;
-			const offset = Number.isFinite(Number(calCoeffs[sensor]?.offset)) ? Number(calCoeffs[sensor].offset) : 0;
-			if (!Number.isFinite(m) || !Number.isFinite(slope) || !Number.isFinite(offset) || Math.abs(slope) < 1e-9) {
-				return null;
-			}
-			const v = (m - offset) / slope;
-			return Number.isFinite(v) ? v : null;
-		};
-
-		const phVal = getCurrentSensorValue('ph', null);
-		const doVal = getCurrentSensorValue('do', null);
-		const tdsVal = getCurrentSensorValue('tds', null);
-
-		const out = {};
-		const phV = estimateVoltage('ph', phVal);
-		const doV = estimateVoltage('do', doVal);
-		const tdsV = estimateVoltage('tds', tdsVal);
-
-		if (phV !== null) out.ph = { voltage: phV };
-		if (doV !== null) out.do = { voltage: doV };
-		if (tdsV !== null) out.tds = { voltage: tdsV };
-		return out;
-	}
-
 	// Fetch live voltage readings
 	async function fetchVoltage() {
         let data = {};
@@ -4888,26 +4860,6 @@ function updateMiniCharts(){
 				return null;
 			};
 
-			const pickSensorValue = (...vals) => {
-				for (const v of vals) {
-					if (v !== undefined && v !== null && !Number.isNaN(Number(v))) {
-						return Number(v);
-					}
-				}
-				return null;
-			};
-
-			const readDomNumber = (selector) => {
-				const raw = document.querySelector(selector)?.textContent || '';
-				const n = parseFloat(String(raw).replace(/[^0-9.+-]/g, ''));
-				return Number.isFinite(n) ? n : null;
-			};
-
-			const estimateVoltage = (sensor, measuredValue) => {
-				const estimated = buildEstimatedVoltageFromDashboard();
-				return estimated[sensor]?.voltage ?? null;
-			};
-
 			const voltageMap = {
 				ph: pickVoltage(
 					sensorData.ph?.raw_voltage,
@@ -4927,23 +4879,9 @@ function updateMiniCharts(){
 					sensorData.tds_ppm?.raw_voltage,
 					sensorData.tds_ppm?.voltage,
 					sensorData.tds_voltage_v?.value,
-					sensorData.tds_voltage_v,
-					estimateVoltage('tds', sensorData.tds_ppm?.value)
+					sensorData.tds_voltage_v
 				)
 			};
-
-			if (voltageMap.ph === null) {
-				const measured = pickSensorValue(sensorData.ph?.value, readDomNumber('#val-ph'));
-				voltageMap.ph = estimateVoltage('ph', measured);
-			}
-			if (voltageMap.do === null) {
-				const measured = pickSensorValue(sensorData.do_mg_per_l?.value, sensorData.do_mg_l?.value, readDomNumber('#val-do'));
-				voltageMap.do = estimateVoltage('do', measured);
-			}
-			if (voltageMap.tds === null) {
-				const measured = pickSensorValue(sensorData.tds_ppm?.value, readDomNumber('#val-tds'));
-				voltageMap.tds = estimateVoltage('tds', measured);
-			}
 
 			for (const sensor of ['ph', 'do', 'tds']) {
 				if (voltageMap[sensor] !== null) {
@@ -4954,12 +4892,11 @@ function updateMiniCharts(){
 			// If Firebase payload doesn't contain raw voltages, try backend voltage endpoint.
 			if (!data.ph && !data.do && !data.tds) {
 				try {
-					const voltageUrl = `${getApiUrl()}/voltage`;
+					const voltageUrl = `${getApiUrl()}/voltage?_ts=${Date.now()}`;
 					if (isMixedContentBlocked(voltageUrl)) {
-						// Keep going with local estimation fallback.
-						data = buildEstimatedVoltageFromDashboard();
+						// Keep only true live values. Do not synthesize.
 					} else {
-						const res = await fetch(voltageUrl);
+						const res = await fetch(voltageUrl, { cache: 'no-store' });
 						if (res.ok) {
 							const ct = (res.headers.get('content-type') || '').toLowerCase();
 							if (ct.includes('application/json')) {
@@ -4969,7 +4906,6 @@ function updateMiniCharts(){
 					}
 				} catch (e) {
 					// Ignore fallback errors on static hosting to avoid console spam.
-					data = buildEstimatedVoltageFromDashboard();
 				}
 			}
 
@@ -4978,21 +4914,19 @@ function updateMiniCharts(){
 				const mapped = mapFromLatestPayload(sensorData);
 				if (mapped.ph.voltage !== null || mapped.do.voltage !== null || mapped.tds.voltage !== null) {
 					data = mapped;
-				} else {
-					data = buildEstimatedVoltageFromDashboard();
 				}
 			}
         } else {
             try {
 				const base = getApiUrl();
-				const res = await fetch(`${base}/voltage`);
+				const res = await fetch(`${base}/voltage?_ts=${Date.now()}`, { cache: 'no-store' });
 				if (res.ok) {
 					data = await res.json();
 				}
 
 				// Fallback to /latest voltage sensor keys
 				if (!data.ph && !data.do && !data.tds) {
-					const latestRes = await fetch(`${base}/latest`);
+					const latestRes = await fetch(`${base}/latest?_ts=${Date.now()}`, { cache: 'no-store' });
 					if (latestRes.ok) {
 						const latest = await latestRes.json();
 						const mapped = mapFromLatestPayload(latest);
@@ -5003,7 +4937,6 @@ function updateMiniCharts(){
 				}
             } catch (e) {
                 console.error('Failed to fetch voltage:', e);
-				data = buildEstimatedVoltageFromDashboard();
             }
         }
         
@@ -5035,6 +4968,12 @@ function updateMiniCharts(){
                             </div>`;
                     }
                 }
+			} else {
+				calState[sensor].voltage = null;
+				if (el) el.textContent = '-- mV';
+				if (stabilityEl) {
+					stabilityEl.innerHTML = `<span style="color:#ef4444;">No live voltage</span>`;
+				}
             }
         }
     }
