@@ -4711,6 +4711,12 @@ function updateMiniCharts(){
         do: { voltage: null, points: [], history: [] },
         tds: { voltage: null, points: [], history: [] }
     };
+
+	const calCoeffs = {
+		ph: { slope: null, offset: null },
+		do: { slope: null, offset: null },
+		tds: { slope: null, offset: null }
+	};
     
     // Voltage smoothing - keeps last 15 readings and averages
     const VOLTAGE_HISTORY_SIZE = 15;
@@ -4763,6 +4769,8 @@ function updateMiniCharts(){
                 if (!cal) return;
                 for (const sensor of ['ph', 'do', 'tds']) {
                     if (cal[sensor]) {
+						calCoeffs[sensor].slope = Number(cal[sensor].slope);
+						calCoeffs[sensor].offset = Number(cal[sensor].offset);
                         const slopeEl = document.getElementById(`${sensor}CurrentSlope`);
                         const offsetEl = document.getElementById(`${sensor}CurrentOffset`);
                         const badge = document.getElementById(`${sensor}CalStatus`);
@@ -4790,6 +4798,8 @@ function updateMiniCharts(){
             
             for (const sensor of ['ph', 'do', 'tds']) {
                 if (data[sensor]) {
+					calCoeffs[sensor].slope = Number(data[sensor].slope);
+					calCoeffs[sensor].offset = Number(data[sensor].offset);
                     const slopeEl = document.getElementById(`${sensor}CurrentSlope`);
                     const offsetEl = document.getElementById(`${sensor}CurrentOffset`);
                     const badge = document.getElementById(`${sensor}CalStatus`);
@@ -4825,6 +4835,17 @@ function updateMiniCharts(){
 				return null;
 			};
 
+			const estimateVoltage = (sensor, measuredValue) => {
+				const m = Number(measuredValue);
+				const slope = Number(calCoeffs[sensor]?.slope);
+				const offset = Number(calCoeffs[sensor]?.offset);
+				if (!Number.isFinite(m) || !Number.isFinite(slope) || !Number.isFinite(offset) || Math.abs(slope) < 1e-9) {
+					return null;
+				}
+				const v = (m - offset) / slope;
+				return Number.isFinite(v) ? v : null;
+			};
+
 			const voltageMap = {
 				ph: pickVoltage(
 					sensorData.ph?.raw_voltage,
@@ -4844,9 +4865,17 @@ function updateMiniCharts(){
 					sensorData.tds_ppm?.raw_voltage,
 					sensorData.tds_ppm?.voltage,
 					sensorData.tds_voltage_v?.value,
-					sensorData.tds_voltage_v
+					sensorData.tds_voltage_v,
+					estimateVoltage('tds', sensorData.tds_ppm?.value)
 				)
 			};
+
+			if (voltageMap.ph === null) {
+				voltageMap.ph = estimateVoltage('ph', sensorData.ph?.value);
+			}
+			if (voltageMap.do === null) {
+				voltageMap.do = estimateVoltage('do', sensorData.do_mg_per_l?.value ?? sensorData.do_mg_l?.value);
+			}
 
 			for (const sensor of ['ph', 'do', 'tds']) {
 				if (voltageMap[sensor] !== null) {
