@@ -1,0 +1,273 @@
+﻿SYSTEM USER MANUAL
+DASHBOARD
+The Dashboard provides a real-time overview of the system, including sensor readings, actuator status, and nutrient solution controls.
+________________
+
+
+1. Sensor Readings
+This section displays the current condition of all sensors.
+Each parameter includes:
+* Status: Normal, Warning, or Critical
+* Level: Indicates deviation from normal conditions
+* Recommendation: Suggested action based on readings
+* Numerical Value: Actual sensor measurement
+Automation Behavior:
+* Warning: Actuators will not automate
+* Critical: Actuators will automatically activate
+________________
+
+
+pH Level
+* pH < 5.5
+ Status: Critical (Very Acidic)
+Level: Very Low from Normal
+Recommendation: Automation Active / Turn ON pH Up
+* 5.5 ≤ pH < 5.8
+ Status: Warning (Acidic)
+Level: Below Normal
+Recommendation: Turn ON pH Up
+* 5.8 ≤ pH ≤ 6.2
+ Status: Normal
+Level: Normal
+Recommendation: None
+* 6.2 < pH ≤ 7
+ Status: Warning (High pH)
+Level: Above Normal
+Recommendation: Turn ON pH Down
+* pH > 7
+ Status: Critical (Very High pH)
+Level: Very High from Normal
+Recommendation: Automation Active / Turn ON pH Down
+________________
+
+
+Dissolved Oxygen (DO)
+   * DO < 5
+ Status: Critical (Very Low Oxygen)
+Level: Not Enough Oxygen
+Recommendation: Automation Active / Turn ON Air Pump
+   * DO below optimal range
+ Status: Warning
+Level: Below Normal
+Recommendation: Turn ON Air Pump
+   * DO within optimal range
+ Status: Normal
+Level: Normal Oxygen
+Recommendation: None
+________________
+
+
+Temperature
+      * Temperature > 30°C
+ Status: Critical (Too Hot)
+Level: Too Hot for Plants
+Recommendation: Automation Active / Turn ON Exhaust Fans
+      * 28°C to 29°C
+ Status: Warning (Warm)
+Level: Warm for Plants
+Recommendation: Turn ON Exhaust Fans
+      * 19°C to 27°C
+ Status: Normal
+Level: Normal Temperature
+Recommendation: Optimal Condition
+      * 15°C to 18°C
+ Status: Warning (Cold)
+Level: Below Optimal
+Recommendation: Maintain Exhaust Fan OFF
+      * Temperature < 15°C
+ Status: Critical (Too Cold)
+Level: Too Cold for Plants
+Recommendation: Maintain Exhaust Fan OFF
+________________
+
+
+Humidity
+         * Humidity > 80%
+ Status: Critical
+Level: Too Humid for Plants
+Recommendation: Automation Active / Turn ON Exhaust Fans
+         * 70% to 79%
+ Status: Warning
+Level: Above Normal
+Recommendation: Turn ON Exhaust Fans
+         * 50% to 70%
+ Status: Normal
+Level: Normal Humidity
+Recommendation: Optimal Condition
+         * 40% to 49%
+ Status: Warning
+Level: Below Normal
+Recommendation: Maintain Exhaust Fan OFF
+         * Humidity < 30%
+ Status: Critical
+Level: Too Dry for Plants
+Recommendation: Maintain Exhaust Fan OFF
+________________
+
+
+TDS (Total Dissolved Solids)
+            * TDS < 500 ppm
+ Status: Critical
+Level: Needs More Nutrients
+Recommendation: Automation Active / Add Leafy Green Solution
+            * 500 ppm to 700 ppm
+ Status: Warning
+Level: Below Normal
+Recommendation: Add More Leafy Green Solution
+            * 700 ppm to 1400 ppm
+ Status: Normal
+Level: Normal Nutrients
+Recommendation: Plants are Healthy
+            * TDS > 1400 ppm
+ Status: Critical
+Level: Concentration Too High
+Recommendation: Dilute with Water
+________________
+
+
+2. Actuator Status
+This section displays and controls the system actuators.
+Available actuators:
+               * Air Pump
+               * Exhaust Fan (In)
+               * Exhaust Fan (Out)
+               * Grow Lights (Aeroponics)
+               * Grow Lights (DWC)
+Switches automatically update based on actuator activity. For example, when an actuator is turned off by the system, the corresponding switch will also turn off.
+Override Mode:
+               * When enabled, manual control of switches is disabled
+               * The system will follow automated behavior only
+________________
+
+
+3. Nutrient Solution Controls
+This section allows manual control of nutrient-related components.
+               * pH Up: Dispenses 1 mL per second
+               * pH Down: Dispenses 1 mL per second
+               * Leafy Green Solution: Activates for 1 minute
+               * Misting Pump: Activates the misting system
+________________
+
+
+PREDICTION
+This section provides plant growth predictions based on sensor data.
+Step 1: Input Selection
+               * Plant Number (1–6)
+               * Growing Method (Deep Water Culture or Aeroponics)
+               * Date
+________________
+
+
+Step 2: Add Actual Measurements (Optional)
+Users may input actual plant data:
+               * Height
+               * Length
+               * Weight
+               * Number of Leaves
+               * Number of Branches
+________________
+
+
+Step 3: Actions
+               * Run Prediction (Sensors Only)
+ Displays prediction results without actual data
+               * Save Actual + Predict
+ Saves input data and compares with predicted values
+               * See All Predictions
+ Displays all stored prediction records
+________________
+
+
+Output Display
+After running a prediction, the following are shown:
+                  * Sensor input summary
+                  * Prediction versus actual comparison table
+                  * Bar graph visualization
+________________
+
+
+SENSOR READINGS
+This tab displays a line graph showing sensor values over time.
+________________
+
+
+GROWTH STATE
+This section visualizes plant growth trends.
+Available Metrics:
+                  * Height
+                  * Weight
+                  * Length
+                  * Number of Leaves
+                  * Number of Branches
+Time Intervals:
+                  * 1 Day
+                  * 14 Days
+                  * All Records
+Legend:
+                  * Green: Aeroponics
+                  * Blue: Deep Water Culture
+                  * Orange: Traditional
+________________
+
+
+CALIBRATION
+Before performing calibration, enable Calibration Mode to temporarily disable actuator automation.
+________________
+
+
+pH Calibration
+                  1. Select either 2-point or 3-point calibration
+                  2. Enter water temperature
+                  3. Place the sensor in buffer solutions and capture readings:
+                  * pH 4.00
+                  * pH 6.86
+                  * (Optional) pH 9.18
+                  4. Click Apply Calibration
+________________
+
+
+Dissolved Oxygen Calibration
+                  1. Select 1-point or 2-point calibration
+                  2. Enter water temperature
+Options:
+                  * 1-point: Capture 100% (air saturation)
+                  * 2-point: Capture 100% and 0%
+Click Apply Calibration
+________________
+
+
+TDS Calibration
+                  1. Select 1-point or 2-point calibration
+                  2. Enter water temperature
+                  3. Input the known ppm value of the solution
+                  4. Click Capture
+                  5. (Optional) Repeat for a second solution
+                  6. Click Apply Calibration
+________________
+
+
+HISTORY
+This section provides access to historical system data.
+________________
+
+
+Plant History
+Categories:
+                  * Aeroponics
+                  * Deep Water Culture
+                  * Traditional
+Each section includes:
+                  * Plant selection (1–6)
+                  * View options: Daily or 15-minute intervals
+                  * Data table containing:
+                  * Timestamp
+                  * Sensor Readings
+                  * Plant Readings
+________________
+
+
+Actuator History
+                  * View options: Daily or 15-minute intervals
+                  * Data table includes:
+                  * Actuator Events
+                  * Sensor Readings
