@@ -1337,7 +1337,7 @@
 		<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 		
 		<!-- Load main app JS first -->
-		<script src="index.js?v=3.4"></script>
+		<script src="index.js?v=3.5"></script>
 		
 		<!-- Firebase SDK - load after index.js so listeners are ready -->
 		<script type="module">
@@ -1592,6 +1592,32 @@
 					
 					// Store latest sensor data globally for history tab to use
 					window.latestSensorData = data;
+
+					// Extract and expose latest live voltages (same stream used by dashboard)
+					const pickNum = (...vals) => {
+						for (const v of vals) {
+							const n = Number(v);
+							if (Number.isFinite(n)) return n;
+						}
+						return null;
+					};
+					const latestVoltage = {
+						ph: pickNum(data.ph?.raw_voltage, data.ph?.voltage, data.ph_voltage_v?.value, data.ph_voltage_v),
+						do: pickNum(data.do_mg_per_l?.raw_voltage, data.do_mg_l?.raw_voltage, data.do_mg_per_l?.voltage, data.do_mg_l?.voltage, data.do_voltage_v?.value, data.do_voltage_v),
+						tds: pickNum(data.tds_ppm?.raw_voltage, data.tds_ppm?.voltage, data.tds_voltage_v?.value, data.tds_voltage_v),
+						_ts: Date.now()
+					};
+					window.latestVoltageData = latestVoltage;
+
+					// Update calibration voltage widgets directly from Firebase live stream.
+					const setMv = (id, v) => {
+						const el = document.getElementById(id);
+						if (!el) return;
+						el.textContent = Number.isFinite(v) ? `${(v * 1000).toFixed(1)} mV` : '-- mV';
+					};
+					setMv('phLiveVoltage', latestVoltage.ph);
+					setMv('doLiveVoltage', latestVoltage.do);
+					setMv('tdsLiveVoltage', latestVoltage.tds);
 					
 					// Update sensor displays directly
 					const phVal = (data.ph && data.ph.value !== undefined) ? parseFloat(data.ph.value).toFixed(2) : '0.00';
