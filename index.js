@@ -4857,31 +4857,6 @@ function updateMiniCharts(){
 			// On static hosting, prefer backend /voltage first (real ESP values).
 			// Only fallback to Firebase raw voltage fields if backend is unreachable.
 			const sensorData = window.latestSensorData || {};
-			const liveVoltage = window.latestVoltageData || null;
-			if (liveVoltage && Number.isFinite(Number(liveVoltage._ts)) && (Date.now() - Number(liveVoltage._ts) <= 8000)) {
-				data = {};
-				if (Number.isFinite(Number(liveVoltage.ph))) data.ph = { voltage: Number(liveVoltage.ph), timestamp: null };
-				if (Number.isFinite(Number(liveVoltage.do))) data.do = { voltage: Number(liveVoltage.do), timestamp: null };
-				if (Number.isFinite(Number(liveVoltage.tds))) data.tds = { voltage: Number(liveVoltage.tds), timestamp: null };
-				if (data.ph || data.do || data.tds) {
-					for (const sensor of ['ph', 'do', 'tds']) {
-						const el = document.getElementById(`${sensor}LiveVoltage`);
-						if (data[sensor]?.voltage !== undefined && el) {
-							const rawVoltage = Number(data[sensor].voltage);
-							if (Number.isFinite(rawVoltage)) {
-								calState[sensor].history.push(rawVoltage);
-								if (calState[sensor].history.length > VOLTAGE_HISTORY_SIZE) {
-									calState[sensor].history.shift();
-								}
-								calState[sensor].voltage = rawVoltage;
-								el.textContent = `${(rawVoltage * 1000).toFixed(1)} mV`;
-								markVoltageUpdate();
-							}
-						}
-					}
-					return;
-				}
-			}
 
 			const pickVoltage = (...vals) => {
 				for (const v of vals) {
