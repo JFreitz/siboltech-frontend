@@ -4894,7 +4894,10 @@ function updateMiniCharts(){
 			try {
 				const voltageUrl = `${getApiUrl()}/voltage?_ts=${Date.now()}`;
 				if (!isMixedContentBlocked(voltageUrl)) {
-					const res = await fetch(voltageUrl, { cache: 'no-store' });
+					const res = await fetch(voltageUrl, {
+						cache: 'no-store',
+						headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+					});
 					if (res.ok) {
 						const ct = (res.headers.get('content-type') || '').toLowerCase();
 						if (ct.includes('application/json')) {
@@ -4936,7 +4939,10 @@ function updateMiniCharts(){
 					if (isMixedContentBlocked(voltageUrl)) {
 						// Keep only true live values. Do not synthesize.
 					} else {
-						const res = await fetch(voltageUrl, { cache: 'no-store' });
+						const res = await fetch(voltageUrl, {
+							cache: 'no-store',
+							headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+						});
 						if (res.ok) {
 							const ct = (res.headers.get('content-type') || '').toLowerCase();
 							if (ct.includes('application/json')) {
@@ -4951,7 +4957,10 @@ function updateMiniCharts(){
         } else {
             try {
 				const base = getApiUrl();
-				const res = await fetch(`${base}/voltage?_ts=${Date.now()}`, { cache: 'no-store' });
+				const res = await fetch(`${base}/voltage?_ts=${Date.now()}`, {
+					cache: 'no-store',
+					headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+				});
 				if (res.ok) {
 					data = await res.json();
 				}
@@ -4964,7 +4973,10 @@ function updateMiniCharts(){
 
 				// Fallback to /latest voltage sensor keys
 				if (!data.ph && !data.do && !data.tds) {
-					const latestRes = await fetch(`${base}/latest?_ts=${Date.now()}`, { cache: 'no-store' });
+					const latestRes = await fetch(`${base}/latest?_ts=${Date.now()}`, {
+						cache: 'no-store',
+						headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+					});
 					if (latestRes.ok) {
 						const latest = await latestRes.json();
 						const mapped = mapFromLatestPayload(latest);
@@ -5330,8 +5342,9 @@ function updateMiniCharts(){
         }
     }
     
-    // Initialize
+	// Initialize
 	let _voltagePollTimer = null;
+	let _calibrationInitialized = false;
 
 	function startVoltagePolling() {
 		if (_voltagePollTimer) clearInterval(_voltagePollTimer);
@@ -5342,7 +5355,10 @@ function updateMiniCharts(){
 		}, 1000);
 	}
 
-    document.addEventListener('DOMContentLoaded', () => {
+	function initCalibrationRuntime() {
+		if (_calibrationInitialized) return;
+		_calibrationInitialized = true;
+
         setupEventListeners();
         loadCalibration();
         fetchVoltage();
@@ -5356,7 +5372,21 @@ function updateMiniCharts(){
 				fetchVoltage();
 			}
 		}, 3000);
-    });
+
+		// Resume polling aggressively when tab becomes visible again.
+		document.addEventListener('visibilitychange', () => {
+			if (!document.hidden) {
+				startVoltagePolling();
+				fetchVoltage();
+			}
+		});
+	}
+
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', initCalibrationRuntime, { once: true });
+	} else {
+		initCalibrationRuntime();
+	}
 })();
 
 // === PREDICTION TAB NOTE ===
