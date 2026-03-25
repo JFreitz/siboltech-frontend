@@ -4854,10 +4854,26 @@ function updateMiniCharts(){
 				return null;
 			};
 
+			const pickSensorValue = (...vals) => {
+				for (const v of vals) {
+					if (v !== undefined && v !== null && !Number.isNaN(Number(v))) {
+						return Number(v);
+					}
+				}
+				return null;
+			};
+
+			const readDomNumber = (selector) => {
+				const raw = document.querySelector(selector)?.textContent || '';
+				const n = parseFloat(String(raw).replace(/[^0-9.+-]/g, ''));
+				return Number.isFinite(n) ? n : null;
+			};
+
 			const estimateVoltage = (sensor, measuredValue) => {
 				const m = Number(measuredValue);
-				const slope = Number(calCoeffs[sensor]?.slope);
-				const offset = Number(calCoeffs[sensor]?.offset);
+				const defaultSlope = { ph: 4.24, do: 4.24, tds: 606.06 }[sensor] || 1;
+				const slope = Number.isFinite(Number(calCoeffs[sensor]?.slope)) ? Number(calCoeffs[sensor].slope) : defaultSlope;
+				const offset = Number.isFinite(Number(calCoeffs[sensor]?.offset)) ? Number(calCoeffs[sensor].offset) : 0;
 				if (!Number.isFinite(m) || !Number.isFinite(slope) || !Number.isFinite(offset) || Math.abs(slope) < 1e-9) {
 					return null;
 				}
@@ -4890,10 +4906,16 @@ function updateMiniCharts(){
 			};
 
 			if (voltageMap.ph === null) {
-				voltageMap.ph = estimateVoltage('ph', sensorData.ph?.value);
+				const measured = pickSensorValue(sensorData.ph?.value, readDomNumber('#val-ph'));
+				voltageMap.ph = estimateVoltage('ph', measured);
 			}
 			if (voltageMap.do === null) {
-				voltageMap.do = estimateVoltage('do', sensorData.do_mg_per_l?.value ?? sensorData.do_mg_l?.value);
+				const measured = pickSensorValue(sensorData.do_mg_per_l?.value, sensorData.do_mg_l?.value, readDomNumber('#val-do'));
+				voltageMap.do = estimateVoltage('do', measured);
+			}
+			if (voltageMap.tds === null) {
+				const measured = pickSensorValue(sensorData.tds_ppm?.value, readDomNumber('#val-tds'));
+				voltageMap.tds = estimateVoltage('tds', measured);
 			}
 
 			for (const sensor of ['ph', 'do', 'tds']) {

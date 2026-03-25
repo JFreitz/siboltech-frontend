@@ -1337,7 +1337,7 @@
 		<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 		
 		<!-- Load main app JS first -->
-		<script src="index.js?v=2.8"></script>
+		<script src="index.js?v=3.0"></script>
 		
 		<!-- Firebase SDK - load after index.js so listeners are ready -->
 		<script type="module">
@@ -1390,8 +1390,43 @@
 			window.firebaseSetDoc = setDoc;
 			window.firebaseServerTimestamp = serverTimestamp;
 			window.firebaseReady = true;
+			window.firebaseCalibration = null;
 			setTopbarConnectionStatus(true);
 			markSystemHeartbeatSafe();
+
+			// Save calibration values via Firebase (for static hosting)
+			window.saveCalibrationFirebase = async function(sensor, slope, offset) {
+				try {
+					const ref = doc(db, 'settings', 'calibration');
+					await setDoc(ref, {
+						[sensor]: {
+							slope: Number(slope),
+							offset: Number(offset)
+						},
+						updated_at: serverTimestamp(),
+						source: 'dashboard'
+					}, { merge: true });
+					return true;
+				} catch (error) {
+					console.error('Error saving calibration to Firebase:', error);
+					return false;
+				}
+			};
+
+			// Keep calibration values synced for Calibrate tab
+			const calDocRef = doc(db, 'settings', 'calibration');
+			onSnapshot(calDocRef, (docSnap) => {
+				if (docSnap.exists()) {
+					const cal = docSnap.data() || {};
+					window.firebaseCalibration = {
+						ph: cal.ph || { slope: 4.24, offset: 0.0 },
+						do: cal.do || { slope: 4.24, offset: 0.0 },
+						tds: cal.tds || { slope: 606.06, offset: 0.0 }
+					};
+				}
+			}, (error) => {
+				console.error('Firebase calibration listener error:', error);
+			});
 			
 			// Load plant history from Firebase
 			window.loadPlantHistory = async function(farmingSystem, maxResults = 100) {
