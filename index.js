@@ -4818,8 +4818,42 @@ function updateMiniCharts(){
         }
     }
     
-    // Fetch live voltage readings
-    async function fetchVoltage() {
+	let _calVoltageLastUpdateTs = 0;
+
+	function markVoltageUpdate() {
+		_calVoltageLastUpdateTs = Date.now();
+	}
+
+	function buildEstimatedVoltageFromDashboard() {
+		const estimateVoltage = (sensor, measuredValue) => {
+			const m = Number(measuredValue);
+			const defaultSlope = { ph: 4.24, do: 4.24, tds: 606.06 }[sensor] || 1;
+			const slope = Number.isFinite(Number(calCoeffs[sensor]?.slope)) ? Number(calCoeffs[sensor].slope) : defaultSlope;
+			const offset = Number.isFinite(Number(calCoeffs[sensor]?.offset)) ? Number(calCoeffs[sensor].offset) : 0;
+			if (!Number.isFinite(m) || !Number.isFinite(slope) || !Number.isFinite(offset) || Math.abs(slope) < 1e-9) {
+				return null;
+			}
+			const v = (m - offset) / slope;
+			return Number.isFinite(v) ? v : null;
+		};
+
+		const phVal = getCurrentSensorValue('ph', null);
+		const doVal = getCurrentSensorValue('do', null);
+		const tdsVal = getCurrentSensorValue('tds', null);
+
+		const out = {};
+		const phV = estimateVoltage('ph', phVal);
+		const doV = estimateVoltage('do', doVal);
+		const tdsV = estimateVoltage('tds', tdsVal);
+
+		if (phV !== null) out.ph = { voltage: phV };
+		if (doV !== null) out.do = { voltage: doV };
+		if (tdsV !== null) out.tds = { voltage: tdsV };
+		return out;
+	}
+
+	// Fetch live voltage readings
+	async function fetchVoltage() {
         let data = {};
 
 		const mapFromLatestPayload = (payload) => {
@@ -4870,15 +4904,8 @@ function updateMiniCharts(){
 			};
 
 			const estimateVoltage = (sensor, measuredValue) => {
-				const m = Number(measuredValue);
-				const defaultSlope = { ph: 4.24, do: 4.24, tds: 606.06 }[sensor] || 1;
-				const slope = Number.isFinite(Number(calCoeffs[sensor]?.slope)) ? Number(calCoeffs[sensor].slope) : defaultSlope;
-				const offset = Number.isFinite(Number(calCoeffs[sensor]?.offset)) ? Number(calCoeffs[sensor].offset) : 0;
-				if (!Number.isFinite(m) || !Number.isFinite(slope) || !Number.isFinite(offset) || Math.abs(slope) < 1e-9) {
-					return null;
-				}
-				const v = (m - offset) / slope;
-				return Number.isFinite(v) ? v : null;
+				const estimated = buildEstimatedVoltageFromDashboard();
+				return estimated[sensor]?.voltage ?? null;
 			};
 
 			const voltageMap = {
@@ -4929,16 +4956,20 @@ function updateMiniCharts(){
 				try {
 					const voltageUrl = `${getApiUrl()}/voltage`;
 					if (isMixedContentBlocked(voltageUrl)) {
-						return;
+						// Keep going with local estimation fallback.
+						data = buildEstimatedVoltageFromDashboard();
+					} else {
+						const res = await fetch(voltageUrl);
+						if (res.ok) {
+							const ct = (res.headers.get('content-type') || '').toLowerCase();
+							if (ct.includes('application/json')) {
+								data = await res.json();
+							}
+						}
 					}
-					const res = await fetch(voltageUrl);
-					if (!res.ok) return;
-					const ct = (res.headers.get('content-type') || '').toLowerCase();
-					if (!ct.includes('application/json')) return;
-					data = await res.json();
 				} catch (e) {
 					// Ignore fallback errors on static hosting to avoid console spam.
-					return;
+					data = buildEstimatedVoltageFromDashboard();
 				}
 			}
 
@@ -4947,6 +4978,8 @@ function updateMiniCharts(){
 				const mapped = mapFromLatestPayload(sensorData);
 				if (mapped.ph.voltage !== null || mapped.do.voltage !== null || mapped.tds.voltage !== null) {
 					data = mapped;
+				} else {
+					data = buildEstimatedVoltageFromDashboard();
 				}
 			}
         } else {
@@ -4970,7 +5003,7 @@ function updateMiniCharts(){
 				}
             } catch (e) {
                 console.error('Failed to fetch voltage:', e);
-                return;
+				data = buildEstimatedVoltageFromDashboard();
             }
         }
         
@@ -4983,6 +5016,7 @@ function updateMiniCharts(){
                 const smoothed = smoothVoltage(sensor, data[sensor].voltage);
                 calState[sensor].voltage = smoothed;
                 if (el) el.textContent = `${(smoothed * 1000).toFixed(1)} mV`;
+				markVoltageUpdate();
                 
                 // Update stability indicator
                 const stable = isVoltageStable(sensor);
@@ -5313,11 +5347,31 @@ function updateMiniCharts(){
     }
     
     // Initialize
+	let _voltagePollTimer = null;
+
+	function startVoltagePolling() {
+		if (_voltagePollTimer) clearInterval(_voltagePollTimer);
+		_voltagePollTimer = setInterval(() => {
+			fetchVoltage().catch((e) => {
+				console.error('Voltage polling error:', e);
+			});
+		}, 1000);
+	}
+
     document.addEventListener('DOMContentLoaded', () => {
         setupEventListeners();
         loadCalibration();
         fetchVoltage();
-        setInterval(fetchVoltage, 2000);
+		startVoltagePolling();
+
+		// Self-healing watchdog: restart polling if UI hasn't updated recently.
+		setInterval(() => {
+			if (!_calVoltageLastUpdateTs) return;
+			if (Date.now() - _calVoltageLastUpdateTs > 6000) {
+				startVoltagePolling();
+				fetchVoltage();
+			}
+		}, 3000);
     });
 })();
 
