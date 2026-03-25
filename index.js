@@ -4713,9 +4713,10 @@ function updateMiniCharts(){
     };
 
 	const calCoeffs = {
-		ph: { slope: null, offset: null },
-		do: { slope: null, offset: null },
-		tds: { slope: null, offset: null }
+		// Defaults match project calibration convention (value = slope * voltage + offset)
+		ph: { slope: 4.24, offset: 0.0 },
+		do: { slope: 4.24, offset: 0.0 },
+		tds: { slope: 606.06, offset: 0.0 }
 	};
     
     // Voltage smoothing - keeps last 15 readings and averages
@@ -4820,6 +4821,24 @@ function updateMiniCharts(){
     // Fetch live voltage readings
     async function fetchVoltage() {
         let data = {};
+
+		const mapFromLatestPayload = (payload) => {
+			if (!payload || typeof payload !== 'object') return {};
+			const getVal = (entry) => {
+				if (entry === undefined || entry === null) return null;
+				if (typeof entry === 'object' && entry.value !== undefined) {
+					const n = Number(entry.value);
+					return Number.isFinite(n) ? n : null;
+				}
+				const n = Number(entry);
+				return Number.isFinite(n) ? n : null;
+			};
+			return {
+				ph: { voltage: getVal(payload.ph_voltage_v) },
+				do: { voltage: getVal(payload.do_voltage_v) },
+				tds: { voltage: getVal(payload.tds_voltage_v) },
+			};
+		};
         
         if (isStaticHosting()) {
 			// Read voltage from Firebase latest sensor data first.
@@ -4900,10 +4919,33 @@ function updateMiniCharts(){
 					return;
 				}
 			}
+
+			// Secondary fallback: map direct voltage sensors from latest payload.
+			if (!data.ph && !data.do && !data.tds) {
+				const mapped = mapFromLatestPayload(sensorData);
+				if (mapped.ph.voltage !== null || mapped.do.voltage !== null || mapped.tds.voltage !== null) {
+					data = mapped;
+				}
+			}
         } else {
             try {
-                const res = await fetch(`${getApiUrl()}/voltage`);
-                data = await res.json();
+				const base = getApiUrl();
+				const res = await fetch(`${base}/voltage`);
+				if (res.ok) {
+					data = await res.json();
+				}
+
+				// Fallback to /latest voltage sensor keys
+				if (!data.ph && !data.do && !data.tds) {
+					const latestRes = await fetch(`${base}/latest`);
+					if (latestRes.ok) {
+						const latest = await latestRes.json();
+						const mapped = mapFromLatestPayload(latest);
+						if (mapped.ph.voltage !== null || mapped.do.voltage !== null || mapped.tds.voltage !== null) {
+							data = mapped;
+						}
+					}
+				}
             } catch (e) {
                 console.error('Failed to fetch voltage:', e);
                 return;
