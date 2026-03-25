@@ -4862,9 +4862,12 @@ function updateMiniCharts(){
 						return;
 					}
 					const res = await fetch(voltageUrl);
+					if (!res.ok) return;
+					const ct = (res.headers.get('content-type') || '').toLowerCase();
+					if (!ct.includes('application/json')) return;
 					data = await res.json();
 				} catch (e) {
-					console.error('Failed to fetch voltage fallback:', e);
+					// Ignore fallback errors on static hosting to avoid console spam.
 					return;
 				}
 			}
