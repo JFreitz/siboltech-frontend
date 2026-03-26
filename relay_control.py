@@ -13,8 +13,19 @@ Usage:
 import serial
 import sys
 import time
+import os
+import glob
 
-SERIAL_PORT = "/dev/ttyUSB0"
+def _auto_detect_serial_port() -> str:
+    preferred = ["/dev/ttyUSB1", "/dev/ttyUSB0", "/dev/ttyACM0", "/dev/ttyACM1"]
+    for p in preferred:
+        if os.path.exists(p):
+            return p
+    ports = sorted(glob.glob("/dev/ttyUSB*") + glob.glob("/dev/ttyACM*"))
+    return ports[0] if ports else "/dev/ttyUSB0"
+
+
+SERIAL_PORT = os.getenv("SERIAL_PORT", _auto_detect_serial_port())
 BAUD_RATE = 115200
 
 def send_command(ser, cmd):
@@ -76,6 +87,7 @@ def main():
         
     except serial.SerialException as e:
         print(f"Error: {e}")
+        print(f"Serial port tried: {SERIAL_PORT}")
         print("Make sure the ESP32 is connected and no other program is using the serial port.")
         sys.exit(1)
 
