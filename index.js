@@ -4915,39 +4915,6 @@ function updateMiniCharts(){
 	async function fetchVoltage() {
         let data = {};
 
-		const latestLiveVoltage = extractLiveVoltageFromLatestSensorData(window.latestSensorData || {});
-		if (isStaticHosting() && (latestLiveVoltage.ph !== null || latestLiveVoltage.do !== null || latestLiveVoltage.tds !== null)) {
-			for (const sensor of ['ph', 'do', 'tds']) {
-				const v = latestLiveVoltage[sensor];
-				if (!Number.isFinite(Number(v))) continue;
-				const rawVoltage = Number(v);
-				const stabilityEl = document.getElementById(`${sensor}Stability`);
-				calState[sensor].history.push(rawVoltage);
-				if (calState[sensor].history.length > VOLTAGE_HISTORY_SIZE) {
-					calState[sensor].history.shift();
-				}
-				calState[sensor].voltage = rawVoltage;
-				writeCalibrationVoltage(sensor, rawVoltage, 'latestSensorData');
-
-				if (stabilityEl) {
-					const stable = isVoltageStable(sensor);
-					const stabilityPct = getStabilityPercent(sensor);
-					if (stable) {
-						stabilityEl.innerHTML = `<span style="color:#22c55e;font-weight:bold;">✓ STABLE - Ready to capture!</span>`;
-					} else {
-						const barColor = stabilityPct > 70 ? '#eab308' : '#ef4444';
-						stabilityEl.innerHTML = `
-							<span style="color:#888;">Stabilizing... ${stabilityPct}%</span>
-							<div style="width:100px;height:6px;background:#333;border-radius:3px;margin-top:4px;">
-								<div style="width:${stabilityPct}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.3s;"></div>
-							</div>`;
-					}
-				}
-			}
-			markVoltageUpdate();
-			return;
-		}
-
 		const mapFromLatestPayload = (payload) => {
 			if (!payload || typeof payload !== 'object') return {};
 			const getVal = (entry) => {
