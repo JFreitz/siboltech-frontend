@@ -4998,9 +4998,10 @@ function updateMiniCharts(){
 						if (ct.includes('application/json')) {
 							const raw = await res.json();
 							for (const sensor of ['ph', 'do', 'tds']) {
-								if (raw[sensor]?.voltage !== undefined) {
-									data[sensor] = { ...raw[sensor], _source: 'api/voltage' };
-								}
+								const v = Number(raw[sensor]?.voltage);
+								const ts = raw[sensor]?.timestamp || null;
+								if (!Number.isFinite(v) || !ts || !isFreshTs(ts)) continue;
+								data[sensor] = { ...raw[sensor], _source: 'api/voltage' };
 							}
 						}
 					}
@@ -5041,9 +5042,10 @@ function updateMiniCharts(){
 							if (ct.includes('application/json')) {
 								const raw = await res.json();
 								for (const sensor of ['ph', 'do', 'tds']) {
-									if (raw[sensor]?.voltage !== undefined) {
-										data[sensor] = { ...raw[sensor], _source: 'api/voltage' };
-									}
+									const v = Number(raw[sensor]?.voltage);
+									const ts = raw[sensor]?.timestamp || null;
+									if (!Number.isFinite(v) || !ts || !isFreshTs(ts)) continue;
+									data[sensor] = { ...raw[sensor], _source: 'api/voltage' };
 								}
 							}
 						}
