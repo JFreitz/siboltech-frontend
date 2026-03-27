@@ -316,7 +316,7 @@ function writeCalibrationVoltage(sensor, voltage, source = 'unknown') {
 	const stabilityEl = document.getElementById(`${sensor}Stability`);
 
 	const valid = Number.isFinite(Number(voltage));
-	el.textContent = valid ? `${(Number(voltage) * 1000).toFixed(1)} mV` : '-- mV';
+	el.textContent = valid ? `${Number(voltage).toFixed(4)} V` : '-- V';
 
 	// Prevent stale "No live voltage" label when live values are actually arriving.
 	if (stabilityEl && valid) {
@@ -4523,24 +4523,6 @@ function updateThemeIcon(theme) {
 initThemeToggle();
 
 
-// Populate elements with class 'readingvoltage' with a random voltage (mV)
-function populateRandomVoltages() {
-	const els = document.querySelectorAll('.readingvoltage');
-	if (!els || els.length === 0) return;
-	els.forEach(el => {
-		const min = parseFloat(el.dataset.min) || 200; // default min mV
-		const max = parseFloat(el.dataset.max) || 1200; // default max mV
-		const val = Math.random() * (max - min) + min;
-		const formatted = val >= 100 ? val.toFixed(0) : val.toFixed(2);
-		if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.value = formatted;
-		else el.textContent = formatted + ' mV';
-	});
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-	populateRandomVoltages();
-});
-
 // --- Growth State Chart (averages of 6 plants per method) ---
 function getAverageForMethod(methodContainerId, field) {
 	const selector = `#${methodContainerId} .sensor-input1[data-field="${field}"]`;
@@ -5012,6 +4994,11 @@ function updateMiniCharts(){
 				if (!Number.isFinite(rawVoltage)) {
 					continue;
 				}
+				const prevVoltage = Number(calState[sensor].voltage);
+				const maxStepV = { ph: 0.30, do: 0.20, tds: 0.20 }[sensor] || 0.25;
+				if (Number.isFinite(prevVoltage) && Math.abs(rawVoltage - prevVoltage) > maxStepV) {
+					continue;
+				}
 				calState[sensor].history.push(rawVoltage);
 				if (calState[sensor].history.length > VOLTAGE_HISTORY_SIZE) {
 					calState[sensor].history.shift();
@@ -5106,7 +5093,7 @@ function updateMiniCharts(){
         const statusEl = document.getElementById(`${sensor}Point${pointNum}Status`);
         
         if (pointEl) pointEl.classList.add('captured');
-        if (voltageEl) voltageEl.textContent = (point.voltage * 1000).toFixed(1) + ' mV';
+		if (voltageEl) voltageEl.textContent = Number(point.voltage).toFixed(4) + ' V';
         if (statusEl) {
             statusEl.textContent = 'Captured';
             statusEl.classList.add('captured');
