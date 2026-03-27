@@ -148,6 +148,7 @@ class AutomationController:
         self.relay_callback = relay_callback
         self.enabled = True
         self.override_mode = False  # When True, automation is disabled
+        self.time_mode_override = "normal"  # normal | morning | night
         
         # Filtered sensor values
         self.filters = {
@@ -250,8 +251,28 @@ class AutomationController:
     
     def _is_daytime(self) -> bool:
         """Check if current time is daytime (6am-6pm)."""
+        if self.time_mode_override == "morning":
+            return True
+        if self.time_mode_override == "night":
+            return False
         hour = datetime.now().hour
         return LIGHTS_ON_HOUR <= hour < LIGHTS_OFF_HOUR
+
+    def set_time_mode(self, mode: str):
+        """Set time mode override for demo/testing: normal | morning | night."""
+        raw = str(mode or "normal").strip().lower()
+        if raw not in {"normal", "morning", "night"}:
+            raw = "normal"
+        self.time_mode_override = raw
+        print(f"[AUTOMATION] Time mode set to: {raw.upper()}", flush=True)
+
+        # Apply mode immediately when automation is active
+        if not self.override_mode:
+            try:
+                self._process_grow_lights()
+                self._process_automation()
+            except Exception as e:
+                print(f"[AUTOMATION] Error applying time mode: {e}", flush=True)
     
     def _loop(self):
         """Main automation loop."""
@@ -449,6 +470,7 @@ class AutomationController:
         return {
             "enabled": self.enabled,
             "override_mode": self.override_mode,
+            "time_mode": self.time_mode_override,
             "is_daytime": self._is_daytime(),
             "filtered_values": {
                 "temperature": round(self.filters["temperature"].get(), 2),

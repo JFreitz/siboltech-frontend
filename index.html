@@ -149,13 +149,23 @@
 					<div class="actuator-card">
 						<div class="card-header actuator-header">
 							<span>Actuator Status</span>
-							<div class="override-toggle">
-								<span class="override-label">OVERRIDE:</span>
-								<label class="toggle-switch actuator-override">
-									<input type="checkbox" id="actuatorOverrideToggle">
-									<span class="toggle-slider"></span>
-									<span class="toggle-text">OFF</span>
-								</label>
+							<div class="actuator-header-controls">
+								<div class="time-mode-control" id="timeModeControl">
+									<span class="mode-label">TIME MODE:</span>
+									<div class="time-mode-buttons" role="group" aria-label="Demo time mode">
+										<button type="button" class="time-mode-btn active" data-mode="normal">Normal</button>
+										<button type="button" class="time-mode-btn" data-mode="morning">Morning</button>
+										<button type="button" class="time-mode-btn" data-mode="night">Night</button>
+									</div>
+								</div>
+								<div class="override-toggle">
+									<span class="override-label">OVERRIDE:</span>
+									<label class="toggle-switch actuator-override">
+										<input type="checkbox" id="actuatorOverrideToggle">
+										<span class="toggle-slider"></span>
+										<span class="toggle-text">OFF</span>
+									</label>
+								</div>
 							</div>
 						</div>
 						<div class="actuators">

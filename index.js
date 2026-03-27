@@ -2597,6 +2597,71 @@ document.addEventListener('DOMContentLoaded', ()=>{
 		}
 	}
 
+	// Demo time mode control: normal | morning | night
+	let demoTimeMode = 'normal';
+
+	function setTimeModeButtonUI(mode) {
+		demoTimeMode = (mode || 'normal').toLowerCase();
+		document.querySelectorAll('.time-mode-btn').forEach(btn => {
+			const isActive = btn.dataset.mode === demoTimeMode;
+			btn.classList.toggle('active', isActive);
+			btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+		});
+	}
+
+	async function fetchTimeModeState() {
+		try {
+			const resp = await fetch(`${RELAY_API_URL}/time-mode`, { signal: AbortSignal.timeout(3000) });
+			if (!resp.ok) return;
+			const data = await resp.json();
+			setTimeModeButtonUI(data.mode || 'normal');
+		} catch (e) {
+			console.warn('[TimeMode] Could not fetch current mode:', e.message);
+		}
+	}
+
+	async function setTimeMode(mode) {
+		const selectedMode = String(mode || 'normal').toLowerCase();
+		const resp = await fetch(`${RELAY_API_URL}/time-mode`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ mode: selectedMode }),
+			signal: AbortSignal.timeout(3000)
+		});
+		if (!resp.ok) {
+			throw new Error(`HTTP ${resp.status}`);
+		}
+		const data = await resp.json();
+		setTimeModeButtonUI(data.mode || selectedMode);
+		console.log(`[TimeMode] Set to ${data.mode || selectedMode}`);
+	}
+
+	function initTimeModeControls() {
+		const control = document.getElementById('timeModeControl');
+		if (!control) return;
+
+		const buttons = Array.from(control.querySelectorAll('.time-mode-btn'));
+		if (!buttons.length) return;
+
+		buttons.forEach(btn => {
+			btn.addEventListener('click', async () => {
+				const mode = btn.dataset.mode;
+				if (!mode || mode === demoTimeMode) return;
+
+				buttons.forEach(b => b.disabled = true);
+				try {
+					await setTimeMode(mode);
+				} catch (e) {
+					console.warn('[TimeMode] Failed to set mode:', e.message);
+				} finally {
+					buttons.forEach(b => b.disabled = false);
+				}
+			});
+		});
+
+		fetchTimeModeState();
+	}
+
 	// Turn all actuators/relays OFF
 	async function turnAllActuatorsOff() {
 		// On HTTPS/static hosting: use Firebase only (avoids mixed content)
@@ -2638,6 +2703,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	// Call on page load - set UI to OFF initially
 	initializeActuatorsOff();
+	initTimeModeControls();
 
 	// Periodically sync relay status with UI (every 3 seconds)
 	setInterval(loadRelayStatus, 3000);

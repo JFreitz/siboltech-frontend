@@ -473,6 +473,31 @@ def override_mode():
         return jsonify({"success": True, "override_mode": mode, "enabled": mode})
 
 
+@app.route("/api/time-mode", methods=["GET", "POST"])
+def time_mode():
+    """Get or set automation time mode override (normal/morning/night)."""
+    if request.method == "GET":
+        mode = getattr(automation_controller, "time_mode_override", "normal")
+        return jsonify({
+            "success": True,
+            "mode": mode,
+            "available_modes": ["normal", "morning", "night"],
+            "is_daytime": bool(automation_controller._is_daytime()),
+        })
+
+    data = request.get_json(silent=True) or {}
+    mode = str(data.get("mode", "normal")).strip().lower()
+    if mode not in {"normal", "morning", "night"}:
+        return jsonify({"success": False, "error": "Invalid mode. Use normal, morning, or night."}), 400
+
+    automation_controller.set_time_mode(mode)
+    return jsonify({
+        "success": True,
+        "mode": mode,
+        "is_daytime": bool(automation_controller._is_daytime()),
+    })
+
+
 @app.route("/api/calibration-mode", methods=["GET", "POST"])
 def calibration_mode():
     """Get or set calibration mode for dashboard calibration workflow."""
