@@ -277,6 +277,29 @@ function showSensorError() {
     document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => { if (el) el.textContent = '0 ppm'; });
 }
 
+function extractLiveVoltageFromLatestSensorData(data) {
+	if (!data || typeof data !== 'object') return {};
+	const pickVoltage = (...vals) => {
+		for (const v of vals) {
+			if (v === undefined || v === null) continue;
+			if (typeof v === 'object' && v.value !== undefined) {
+				const n = Number(v.value);
+				if (Number.isFinite(n)) return n;
+				continue;
+			}
+			const n = Number(v);
+			if (Number.isFinite(n)) return n;
+		}
+		return null;
+	};
+
+	return {
+		ph: pickVoltage(data.ph?.raw_voltage, data.ph?.voltage, data.ph_voltage_v),
+		do: pickVoltage(data.do_mg_per_l?.raw_voltage, data.do_mg_l?.raw_voltage, data.do_mg_per_l?.voltage, data.do_mg_l?.voltage, data.do_voltage_v),
+		tds: pickVoltage(data.tds_ppm?.raw_voltage, data.tds_ppm?.voltage, data.tds_voltage_v),
+	};
+}
+
 // Expose shared sensor renderer for Firebase module script in index.html
 window.updateSensorDisplayFromData = updateSensorDisplayFromData;
 
@@ -432,6 +455,7 @@ setInterval(() => {
 	};
 
 	// --- UI Helpers ---
+
 	const showValidationModal = (message) => {
 		const modal = document.getElementById('calibrationValidationModal');
 		const msgEl = document.getElementById('calibrationValidationMessage');
