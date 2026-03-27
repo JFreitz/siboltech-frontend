@@ -811,7 +811,8 @@
 				<div class="cal-live-card">
 					<div class="cal-live-header">Live Voltage Reading</div>
 					<div class="cal-live-value" id="phLiveVoltage">-- V</div>
-					<div class="cal-live-hint">Updates every 2 seconds</div>
+					<div class="cal-live-hint">Live stream</div>
+					<div class="cal-live-hint" id="phLiveMeta" style="font-size:11px;opacity:.8;">src: -- | seq: 0 | updated: --</div>
 					<div id="phStability" style="margin-top:8px;font-size:13px;"></div>
 				</div>
 
@@ -899,7 +900,8 @@
 				<div class="cal-live-card">
 					<div class="cal-live-header">Live Voltage Reading</div>
 					<div class="cal-live-value" id="doLiveVoltage">-- V</div>
-					<div class="cal-live-hint">Updates every 2 seconds</div>
+					<div class="cal-live-hint">Live stream</div>
+					<div class="cal-live-hint" id="doLiveMeta" style="font-size:11px;opacity:.8;">src: -- | seq: 0 | updated: --</div>
 					<div id="doStability" style="margin-top:8px;font-size:13px;"></div>
 				</div>
 
@@ -974,7 +976,8 @@
 				<div class="cal-live-card">
 					<div class="cal-live-header">Live Voltage Reading</div>
 					<div class="cal-live-value" id="tdsLiveVoltage">-- V</div>
-					<div class="cal-live-hint">Updates every 2 seconds</div>
+					<div class="cal-live-hint">Live stream</div>
+					<div class="cal-live-hint" id="tdsLiveMeta" style="font-size:11px;opacity:.8;">src: -- | seq: 0 | updated: --</div>
 					<div id="tdsStability" style="margin-top:8px;font-size:13px;"></div>
 				</div>
 
@@ -1337,7 +1340,7 @@
 		<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 		
 		<!-- Load main app JS first -->
-		<script src="index.js?v=3.9"></script>
+		<script src="index.js?v=4.0"></script>
 		
 		<!-- Firebase SDK - load after index.js so listeners are ready -->
 		<script type="module">

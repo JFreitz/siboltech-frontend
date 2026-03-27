@@ -305,6 +305,7 @@ function extractLiveVoltageFromLatestSensorData(data) {
 function writeCalibrationVoltage(sensor, voltage, source = 'unknown') {
 	const el = document.getElementById(`${sensor}LiveVoltage`);
 	if (!el) return;
+	const metaEl = document.getElementById(`${sensor}LiveMeta`);
 
 	const valid = Number.isFinite(Number(voltage));
 	el.textContent = valid ? `${(Number(voltage) * 1000).toFixed(1)} mV` : '-- mV';
@@ -314,6 +315,10 @@ function writeCalibrationVoltage(sensor, voltage, source = 'unknown') {
 	el.dataset.source = String(source);
 	el.dataset.lastUpdate = new Date().toISOString();
 	el.title = `src=${source} seq=${seq} updated=${el.dataset.lastUpdate}`;
+
+	if (metaEl) {
+		metaEl.textContent = `src: ${source} | seq: ${seq} | updated: ${el.dataset.lastUpdate}`;
+	}
 }
 
 // Expose shared sensor renderer for Firebase module script in index.html
