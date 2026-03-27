@@ -4916,6 +4916,64 @@ function updateMiniCharts(){
 	async function fetchVoltage() {
         let data = {};
 
+		// DIRECT MODE: read probe voltages only from backend /api/voltage and write straight to target IDs.
+		// This is the authoritative ESP→RPi path for calibration live voltage.
+		try {
+			const base = getApiUrl();
+			const res = await fetch(`${base}/voltage?_ts=${Date.now()}`, {
+				cache: 'no-store',
+				headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+			});
+			if (!res.ok) throw new Error(`voltage http ${res.status}`);
+			const ct = (res.headers.get('content-type') || '').toLowerCase();
+			if (!ct.includes('application/json')) throw new Error('voltage response not json');
+			data = await res.json();
+
+			let anyUpdated = false;
+			for (const sensor of ['ph', 'do', 'tds']) {
+				const stabilityEl = document.getElementById(`${sensor}Stability`);
+				const rawVoltage = Number(data?.[sensor]?.voltage);
+				if (!Number.isFinite(rawVoltage)) {
+					calState[sensor].voltage = null;
+					writeCalibrationVoltage(sensor, null, 'esp/api-voltage');
+					if (stabilityEl) stabilityEl.innerHTML = `<span style="color:#ef4444;">No live voltage</span>`;
+					continue;
+				}
+
+				anyUpdated = true;
+				calState[sensor].history.push(rawVoltage);
+				if (calState[sensor].history.length > VOLTAGE_HISTORY_SIZE) calState[sensor].history.shift();
+				calState[sensor].voltage = rawVoltage;
+				writeCalibrationVoltage(sensor, rawVoltage, 'esp/api-voltage');
+
+				if (stabilityEl) {
+					const stable = isVoltageStable(sensor);
+					const stabilityPct = getStabilityPercent(sensor);
+					if (stable) {
+						stabilityEl.innerHTML = `<span style="color:#22c55e;font-weight:bold;">✓ STABLE - Ready to capture!</span>`;
+					} else {
+						const barColor = stabilityPct > 70 ? '#eab308' : '#ef4444';
+						stabilityEl.innerHTML = `
+							<span style="color:#888;">Stabilizing... ${stabilityPct}%</span>
+							<div style="width:100px;height:6px;background:#333;border-radius:3px;margin-top:4px;">
+								<div style="width:${stabilityPct}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.3s;"></div>
+							</div>`;
+					}
+				}
+			}
+
+			if (anyUpdated) markVoltageUpdate();
+			return;
+		} catch (e) {
+			for (const sensor of ['ph', 'do', 'tds']) {
+				const stabilityEl = document.getElementById(`${sensor}Stability`);
+				calState[sensor].voltage = null;
+				writeCalibrationVoltage(sensor, null, 'esp/api-voltage');
+				if (stabilityEl) stabilityEl.innerHTML = `<span style="color:#ef4444;">No live voltage</span>`;
+			}
+			return;
+		}
+
 		const mapFromLatestPayload = (payload) => {
 			if (!payload || typeof payload !== 'object') return {};
 			const getVal = (entry) => {
