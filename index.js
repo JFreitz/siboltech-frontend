@@ -4938,12 +4938,14 @@ function updateMiniCharts(){
 			if (!ts) return false;
 			const t = new Date(ts).getTime();
 			if (!Number.isFinite(t)) return false;
-			return (Date.now() - t) <= 12000;
+			const maxAgeMs = isStaticHosting() ? 90000 : 15000;
+			return (Date.now() - t) <= maxAgeMs;
 		};
 
 		const isFreshLatestPayload = () => {
 			const ts = Number(window.latestSensorDataUpdatedAt || 0);
-			return Number.isFinite(ts) && ts > 0 && (Date.now() - ts) <= 12000;
+			const maxAgeMs = isStaticHosting() ? 90000 : 15000;
+			return Number.isFinite(ts) && ts > 0 && (Date.now() - ts) <= maxAgeMs;
 		};
 
 		const mapFromLivePayload = (payload) => {
