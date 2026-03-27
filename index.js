@@ -216,6 +216,9 @@ async function fetchSensorData() {
 
 // Update sensor display from data object (used by both API and Firebase)
 function updateSensorDisplayFromData(data) {
+	// Keep a single latest payload source for all consumers (dashboard + calibrate)
+	window.latestSensorData = data;
+
     // API returns: { "ph": {"value": 6.5, "unit": "pH"}, "temperature_c": {...}, ... }
     // Update dashboard sensor values (default to 0 if no data)
     const phVal = (data.ph && data.ph.value !== undefined) ? parseFloat(data.ph.value).toFixed(2) : '0.00';
@@ -263,9 +266,8 @@ function updateSensorDisplayFromData(data) {
 	};
 
 	for (const sensor of ['ph', 'do', 'tds']) {
-		const el = document.getElementById(`${sensor}LiveVoltage`);
-		if (!el || liveVoltage[sensor] === null) continue;
-		el.textContent = `${(liveVoltage[sensor] * 1000).toFixed(1)} mV`;
+		if (liveVoltage[sensor] === null) continue;
+		writeCalibrationVoltage(sensor, liveVoltage[sensor], 'dashboard-payload');
 	}
 }
 
@@ -298,6 +300,20 @@ function extractLiveVoltageFromLatestSensorData(data) {
 		do: pickVoltage(data.do_mg_per_l?.raw_voltage, data.do_mg_l?.raw_voltage, data.do_mg_per_l?.voltage, data.do_mg_l?.voltage, data.do_voltage_v),
 		tds: pickVoltage(data.tds_ppm?.raw_voltage, data.tds_ppm?.voltage, data.tds_voltage_v),
 	};
+}
+
+function writeCalibrationVoltage(sensor, voltage, source = 'unknown') {
+	const el = document.getElementById(`${sensor}LiveVoltage`);
+	if (!el) return;
+
+	const valid = Number.isFinite(Number(voltage));
+	el.textContent = valid ? `${(Number(voltage) * 1000).toFixed(1)} mV` : '-- mV';
+
+	const seq = (Number(el.dataset.seq || '0') || 0) + 1;
+	el.dataset.seq = String(seq);
+	el.dataset.source = String(source);
+	el.dataset.lastUpdate = new Date().toISOString();
+	el.title = `src=${source} seq=${seq} updated=${el.dataset.lastUpdate}`;
 }
 
 // Expose shared sensor renderer for Firebase module script in index.html
@@ -4882,6 +4898,23 @@ function updateMiniCharts(){
 	async function fetchVoltage() {
         let data = {};
 
+		const latestLiveVoltage = extractLiveVoltageFromLatestSensorData(window.latestSensorData || {});
+		if (latestLiveVoltage.ph !== null || latestLiveVoltage.do !== null || latestLiveVoltage.tds !== null) {
+			for (const sensor of ['ph', 'do', 'tds']) {
+				const v = latestLiveVoltage[sensor];
+				if (!Number.isFinite(Number(v))) continue;
+				const rawVoltage = Number(v);
+				calState[sensor].history.push(rawVoltage);
+				if (calState[sensor].history.length > VOLTAGE_HISTORY_SIZE) {
+					calState[sensor].history.shift();
+				}
+				calState[sensor].voltage = rawVoltage;
+				writeCalibrationVoltage(sensor, rawVoltage, 'latestSensorData');
+			}
+			markVoltageUpdate();
+			return;
+		}
+
 		const mapFromLatestPayload = (payload) => {
 			if (!payload || typeof payload !== 'object') return {};
 			const getVal = (entry) => {
@@ -5045,7 +5078,6 @@ function updateMiniCharts(){
         }
         
         for (const sensor of ['ph', 'do', 'tds']) {
-            const el = document.getElementById(`${sensor}LiveVoltage`);
             const stabilityEl = document.getElementById(`${sensor}Stability`);
             
             if (data[sensor]?.voltage !== undefined) {
@@ -5059,7 +5091,7 @@ function updateMiniCharts(){
 					calState[sensor].history.shift();
 				}
 				calState[sensor].voltage = rawVoltage;
-				if (el) el.textContent = `${(rawVoltage * 1000).toFixed(1)} mV`;
+				writeCalibrationVoltage(sensor, rawVoltage, isStaticHosting() ? 'api/static' : 'api/local');
 				markVoltageUpdate();
                 
                 // Update stability indicator
@@ -5081,7 +5113,7 @@ function updateMiniCharts(){
                 }
 			} else {
 				calState[sensor].voltage = null;
-				if (el) el.textContent = '-- mV';
+				writeCalibrationVoltage(sensor, null, 'no-live-voltage');
 				if (stabilityEl) {
 					stabilityEl.innerHTML = `<span style="color:#ef4444;">No live voltage</span>`;
 				}
