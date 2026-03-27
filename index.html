@@ -1337,7 +1337,7 @@
 		<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 		
 		<!-- Load main app JS first -->
-		<script src="index.js?v=3.6"></script>
+		<script src="index.js?v=3.7"></script>
 		
 		<!-- Firebase SDK - load after index.js so listeners are ready -->
 		<script type="module">
@@ -1592,20 +1592,11 @@
 					
 					// Store latest sensor data globally for history tab to use
 					window.latestSensorData = data;
-					
-					// Update sensor displays directly
-					const phVal = (data.ph && data.ph.value !== undefined) ? parseFloat(data.ph.value).toFixed(2) : '0.00';
-					const doObj = (data.do_mg_per_l && data.do_mg_per_l.value !== undefined) ? data.do_mg_per_l : data.do_mg_l;
-					const doVal = (doObj && doObj.value !== undefined) ? parseFloat(doObj.value).toFixed(2) + ' mg/L' : '0.00 mg/L';
-					const tempVal = (data.temperature_c && data.temperature_c.value !== undefined) ? parseFloat(data.temperature_c.value).toFixed(1) + ' °C' : '0.0 °C';
-					const humVal = (data.humidity && data.humidity.value !== undefined) ? parseFloat(data.humidity.value).toFixed(1) + ' %' : '0.0 %';
-					const tdsVal = (data.tds_ppm && data.tds_ppm.value !== undefined) ? parseFloat(data.tds_ppm.value).toFixed(0) + ' ppm' : '0 ppm';
 
-					document.querySelectorAll('#val-ph, [data-sensor="ph"] .value').forEach(el => { if (el) el.textContent = phVal; });
-					document.querySelectorAll('#val-do, [data-sensor="do"] .value').forEach(el => { if (el) el.textContent = doVal; });
-					document.querySelectorAll('#val-temp, [data-sensor="temp"] .value').forEach(el => { if (el) el.textContent = tempVal; });
-					document.querySelectorAll('#val-hum, [data-sensor="hum"] .value').forEach(el => { if (el) el.textContent = humVal; });
-					document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => { if (el) el.textContent = tdsVal; });
+					// Use shared renderer from index.js so dashboard + calibrate voltage stay in one update path.
+					if (typeof window.updateSensorDisplayFromData === 'function') {
+						window.updateSensorDisplayFromData(data);
+					}
 					
 					window.firebaseListenerActive = true;
 				}

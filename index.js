@@ -277,6 +277,9 @@ function showSensorError() {
     document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => { if (el) el.textContent = '0 ppm'; });
 }
 
+// Expose shared sensor renderer for Firebase module script in index.html
+window.updateSensorDisplayFromData = updateSensorDisplayFromData;
+
 function getCurrentSensorValue(sensorType, fallbackValue) {
 	const map = {
 		ph: '#val-ph',
