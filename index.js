@@ -4916,82 +4916,6 @@ function updateMiniCharts(){
 	async function fetchVoltage() {
         let data = {};
 
-		// DIRECT MODE: read probe voltages only from backend /api/voltage and write straight to target IDs.
-		// This is the authoritative ESP→RPi path for calibration live voltage.
-		try {
-			const base = getApiUrl();
-			const res = await fetch(`${base}/voltage?_ts=${Date.now()}`, {
-				cache: 'no-store',
-				headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-			});
-			if (!res.ok) throw new Error(`voltage http ${res.status}`);
-			const ct = (res.headers.get('content-type') || '').toLowerCase();
-			if (!ct.includes('application/json')) throw new Error('voltage response not json');
-			data = await res.json();
-
-			let anyUpdated = false;
-			for (const sensor of ['ph', 'do', 'tds']) {
-				const stabilityEl = document.getElementById(`${sensor}Stability`);
-				const rawVoltage = Number(data?.[sensor]?.voltage);
-				if (!Number.isFinite(rawVoltage)) {
-					calState[sensor].voltage = null;
-					writeCalibrationVoltage(sensor, null, 'esp/api-voltage');
-					if (stabilityEl) stabilityEl.innerHTML = `<span style="color:#ef4444;">No live voltage</span>`;
-					continue;
-				}
-
-				anyUpdated = true;
-				calState[sensor].history.push(rawVoltage);
-				if (calState[sensor].history.length > VOLTAGE_HISTORY_SIZE) calState[sensor].history.shift();
-				calState[sensor].voltage = rawVoltage;
-				writeCalibrationVoltage(sensor, rawVoltage, 'esp/api-voltage');
-
-				if (stabilityEl) {
-					const stable = isVoltageStable(sensor);
-					const stabilityPct = getStabilityPercent(sensor);
-					if (stable) {
-						stabilityEl.innerHTML = `<span style="color:#22c55e;font-weight:bold;">✓ STABLE - Ready to capture!</span>`;
-					} else {
-						const barColor = stabilityPct > 70 ? '#eab308' : '#ef4444';
-						stabilityEl.innerHTML = `
-							<span style="color:#888;">Stabilizing... ${stabilityPct}%</span>
-							<div style="width:100px;height:6px;background:#333;border-radius:3px;margin-top:4px;">
-								<div style="width:${stabilityPct}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.3s;"></div>
-							</div>`;
-					}
-				}
-			}
-
-			if (anyUpdated) markVoltageUpdate();
-			return;
-		} catch (e) {
-			for (const sensor of ['ph', 'do', 'tds']) {
-				const stabilityEl = document.getElementById(`${sensor}Stability`);
-				calState[sensor].voltage = null;
-				writeCalibrationVoltage(sensor, null, 'esp/api-voltage');
-				if (stabilityEl) stabilityEl.innerHTML = `<span style="color:#ef4444;">No live voltage</span>`;
-			}
-			return;
-		}
-
-		const mapFromLatestPayload = (payload) => {
-			if (!payload || typeof payload !== 'object') return {};
-			const getVal = (entry) => {
-				if (entry === undefined || entry === null) return null;
-				if (typeof entry === 'object' && entry.value !== undefined) {
-					const n = Number(entry.value);
-					return Number.isFinite(n) ? n : null;
-				}
-				const n = Number(entry);
-				return Number.isFinite(n) ? n : null;
-			};
-			return {
-				ph: { voltage: getVal(payload.ph_voltage_v), timestamp: payload.ph_voltage_v?.timestamp || null },
-				do: { voltage: getVal(payload.do_voltage_v), timestamp: payload.do_voltage_v?.timestamp || null },
-				tds: { voltage: getVal(payload.tds_voltage_v), timestamp: payload.tds_voltage_v?.timestamp || null },
-			};
-		};
-
 		const isFreshTs = (ts) => {
 			if (!ts) return false;
 			const t = new Date(ts).getTime();
@@ -5000,155 +4924,70 @@ function updateMiniCharts(){
 			return (Date.now() - t) <= maxAgeMs;
 		};
 
-		const isFreshLatestPayload = () => {
-			const ts = Number(window.latestSensorDataUpdatedAt || 0);
-			const maxAgeMs = isStaticHosting() ? 90000 : 15000;
-			return Number.isFinite(ts) && ts > 0 && (Date.now() - ts) <= maxAgeMs;
+		const normalizeApiBase = (u) => {
+			const s = String(u || '').trim().replace(/\/+$/, '');
+			if (!s) return '';
+			return /\/api$/i.test(s) ? s : `${s}/api`;
 		};
 
-		const mapFromLivePayload = (payload) => {
-			if (!payload || typeof payload !== 'object') return {};
-			const pick = (...vals) => {
-				for (const v of vals) {
-					if (v === undefined || v === null) continue;
-					if (typeof v === 'object' && v.value !== undefined) {
-						const n = Number(v.value);
-						if (Number.isFinite(n)) return n;
-						continue;
-					}
-					const n = Number(v);
-					if (Number.isFinite(n)) return n;
-				}
-				return null;
-			};
-
-			return {
-				ph: {
-					voltage: pick(payload.ph_voltage_v?.value, payload.ph_voltage_v, payload.ph?.raw_voltage, payload.ph?.voltage),
-					timestamp: payload.ph_voltage_v?.timestamp || payload.ph?.timestamp || null,
-					_source: 'firebase/live'
-				},
-				do: {
-					voltage: pick(payload.do_voltage_v?.value, payload.do_voltage_v, payload.do_mg_per_l?.raw_voltage, payload.do_mg_l?.raw_voltage, payload.do_mg_per_l?.voltage, payload.do_mg_l?.voltage),
-					timestamp: payload.do_voltage_v?.timestamp || payload.do_mg_per_l?.timestamp || payload.do_mg_l?.timestamp || null,
-					_source: 'firebase/live'
-				},
-				tds: {
-					voltage: pick(payload.tds_voltage_v?.value, payload.tds_voltage_v, payload.tds_ppm?.raw_voltage, payload.tds_ppm?.voltage),
-					timestamp: payload.tds_voltage_v?.timestamp || payload.tds_ppm?.timestamp || null,
-					_source: 'firebase/live'
-				}
-			};
+		const candidateBases = [];
+		const addBase = (u) => {
+			const b = normalizeApiBase(u);
+			if (!b) return;
+			if (!candidateBases.includes(b)) candidateBases.push(b);
 		};
-        
-        if (isStaticHosting()) {
-			// On static hosting, accept only backend /voltage values to avoid stale fixed payload values.
-			const sensorData = window.latestSensorData || {};
 
-			// 1) Try backend endpoint first.
+		addBase(getApiUrl());
+		addBase(localStorage.getItem('remoteAPIUrl'));
+		if (!isMixedContentBlocked(RPI_LAN_API_URL)) addBase(RPI_LAN_API_URL);
+
+		const fetchVoltageFromBase = async (base) => {
+			const url = `${base}/voltage?_ts=${Date.now()}`;
+			if (isMixedContentBlocked(url)) return {};
+			const res = await fetch(url, {
+				cache: 'no-store',
+				headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+			});
+			if (!res.ok) return {};
+			const ct = (res.headers.get('content-type') || '').toLowerCase();
+			if (!ct.includes('application/json')) return {};
+			const raw = await res.json();
+			const out = {};
+			for (const sensor of ['ph', 'do', 'tds']) {
+				const v = Number(raw[sensor]?.voltage);
+				const ts = raw[sensor]?.timestamp || null;
+				if (!Number.isFinite(v) || !ts || !isFreshTs(ts)) continue;
+				out[sensor] = { voltage: v, timestamp: ts, _source: 'esp/api-voltage' };
+			}
+			return out;
+		};
+
+		for (const base of candidateBases) {
 			try {
-				const voltageUrl = `${getApiUrl()}/voltage?_ts=${Date.now()}`;
-				if (!isMixedContentBlocked(voltageUrl)) {
-					const res = await fetch(voltageUrl, {
-						cache: 'no-store',
-						headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-					});
-					if (res.ok) {
-						const ct = (res.headers.get('content-type') || '').toLowerCase();
-						if (ct.includes('application/json')) {
-							const raw = await res.json();
-							for (const sensor of ['ph', 'do', 'tds']) {
-								const v = Number(raw[sensor]?.voltage);
-								const ts = raw[sensor]?.timestamp || null;
-								if (!Number.isFinite(v) || !ts || !isFreshTs(ts)) continue;
-								data[sensor] = { ...raw[sensor], _source: 'api/voltage' };
-							}
-						}
-					}
+				const got = await fetchVoltageFromBase(base);
+				if (got.ph || got.do || got.tds) {
+					data = got;
+					break;
 				}
 			} catch (e) {
-				// Ignore and continue.
+				// try next candidate
 			}
+		}
 
-			// Reject stale voltage from backend payload.
-			for (const sensor of ['ph', 'do', 'tds']) {
-				if (data[sensor]?.voltage !== undefined && data[sensor]?.timestamp && !isFreshTs(data[sensor].timestamp)) {
-					delete data[sensor];
-				}
-			}
-
-			// Fallback: use Firebase live payload only when it is fresh.
-			if (!data.ph && !data.do && !data.tds && isFreshLatestPayload()) {
-				const live = mapFromLivePayload(sensorData);
+		// Static fallback: use fresh Firebase payload only when API candidates are unreachable.
+		if (!data.ph && !data.do && !data.tds && isStaticHosting()) {
+			const latestTs = Number(window.latestSensorDataUpdatedAt || 0);
+			const payloadFresh = Number.isFinite(latestTs) && latestTs > 0 && (Date.now() - latestTs) <= 90000;
+			if (payloadFresh) {
+				const live = extractLiveVoltageFromLatestSensorData(window.latestSensorData || {});
 				for (const sensor of ['ph', 'do', 'tds']) {
-					if (live[sensor]?.voltage === null) continue;
-					if (live[sensor]?.timestamp && !isFreshTs(live[sensor].timestamp)) continue;
-					data[sensor] = live[sensor];
+					const v = Number(live[sensor]);
+					if (Number.isFinite(v)) {
+						data[sensor] = { voltage: v, timestamp: null, _source: 'firebase/live' };
+					}
 				}
 			}
-
-			if (!data.ph && !data.do && !data.tds) {
-				try {
-					const voltageUrl = `${getApiUrl()}/voltage?_ts=${Date.now()}`;
-					if (isMixedContentBlocked(voltageUrl)) {
-						// Keep only true live values. Do not synthesize.
-					} else {
-						const res = await fetch(voltageUrl, {
-							cache: 'no-store',
-							headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-						});
-						if (res.ok) {
-							const ct = (res.headers.get('content-type') || '').toLowerCase();
-							if (ct.includes('application/json')) {
-								const raw = await res.json();
-								for (const sensor of ['ph', 'do', 'tds']) {
-									const v = Number(raw[sensor]?.voltage);
-									const ts = raw[sensor]?.timestamp || null;
-									if (!Number.isFinite(v) || !ts || !isFreshTs(ts)) continue;
-									data[sensor] = { ...raw[sensor], _source: 'api/voltage' };
-								}
-							}
-						}
-					}
-				} catch (e) {
-					// Ignore fallback errors on static hosting to avoid console spam.
-				}
-			}
-        } else {
-            try {
-				const base = getApiUrl();
-				const res = await fetch(`${base}/voltage?_ts=${Date.now()}`, {
-					cache: 'no-store',
-					headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-				});
-				if (res.ok) {
-					data = await res.json();
-				}
-
-				for (const sensor of ['ph', 'do', 'tds']) {
-					if (data[sensor]?.voltage !== undefined && data[sensor]?.timestamp && !isFreshTs(data[sensor].timestamp)) {
-						delete data[sensor];
-					}
-				}
-
-				// Fallback to /latest voltage sensor keys
-				if (!data.ph && !data.do && !data.tds) {
-					const latestRes = await fetch(`${base}/latest?_ts=${Date.now()}`, {
-						cache: 'no-store',
-						headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-					});
-					if (latestRes.ok) {
-						const latest = await latestRes.json();
-						const mapped = mapFromLatestPayload(latest);
-						if (mapped.ph.voltage !== null || mapped.do.voltage !== null || mapped.tds.voltage !== null) {
-							data = mapped;
-						}
-					}
-				}
-            } catch (e) {
-                console.error('Failed to fetch voltage:', e);
-            }
-        }
+		}
         
         for (const sensor of ['ph', 'do', 'tds']) {
             const stabilityEl = document.getElementById(`${sensor}Stability`);
@@ -5164,7 +5003,7 @@ function updateMiniCharts(){
 					calState[sensor].history.shift();
 				}
 				calState[sensor].voltage = rawVoltage;
-				const sourceTag = data[sensor]?._source || (isStaticHosting() ? 'api/static' : 'api/local');
+				const sourceTag = data[sensor]?._source || 'esp/api-voltage';
 				writeCalibrationVoltage(sensor, rawVoltage, sourceTag);
 				markVoltageUpdate();
                 
