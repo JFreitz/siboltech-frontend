@@ -245,7 +245,16 @@ function updateSensorDisplayFromData(data) {
         if (el) el.textContent = tdsVal;
     });
 
-	// Calibration voltage updates are handled by fetchVoltage() only.
+	// Static hosting: use direct Firebase voltage keys as the single source of truth for calibration cards.
+	if (isStaticHosting()) {
+		const direct = extractVoltageFromFirebaseDirectKeys(data);
+		for (const sensor of ['ph', 'do', 'tds']) {
+			const v = Number(direct[sensor]?.voltage);
+			if (Number.isFinite(v)) {
+				writeCalibrationVoltage(sensor, v, 'firebase/direct-keys');
+			}
+		}
+	}
 }
 
 function showSensorError() {
@@ -4889,6 +4898,9 @@ function updateMiniCharts(){
 
 	// Fetch live voltage readings
 	async function fetchVoltage() {
+		// Static hosting gets voltage directly from Firebase sensor stream.
+		if (isStaticHosting()) return;
+
         let data = {};
 
 		const asFiniteVoltage = (val) => {
