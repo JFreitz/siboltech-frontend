@@ -4891,6 +4891,12 @@ function updateMiniCharts(){
 	async function fetchVoltage() {
         let data = {};
 
+		const asFiniteVoltage = (val) => {
+			if (val === undefined || val === null) return null;
+			const n = Number(val);
+			return Number.isFinite(n) ? n : null;
+		};
+
 		const isFreshTs = (ts) => {
 			if (!ts) return false;
 			const t = new Date(ts).getTime();
@@ -4906,8 +4912,8 @@ function updateMiniCharts(){
 			if (payloadFresh) {
 				const direct = extractVoltageFromFirebaseDirectKeys(window.latestSensorData || {});
 				for (const sensor of ['ph', 'do', 'tds']) {
-					const v = Number(direct[sensor]?.voltage);
-					if (Number.isFinite(v)) {
+					const v = asFiniteVoltage(direct[sensor]?.voltage);
+					if (v !== null) {
 						data[sensor] = direct[sensor];
 					}
 				}
@@ -4949,9 +4955,9 @@ function updateMiniCharts(){
 			const raw = await res.json();
 			const out = {};
 			for (const sensor of ['ph', 'do', 'tds']) {
-				const v = Number(raw[sensor]?.voltage);
+				const v = asFiniteVoltage(raw[sensor]?.voltage);
 				const ts = raw[sensor]?.timestamp || null;
-				if (!Number.isFinite(v) || !ts || !isFreshTs(ts)) continue;
+				if (v === null || !ts || !isFreshTs(ts)) continue;
 				out[sensor] = { voltage: v, timestamp: ts, _source: 'esp/api-voltage' };
 			}
 			return out;
@@ -4977,8 +4983,8 @@ function updateMiniCharts(){
 			if (payloadFresh) {
 				const live = extractLiveVoltageFromLatestSensorData(window.latestSensorData || {});
 				for (const sensor of ['ph', 'do', 'tds']) {
-					const v = Number(live[sensor]);
-					if (Number.isFinite(v)) {
+					const v = asFiniteVoltage(live[sensor]);
+					if (v !== null) {
 						data[sensor] = { voltage: v, timestamp: null, _source: 'firebase/live' };
 					}
 				}
