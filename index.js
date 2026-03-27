@@ -306,6 +306,37 @@ function extractLiveVoltageFromLatestSensorData(data) {
 	};
 }
 
+function extractVoltageFromFirebaseDirectKeys(data) {
+	if (!data || typeof data !== 'object') return {};
+	const getNum = (entry) => {
+		if (entry === undefined || entry === null) return null;
+		if (typeof entry === 'object' && entry.value !== undefined) {
+			const n = Number(entry.value);
+			return Number.isFinite(n) ? n : null;
+		}
+		const n = Number(entry);
+		return Number.isFinite(n) ? n : null;
+	};
+
+	return {
+		ph: {
+			voltage: getNum(data.ph_voltage_v),
+			timestamp: data.ph_voltage_v?.timestamp || data.ph?.timestamp || null,
+			_source: 'firebase/direct-keys'
+		},
+		do: {
+			voltage: getNum(data.do_voltage_v),
+			timestamp: data.do_voltage_v?.timestamp || data.do_mg_per_l?.timestamp || data.do_mg_l?.timestamp || null,
+			_source: 'firebase/direct-keys'
+		},
+		tds: {
+			voltage: getNum(data.tds_voltage_v),
+			timestamp: data.tds_voltage_v?.timestamp || data.tds_ppm?.timestamp || null,
+			_source: 'firebase/direct-keys'
+		}
+	};
+}
+
 function writeCalibrationVoltage(sensor, voltage, source = 'unknown') {
 	const el = document.getElementById(`${sensor}LiveVoltage`);
 	if (!el) return;
@@ -4924,6 +4955,26 @@ function updateMiniCharts(){
 			return (Date.now() - t) <= maxAgeMs;
 		};
 
+		// Static-first path: use explicit Firebase voltage keys seen in sensors/latest stream.
+		if (isStaticHosting()) {
+			const latestTs = Number(window.latestSensorDataUpdatedAt || 0);
+			const payloadFresh = Number.isFinite(latestTs) && latestTs > 0 && (Date.now() - latestTs) <= 90000;
+			if (payloadFresh) {
+				const direct = extractVoltageFromFirebaseDirectKeys(window.latestSensorData || {});
+				for (const sensor of ['ph', 'do', 'tds']) {
+					const v = Number(direct[sensor]?.voltage);
+					if (Number.isFinite(v)) {
+						data[sensor] = direct[sensor];
+					}
+				}
+				if (data.ph || data.do || data.tds) {
+					// Use Firebase direct key voltages immediately.
+				} else {
+					data = {};
+				}
+			}
+		}
+
 		const normalizeApiBase = (u) => {
 			const s = String(u || '').trim().replace(/\/+$/, '');
 			if (!s) return '';
@@ -4963,6 +5014,7 @@ function updateMiniCharts(){
 		};
 
 		for (const base of candidateBases) {
+			if (data.ph || data.do || data.tds) break;
 			try {
 				const got = await fetchVoltageFromBase(base);
 				if (got.ph || got.do || got.tds) {
