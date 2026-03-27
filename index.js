@@ -340,21 +340,10 @@ function extractVoltageFromFirebaseDirectKeys(data) {
 function writeCalibrationVoltage(sensor, voltage, source = 'unknown') {
 	const el = document.getElementById(`${sensor}LiveVoltage`);
 	if (!el) return;
-	const metaEl = document.getElementById(`${sensor}LiveMeta`);
 	const stabilityEl = document.getElementById(`${sensor}Stability`);
 
 	const valid = Number.isFinite(Number(voltage));
 	el.textContent = valid ? `${(Number(voltage) * 1000).toFixed(1)} mV` : '-- mV';
-
-	const seq = (Number(el.dataset.seq || '0') || 0) + 1;
-	el.dataset.seq = String(seq);
-	el.dataset.source = String(source);
-	el.dataset.lastUpdate = new Date().toISOString();
-	el.title = `src=${source} seq=${seq} updated=${el.dataset.lastUpdate}`;
-
-	if (metaEl) {
-		metaEl.textContent = `src: ${source} | seq: ${seq} | updated: ${el.dataset.lastUpdate}`;
-	}
 
 	// Prevent stale "No live voltage" label when live values are actually arriving.
 	if (stabilityEl && valid) {
