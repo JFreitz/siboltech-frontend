@@ -4941,41 +4941,7 @@ function updateMiniCharts(){
 		};
         
         if (isStaticHosting()) {
-			// On static hosting, prefer backend /voltage first (real ESP values).
-			// Only fallback to Firebase raw voltage fields if backend is unreachable.
-			const sensorData = window.latestSensorData || {};
-
-			const pickVoltage = (...vals) => {
-				for (const v of vals) {
-					if (v !== undefined && v !== null && !Number.isNaN(Number(v))) {
-						return Number(v);
-					}
-				}
-				return null;
-			};
-
-			const voltageMap = {
-				ph: pickVoltage(
-					sensorData.ph?.raw_voltage,
-					sensorData.ph?.voltage,
-					sensorData.ph_voltage_v?.value,
-					sensorData.ph_voltage_v
-				),
-				do: pickVoltage(
-					sensorData.do_mg_per_l?.raw_voltage,
-					sensorData.do_mg_l?.raw_voltage,
-					sensorData.do_mg_per_l?.voltage,
-					sensorData.do_mg_l?.voltage,
-					sensorData.do_voltage_v?.value,
-					sensorData.do_voltage_v
-				),
-				tds: pickVoltage(
-					sensorData.tds_ppm?.raw_voltage,
-					sensorData.tds_ppm?.voltage,
-					sensorData.tds_voltage_v?.value,
-					sensorData.tds_voltage_v
-				)
-			};
+			// On static hosting, accept only backend /voltage values to avoid stale fixed payload values.
 
 			// 1) Try backend endpoint first.
 			try {
@@ -4988,29 +4954,17 @@ function updateMiniCharts(){
 					if (res.ok) {
 						const ct = (res.headers.get('content-type') || '').toLowerCase();
 						if (ct.includes('application/json')) {
-							data = await res.json();
+							const raw = await res.json();
+							for (const sensor of ['ph', 'do', 'tds']) {
+								if (raw[sensor]?.voltage !== undefined) {
+									data[sensor] = { ...raw[sensor], _source: 'api/voltage' };
+								}
+							}
 						}
 					}
 				}
 			} catch (e) {
-				// Ignore and continue with Firebase fallback.
-			}
-
-			// 2) Fallback to Firebase raw voltages only if backend did not return usable values.
-			if (!data.ph && !data.do && !data.tds) {
-				for (const sensor of ['ph', 'do', 'tds']) {
-					if (voltageMap[sensor] !== null) {
-						data[sensor] = { voltage: voltageMap[sensor], timestamp: null };
-					}
-				}
-			}
-
-			// 3) Secondary fallback: direct voltage keys in latest payload.
-			if (!data.ph && !data.do && !data.tds) {
-				const mapped = mapFromLatestPayload(sensorData);
-				if (mapped.ph.voltage !== null || mapped.do.voltage !== null || mapped.tds.voltage !== null) {
-					data = mapped;
-				}
+				// Ignore and continue.
 			}
 
 			// Reject stale voltage from backend payload.
@@ -5033,7 +4987,12 @@ function updateMiniCharts(){
 						if (res.ok) {
 							const ct = (res.headers.get('content-type') || '').toLowerCase();
 							if (ct.includes('application/json')) {
-								data = await res.json();
+								const raw = await res.json();
+								for (const sensor of ['ph', 'do', 'tds']) {
+									if (raw[sensor]?.voltage !== undefined) {
+										data[sensor] = { ...raw[sensor], _source: 'api/voltage' };
+									}
+								}
 							}
 						}
 					}
@@ -5091,7 +5050,8 @@ function updateMiniCharts(){
 					calState[sensor].history.shift();
 				}
 				calState[sensor].voltage = rawVoltage;
-				writeCalibrationVoltage(sensor, rawVoltage, isStaticHosting() ? 'api/static' : 'api/local');
+				const sourceTag = data[sensor]?._source || (isStaticHosting() ? 'api/static' : 'api/local');
+				writeCalibrationVoltage(sensor, rawVoltage, sourceTag);
 				markVoltageUpdate();
                 
                 // Update stability indicator
