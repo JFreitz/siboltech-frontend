@@ -240,6 +240,33 @@ function updateSensorDisplayFromData(data) {
     document.querySelectorAll('#val-tds, [data-sensor="tds"] .value').forEach(el => {
         if (el) el.textContent = tdsVal;
     });
+
+	// Keep calibration live-voltage cards synced with the same live payload used by dashboard.
+	const pickVoltage = (...vals) => {
+		for (const v of vals) {
+			if (v === undefined || v === null) continue;
+			if (typeof v === 'object' && v.value !== undefined) {
+				const n = Number(v.value);
+				if (Number.isFinite(n)) return n;
+				continue;
+			}
+			const n = Number(v);
+			if (Number.isFinite(n)) return n;
+		}
+		return null;
+	};
+
+	const liveVoltage = {
+		ph: pickVoltage(data.ph?.raw_voltage, data.ph?.voltage, data.ph_voltage_v),
+		do: pickVoltage(data.do_mg_per_l?.raw_voltage, data.do_mg_l?.raw_voltage, data.do_mg_per_l?.voltage, data.do_mg_l?.voltage, data.do_voltage_v),
+		tds: pickVoltage(data.tds_ppm?.raw_voltage, data.tds_ppm?.voltage, data.tds_voltage_v),
+	};
+
+	for (const sensor of ['ph', 'do', 'tds']) {
+		const el = document.getElementById(`${sensor}LiveVoltage`);
+		if (!el || liveVoltage[sensor] === null) continue;
+		el.textContent = `${(liveVoltage[sensor] * 1000).toFixed(1)} mV`;
+	}
 }
 
 function showSensorError() {
