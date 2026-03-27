@@ -218,6 +218,7 @@ async function fetchSensorData() {
 function updateSensorDisplayFromData(data) {
 	// Keep a single latest payload source for all consumers (dashboard + calibrate)
 	window.latestSensorData = data;
+	window.latestSensorDataUpdatedAt = Date.now();
 
     // API returns: { "ph": {"value": 6.5, "unit": "pH"}, "temperature_c": {...}, ... }
     // Update dashboard sensor values (default to 0 if no data)
@@ -4939,9 +4940,50 @@ function updateMiniCharts(){
 			if (!Number.isFinite(t)) return false;
 			return (Date.now() - t) <= 12000;
 		};
+
+		const isFreshLatestPayload = () => {
+			const ts = Number(window.latestSensorDataUpdatedAt || 0);
+			return Number.isFinite(ts) && ts > 0 && (Date.now() - ts) <= 12000;
+		};
+
+		const mapFromLivePayload = (payload) => {
+			if (!payload || typeof payload !== 'object') return {};
+			const pick = (...vals) => {
+				for (const v of vals) {
+					if (v === undefined || v === null) continue;
+					if (typeof v === 'object' && v.value !== undefined) {
+						const n = Number(v.value);
+						if (Number.isFinite(n)) return n;
+						continue;
+					}
+					const n = Number(v);
+					if (Number.isFinite(n)) return n;
+				}
+				return null;
+			};
+
+			return {
+				ph: {
+					voltage: pick(payload.ph_voltage_v?.value, payload.ph_voltage_v, payload.ph?.raw_voltage, payload.ph?.voltage),
+					timestamp: payload.ph_voltage_v?.timestamp || payload.ph?.timestamp || null,
+					_source: 'firebase/live'
+				},
+				do: {
+					voltage: pick(payload.do_voltage_v?.value, payload.do_voltage_v, payload.do_mg_per_l?.raw_voltage, payload.do_mg_l?.raw_voltage, payload.do_mg_per_l?.voltage, payload.do_mg_l?.voltage),
+					timestamp: payload.do_voltage_v?.timestamp || payload.do_mg_per_l?.timestamp || payload.do_mg_l?.timestamp || null,
+					_source: 'firebase/live'
+				},
+				tds: {
+					voltage: pick(payload.tds_voltage_v?.value, payload.tds_voltage_v, payload.tds_ppm?.raw_voltage, payload.tds_ppm?.voltage),
+					timestamp: payload.tds_voltage_v?.timestamp || payload.tds_ppm?.timestamp || null,
+					_source: 'firebase/live'
+				}
+			};
+		};
         
         if (isStaticHosting()) {
 			// On static hosting, accept only backend /voltage values to avoid stale fixed payload values.
+			const sensorData = window.latestSensorData || {};
 
 			// 1) Try backend endpoint first.
 			try {
@@ -4971,6 +5013,16 @@ function updateMiniCharts(){
 			for (const sensor of ['ph', 'do', 'tds']) {
 				if (data[sensor]?.voltage !== undefined && data[sensor]?.timestamp && !isFreshTs(data[sensor].timestamp)) {
 					delete data[sensor];
+				}
+			}
+
+			// Fallback: use Firebase live payload only when it is fresh.
+			if (!data.ph && !data.do && !data.tds && isFreshLatestPayload()) {
+				const live = mapFromLivePayload(sensorData);
+				for (const sensor of ['ph', 'do', 'tds']) {
+					if (live[sensor]?.voltage === null) continue;
+					if (live[sensor]?.timestamp && !isFreshTs(live[sensor].timestamp)) continue;
+					data[sensor] = live[sensor];
 				}
 			}
 
