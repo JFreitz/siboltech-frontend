@@ -2610,6 +2610,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
 	}
 
 	async function fetchTimeModeState() {
+		if (isStaticHosting()) {
+			try {
+				if (!window.firebaseDB || !window.firebaseDoc || !window.firebaseGetDoc) return;
+				const ref = window.firebaseDoc(window.firebaseDB, 'settings', 'time_mode');
+				const snap = await window.firebaseGetDoc(ref);
+				if (snap.exists()) {
+					const data = snap.data() || {};
+					setTimeModeButtonUI(data.mode || 'normal');
+				}
+			} catch (e) {
+				console.warn('[TimeMode] Could not fetch Firebase mode:', e.message);
+			}
+			return;
+		}
+
 		try {
 			const resp = await fetch(`${RELAY_API_URL}/time-mode`, { signal: AbortSignal.timeout(3000) });
 			if (!resp.ok) return;
@@ -2622,6 +2637,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 	async function setTimeMode(mode) {
 		const selectedMode = String(mode || 'normal').toLowerCase();
+
+		if (isStaticHosting()) {
+			if (window.sendTimeModeFirebase) {
+				const ok = await window.sendTimeModeFirebase(selectedMode);
+				if (!ok) {
+					throw new Error('Firebase write failed');
+				}
+				setTimeModeButtonUI(selectedMode);
+				console.log(`[TimeMode] Set via Firebase: ${selectedMode}`);
+				return;
+			}
+			throw new Error('Firebase time mode bridge not available');
+		}
+
 		const resp = await fetch(`${RELAY_API_URL}/time-mode`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },

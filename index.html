@@ -1347,7 +1347,7 @@
 		<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 		
 		<!-- Load main app JS first -->
-		<script src="index.js?v=5.4"></script>
+		<script src="index.js?v=5.5"></script>
 		
 		<!-- Firebase SDK - load after index.js so listeners are ready -->
 		<script type="module">
@@ -1548,6 +1548,27 @@
 					return true;
 				} catch (error) {
 					console.error('Error sending override mode via Firebase:', error);
+					return false;
+				}
+			};
+
+			// Send time mode via Firebase (for Vercel/static hosting)
+			window.sendTimeModeFirebase = async function(mode) {
+				try {
+					const normalized = String(mode || 'normal').toLowerCase();
+					if (!['normal', 'morning', 'night'].includes(normalized)) {
+						throw new Error(`Invalid time mode: ${mode}`);
+					}
+					const timeModeRef = window.firebaseDoc(window.firebaseDB, 'settings', 'time_mode');
+					await window.firebaseSetDoc(timeModeRef, {
+						mode: normalized,
+						source: 'dashboard',
+						updated_at: window.firebaseServerTimestamp()
+					});
+					console.log(`🕒 Firebase time mode: ${normalized.toUpperCase()}`);
+					return true;
+				} catch (error) {
+					console.error('Error sending time mode via Firebase:', error);
 					return false;
 				}
 			};

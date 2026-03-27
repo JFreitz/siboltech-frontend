@@ -51,6 +51,7 @@ RELAY_COMMAND_TTL_SEC = int(os.getenv("RELAY_COMMAND_TTL_SEC", "30"))  # ignore 
 # Time-based task cadence (converted to cycles from SYNC_INTERVAL)
 RELAY_CHECK_CYCLES = max(1, int(round(5 / max(SYNC_INTERVAL, 1))))        # ~5s for responsive manual relay commands
 OVERRIDE_CHECK_CYCLES = max(1, int(round(5 / max(SYNC_INTERVAL, 1))))     # ~5s so override takes effect quickly
+TIMEMODE_CHECK_CYCLES = max(1, int(round(5 / max(SYNC_INTERVAL, 1))))     # ~5s so demo time mode takes effect quickly
 CALMODE_CHECK_CYCLES = max(1, int(round(300 / max(SYNC_INTERVAL, 1))))    # ~5 min
 HISTORY_SYNC_CYCLES = max(1, int(round(900 / max(SYNC_INTERVAL, 1))))     # ~15 min
 CAL_UPDATE_CYCLES = max(1, int(round(600 / max(SYNC_INTERVAL, 1))))       # ~10 min
@@ -365,7 +366,12 @@ def get_latest_readings(session) -> dict:
         # Include raw voltage from meta for calibration (pH, DO, TDS)
         if r.meta:
             meta = r.meta if isinstance(r.meta, dict) else json.loads(r.meta) if isinstance(r.meta, str) else {}
-            voltage_keys = {"ph": "ph_voltage_v", "do_mg_l": "do_voltage_v", "tds_ppm": "tds_voltage_v"}
+            voltage_keys = {
+                "ph": "ph_voltage_v",
+                "do_mg_l": "do_voltage_v",
+                "do_mg_per_l": "do_voltage_v",
+                "tds_ppm": "tds_voltage_v"
+            }
             vk = voltage_keys.get(r.sensor)
             if vk and vk in meta:
                 entry["raw_voltage"] = meta[vk]
@@ -592,6 +598,7 @@ def sync_calibration_to_firebase(db: firestore.Client):
 _last_processed_override_ts = None  # Track last processed override command timestamp
 _OVERRIDE_PROCESSED_FILE = Path(__file__).parent / ".last_override_processed"
 _last_seen_override_doc_version = None  # Prevent stale override docs from being re-applied
+_last_seen_time_mode_doc_version = None  # Prevent stale time_mode docs from being re-applied
 
 def _load_last_override_processed():
     """Load the last processed override state from local file."""
@@ -733,6 +740,75 @@ def check_calibration_mode(db: firestore.Client, last_cal_mode_state: bool) -> b
     except Exception as e:
         print(f"  ⚠️ Cal mode check error: {e}")
         raise  # re-raise so main loop backoff can handle it
+
+
+def check_time_mode(db: firestore.Client, last_time_mode: str) -> str:
+    """Check if time mode was changed from dashboard via Firebase.
+    Returns current time mode: normal | morning | night."""
+    global _last_seen_time_mode_doc_version
+    import requests
+
+    try:
+        doc_ref = db.collection("settings").document("time_mode")
+        doc = doc_ref.get(timeout=FIRESTORE_TIMEOUT, retry=FIRESTORE_RETRY)
+
+        if doc.exists:
+            data = doc.to_dict() or {}
+            mode = str(data.get("mode", "normal")).strip().lower()
+            if mode not in {"normal", "morning", "night"}:
+                mode = "normal"
+            source = data.get("source", "")
+            updated_at = data.get("updated_at")
+
+            if hasattr(updated_at, "isoformat"):
+                updated_key = updated_at.isoformat()
+            elif updated_at is not None:
+                updated_key = str(updated_at)
+            else:
+                updated_key = "no-updated-at"
+            doc_version = f"{mode}|{source}|{updated_key}"
+
+            if source == "dashboard":
+                if _last_seen_time_mode_doc_version is None:
+                    _last_seen_time_mode_doc_version = doc_version
+                    return last_time_mode
+
+                if doc_version == _last_seen_time_mode_doc_version:
+                    return last_time_mode
+
+                _last_seen_time_mode_doc_version = doc_version
+
+                # Read live API state to avoid unnecessary writes
+                current_api_mode = last_time_mode
+                try:
+                    api_state_resp = requests.get("http://localhost:5000/api/time-mode", timeout=2)
+                    if api_state_resp.ok:
+                        api_data = api_state_resp.json() or {}
+                        current_api_mode = str(api_data.get("mode", last_time_mode)).strip().lower()
+                except Exception:
+                    pass
+
+                if current_api_mode == mode:
+                    return current_api_mode
+
+                print(f"  🕒 Time mode changed from dashboard: {mode.upper()}")
+                try:
+                    resp = requests.post(
+                        "http://localhost:5000/api/time-mode",
+                        json={"mode": mode},
+                        timeout=2,
+                    )
+                    if resp.ok:
+                        print(f"    → API synced: time_mode={mode}")
+                        return mode
+                    print(f"    → API error: {resp.status_code}")
+                except Exception as e:
+                    print(f"    → API error: {e}")
+
+        return last_time_mode
+    except Exception as e:
+        print(f"  ⚠️ Time mode check error: {e}")
+        raise
 
 
 def check_calibration_updates(db: firestore.Client, last_cal_check: datetime) -> datetime:
@@ -1041,6 +1117,14 @@ def main():
         print(f"[DEBUG] Failed to get override state from API: {e}")
         pass  # API not ready yet, default to False
     last_cal_mode_state = False  # Track calibration mode from dashboard
+    last_time_mode = "normal"   # Track demo time mode from dashboard
+    try:
+        import requests as _req
+        _tm = _req.get("http://localhost:5000/api/time-mode", timeout=2)
+        if _tm.ok:
+            last_time_mode = str((_tm.json() or {}).get("mode", "normal")).strip().lower()
+    except Exception:
+        pass
     print(f"Last sync: {last_sync_ts.isoformat()}")
     print(f"Sync interval: {SYNC_INTERVAL}s")
     print("-" * 50)
@@ -1172,6 +1256,15 @@ def main():
                 except Exception as e:
                     if _is_quota_error(e) or "Timeout" in str(e):
                         quota.fail("override", e)
+
+            # === LOW PRIORITY: Time mode every ~5s (demo control) ===
+            if sync_count % TIMEMODE_CHECK_CYCLES == 0 and not quota.should_skip("timemode"):
+                try:
+                    last_time_mode = check_time_mode(db, last_time_mode)
+                    quota.success("timemode")
+                except Exception as e:
+                    if _is_quota_error(e) or "Timeout" in str(e):
+                        quota.fail("timemode", e)
             
             # === LOW PRIORITY: Cal mode every ~5 min ===
             if sync_count % CALMODE_CHECK_CYCLES == 0 and not quota.should_skip("calmode"):
